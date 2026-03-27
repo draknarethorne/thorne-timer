@@ -1,33 +1,65 @@
-# Ignore Visual Studio temporary files, build results, and
-# user-specific files
+# Visual Studio
 .vs/
+# Build results
+[Bb]in/
+[Oo]bj/
+# User-specific files
 *.user
 *.suo
 *.userosscache
 *.sln.docstates
-
-# Build results
-[Dd]ebug/
-[Rr]elease/
-[Bb]in/
-[Oo]bj/
-
-# NuGet Packages
-*.nupkg
-# The packages folder can be ignored because of Package Restore
-**/packages/*
-!**/packages/build/
-!**/packages/repositories.config
-
+# Auto-generated files
+*.log
+*.tlog
+*.cache
+*.pdb
+*.dbmdl
+*.dbproj.schemaview
+*.dbproj.user
+*.dbproj.vspscc
+*.vssscc
+*.vspscc
+# NuGet
+packages/
+# Resharper
+_ReSharper*/
+*.[Rr]e[Ss]harper
+# Rider
+.idea/
+*.sln.iml
+# DotCover
+*.dotCover
+# NCrunch
+*.ncrunch*
+_NCrunch_*/
+# TeamCity
+_TeamCity*
+# DotTrace
+*.dotTrace
+# Azure
+*.azurePubxml
+*.publishsettings
 # Windows image file caches
 Thumbs.db
-ehthumbs.db
-
 # Folder config file
 Desktop.ini
-
-# Recycle Bin used on file shares
-$RECYCLE.BIN/
-
-# VS Code settings
-.vscode/
+# SQL Server files
+*.mdf
+*.ldf
+# Others
+*.db
+*.bak
+*.backup
+*.tmp
+*.temp
+*.swp
+*.swo
+*.sln.ide
+# Exclude test results
+TestResults/
+# Exclude publish outputs
+*.Publish.xml
+# Exclude ClickOnce publish folder
+publish/
+# Exclude local NuGet config
+NuGet.Config
