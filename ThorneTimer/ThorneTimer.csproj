@@ -53,7 +53,7 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup>
-    <ApplicationIcon>ThorneTimer_v2.ico</ApplicationIcon>
+    <ApplicationIcon>Resources\\ThorneTimer_gold.ico</ApplicationIcon>
   </PropertyGroup>
   <PropertyGroup>
     <ManifestCertificateThumbprint>3FAE3EAF6BB915C7B9F57E7A3BC79B8C0FD9DAD2</ManifestCertificateThumbprint>
