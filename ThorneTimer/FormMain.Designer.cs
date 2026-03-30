@@ -58,6 +58,8 @@
             this.grdViews = new System.Windows.Forms.DataGridView();
             this.tabSettings = new System.Windows.Forms.TabPage();
             this.gbVoice = new System.Windows.Forms.GroupBox();
+            this.lblVoiceEnabled = new System.Windows.Forms.Label();
+            this.chkVoiceEnabled = new System.Windows.Forms.CheckBox();
             this.tbVoiceRate = new System.Windows.Forms.TrackBar();
             this.lblVoiceRate = new System.Windows.Forms.Label();
             this.btnTestVolume = new System.Windows.Forms.Button();
@@ -92,8 +94,6 @@
             this.btnMiniView = new System.Windows.Forms.Button();
             this.colorDialog1 = new System.Windows.Forms.ColorDialog();
             this.labelLogFile = new System.Windows.Forms.Label();
-            this.chkVoiceEnabled = new System.Windows.Forms.CheckBox();
-            this.lblVoiceEnabled = new System.Windows.Forms.Label();
             this.menuStrip1.SuspendLayout();
             this.tabCtrlMain.SuspendLayout();
             this.tabTimers.SuspendLayout();
@@ -156,7 +156,7 @@
             // exitToolStripMenuItem
             // 
             this.exitToolStripMenuItem.Name = "exitToolStripMenuItem";
-            this.exitToolStripMenuItem.Size = new System.Drawing.Size(93, 22);
+            this.exitToolStripMenuItem.Size = new System.Drawing.Size(92, 22);
             this.exitToolStripMenuItem.Text = "E&xit";
             this.exitToolStripMenuItem.Click += new System.EventHandler(this.ExitToolStripMenuItem_Click);
             // 
@@ -453,6 +453,25 @@
             this.gbVoice.TabIndex = 17;
             this.gbVoice.TabStop = false;
             this.gbVoice.Text = "Voice Options";
+            // 
+            // lblVoiceEnabled
+            // 
+            this.lblVoiceEnabled.AutoSize = true;
+            this.lblVoiceEnabled.Location = new System.Drawing.Point(8, 136);
+            this.lblVoiceEnabled.Name = "lblVoiceEnabled";
+            this.lblVoiceEnabled.Size = new System.Drawing.Size(79, 13);
+            this.lblVoiceEnabled.TabIndex = 36;
+            this.lblVoiceEnabled.Text = "Voice Enabled:";
+            // 
+            // chkVoiceEnabled
+            // 
+            this.chkVoiceEnabled.AutoSize = true;
+            this.chkVoiceEnabled.Location = new System.Drawing.Point(92, 136);
+            this.chkVoiceEnabled.Name = "chkVoiceEnabled";
+            this.chkVoiceEnabled.Size = new System.Drawing.Size(15, 14);
+            this.chkVoiceEnabled.TabIndex = 36;
+            this.chkVoiceEnabled.UseVisualStyleBackColor = true;
+            this.chkVoiceEnabled.Click += new System.EventHandler(this.chkVoiceEnabled_Click);
             // 
             // tbVoiceRate
             // 
@@ -811,25 +830,6 @@
             this.labelLogFile.Size = new System.Drawing.Size(24, 13);
             this.labelLogFile.TabIndex = 15;
             this.labelLogFile.Text = "Idle";
-            // 
-            // chkVoiceEnabled
-            // 
-            this.chkVoiceEnabled.AutoSize = true;
-            this.chkVoiceEnabled.Location = new System.Drawing.Point(92, 136);
-            this.chkVoiceEnabled.Name = "chkVoiceEnabled";
-            this.chkVoiceEnabled.Size = new System.Drawing.Size(15, 14);
-            this.chkVoiceEnabled.TabIndex = 36;
-            this.chkVoiceEnabled.UseVisualStyleBackColor = true;
-            this.chkVoiceEnabled.Click += new System.EventHandler(this.chkVoiceEnabled_Click);
-            // 
-            // lblVoiceEnabled
-            // 
-            this.lblVoiceEnabled.AutoSize = true;
-            this.lblVoiceEnabled.Location = new System.Drawing.Point(8, 136);
-            this.lblVoiceEnabled.Name = "lblVoiceEnabled";
-            this.lblVoiceEnabled.Size = new System.Drawing.Size(79, 13);
-            this.lblVoiceEnabled.TabIndex = 36;
-            this.lblVoiceEnabled.Text = "Voice Enabled:";
             // 
             // FormMain
             // 

@@ -16,6 +16,7 @@
     <NuGetPackageImportStamp>
     </NuGetPackageImportStamp>
     <IsWebBootstrapper>false</IsWebBootstrapper>
+    <TargetFrameworkProfile />
     <PublishUrl>publish\</PublishUrl>
     <Install>true</Install>
     <InstallFrom>Disk</InstallFrom>
@@ -31,7 +32,6 @@
     <UseApplicationTrust>false</UseApplicationTrust>
     <PublishWizardCompleted>true</PublishWizardCompleted>
     <BootstrapperEnabled>true</BootstrapperEnabled>
-    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|Any CPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -53,7 +53,7 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup>
-    <ApplicationIcon>timer.ico</ApplicationIcon>
+    <ApplicationIcon>ThorneTimer_v2.ico</ApplicationIcon>
   </PropertyGroup>
   <PropertyGroup>
     <ManifestCertificateThumbprint>3FAE3EAF6BB915C7B9F57E7A3BC79B8C0FD9DAD2</ManifestCertificateThumbprint>
@@ -175,7 +175,6 @@
     </None>
     <None Include="Docs\active-views\active-views-design.md" />
     <None Include="ThorneTimer.pfx" />
-    <None Include="ThorneTimer_TemporaryKey.pfx" />
     <None Include="packages.config" />
     <None Include="Properties\app.manifest" />
     <None Include="Properties\Settings.settings">
@@ -192,14 +191,10 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Icon1.ico" />
     <Content Include="Resources\ThorneTimer.ico" />
-    <Content Include="Resources\ThorneTimerIcon.bmp" />
     <Content Include="Resources\ThorneTimerIcon.png" />
-    <Content Include="Resources\ThorneTimer.jpg" />
     <Content Include="Resources\ThorneTimer.png" />
     <Content Include="Resources\ThorneTimerLogo.png" />
-    <Content Include="Resources\timer.ico" />
     <Content Include="Sounds\ring.wav" />
     <Content Include="Sounds\tada.wav" />
     <Content Include="Sounds\alert.wav" />
@@ -210,7 +205,7 @@
     <Content Include="Sounds\pluck.wav">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
-    <Content Include="timer.ico" />
+    <Content Include="ThorneTimer_v2.ico" />
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include=".NETFramework,Version=v4.6.1">

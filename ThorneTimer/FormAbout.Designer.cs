@@ -30,22 +30,13 @@ namespace ThorneTimer
         private void InitializeComponent()
         {
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(FormAbout));
-            this.pictureIcon = new System.Windows.Forms.PictureBox();
             this.labelAppName = new System.Windows.Forms.Label();
             this.labelVersion = new System.Windows.Forms.Label();
             this.labelCopyright = new System.Windows.Forms.Label();
             this.buttonOk = new System.Windows.Forms.Button();
+            this.pictureIcon = new System.Windows.Forms.PictureBox();
             ((System.ComponentModel.ISupportInitialize)(this.pictureIcon)).BeginInit();
             this.SuspendLayout();
-            // 
-            // pictureIcon
-            // 
-            this.pictureIcon.Image = global::ThorneTimer.Properties.Resources.ThorneTimerIcon;
-            this.pictureIcon.Location = new System.Drawing.Point(12, 26);
-            this.pictureIcon.Name = "pictureIcon";
-            this.pictureIcon.Size = new System.Drawing.Size(56, 59);
-            this.pictureIcon.TabIndex = 0;
-            this.pictureIcon.TabStop = false;
             // 
             // labelAppName
             // 
@@ -84,6 +75,16 @@ namespace ThorneTimer
             this.buttonOk.Text = "Ok";
             this.buttonOk.UseVisualStyleBackColor = true;
             this.buttonOk.Click += new System.EventHandler(this.ButtonOk_Click);
+            // 
+            // pictureIcon
+            // 
+            this.pictureIcon.Image = global::ThorneTimer.Properties.Resources.ThorneTimer;
+            this.pictureIcon.Location = new System.Drawing.Point(3, 26);
+            this.pictureIcon.Name = "pictureIcon";
+            this.pictureIcon.Size = new System.Drawing.Size(65, 59);
+            this.pictureIcon.SizeMode = System.Windows.Forms.PictureBoxSizeMode.StretchImage;
+            this.pictureIcon.TabIndex = 0;
+            this.pictureIcon.TabStop = false;
             // 
             // FormAbout
             // 
