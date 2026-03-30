@@ -61,8 +61,34 @@ namespace ThorneTimer
                 cmd.CommandText = "CREATE TABLE settings(ID INTEGER PRIMARY KEY, ActiveCharacterID TEXT, ActiveVoice TEXT, MiniViewFontSize INTEGER, MiniViewWarnFore INTEGER, MiniViewWarnBack INTEGER, MiniViewWarnTime TEXT, MiniViewOpacity INTEGER, VoiceVolume INTEGER, VoiceRate INTEGER, VoiceEnabled INTEGER, MiniViewNormFore INTEGER, MiniViewNormBack INTEGER, MiniViewShowPing INTEGER, MiniViewPingFore INTEGER, MiniViewPingBack INTEGER, MiniViewPingTime TEXT, MiniViewBuffFore INTEGER, MiniViewBuffBack INTEGER)";
                 cmd.ExecuteNonQuery();
 
-                cmd.CommandText = "INSERT INTO settings(ID, ActiveCharacterID) VALUES(1, '', '" + voice + "', 8)";
+                // Create miniviews table used by the UI
+                cmd.CommandText = "CREATE TABLE miniviews(ID INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT)";
                 cmd.ExecuteNonQuery();
+
+                // Insert default settings with sensible defaults for all known columns
+                cmd.CommandText = "INSERT INTO settings(ID, ActiveCharacterID, ActiveVoice, MiniViewFontSize, MiniViewWarnFore, MiniViewWarnBack, MiniViewWarnTime, MiniViewOpacity, VoiceVolume, VoiceRate, VoiceEnabled, MiniViewNormFore, MiniViewNormBack, MiniViewShowPing, MiniViewPingFore, MiniViewPingBack, MiniViewPingTime, MiniViewBuffFore, MiniViewBuffBack) VALUES(@id,@activeChar,@activeVoice,@fontSize,@warnFore,@warnBack,@warnTime,@opacity,@voiceVolume,@voiceRate,@voiceEnabled,@normFore,@normBack,@showPing,@pingFore,@pingBack,@pingTime,@buffFore,@buffBack)";
+                cmd.Parameters.AddWithValue("@id", 1);
+                cmd.Parameters.AddWithValue("@activeChar", "");
+                cmd.Parameters.AddWithValue("@activeVoice", voice);
+                cmd.Parameters.AddWithValue("@fontSize", 8);
+                cmd.Parameters.AddWithValue("@warnFore", Color.White.ToArgb());
+                cmd.Parameters.AddWithValue("@warnBack", Color.Red.ToArgb());
+                cmd.Parameters.AddWithValue("@warnTime", "00:30");
+                cmd.Parameters.AddWithValue("@opacity", 100);
+                cmd.Parameters.AddWithValue("@voiceVolume", 100);
+                cmd.Parameters.AddWithValue("@voiceRate", -2);
+                cmd.Parameters.AddWithValue("@voiceEnabled", 1);
+                cmd.Parameters.AddWithValue("@normFore", Color.Black.ToArgb());
+                cmd.Parameters.AddWithValue("@normBack", Color.White.ToArgb());
+                cmd.Parameters.AddWithValue("@showPing", 1);
+                cmd.Parameters.AddWithValue("@pingFore", Color.LightGreen.ToArgb());
+                cmd.Parameters.AddWithValue("@pingBack", Color.Black.ToArgb());
+                cmd.Parameters.AddWithValue("@pingTime", "00:30");
+                cmd.Parameters.AddWithValue("@buffFore", Color.Orange.ToArgb());
+                cmd.Parameters.AddWithValue("@buffBack", Color.Black.ToArgb());
+                cmd.ExecuteNonQuery();
+                // Clear parameters so the same command object can be reused safely later
+                cmd.Parameters.Clear();
             }
             else
             {
@@ -264,6 +290,9 @@ namespace ThorneTimer
                 }
             }
 
+            // Ensure reader is closed
+            try { rdr.Close(); } catch { }
+
             return isExist;
         }
 
@@ -293,7 +322,23 @@ namespace ThorneTimer
                 }
             }
 
+            try { rdr.Close(); } catch { }
+
             return retValue;
+        }
+
+        static public bool isTableExist(SQLiteConnection con, string tableName)
+        {
+            bool exists = false;
+            SQLiteCommand cmd = new SQLiteCommand(con)
+            {
+                CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name=@table LIMIT 1"
+            };
+            cmd.Parameters.AddWithValue("@table", tableName);
+            SQLiteDataReader rdr = cmd.ExecuteReader();
+            if (rdr.Read()) exists = true;
+            try { rdr.Close(); } catch { }
+            return exists;
         }
 
         static public void SetSetting(SQLiteConnection con, string column, string value)
@@ -407,23 +452,31 @@ namespace ThorneTimer
 
             while (rdr.Read())
             {
-                Timers.GridData data = new Timers.GridData
+                try
                 {
-                    ID = rdr.GetInt32(rdr.GetOrdinal("ID")),
-                    Name = rdr.GetString(rdr.GetOrdinal("Name")),
-                    CategoryID = rdr.GetInt32(rdr.GetOrdinal("CategoryID")),
-                    StartKeyword = rdr.GetString(rdr.GetOrdinal("StartKeyword")),
-                    EndKeyword = rdr.GetString(rdr.GetOrdinal("EndKeyword")),
-                    WAVFile = rdr.GetString(rdr.GetOrdinal("WAVFile")),
-                    Speech = rdr.GetString(rdr.GetOrdinal("Speech")),
-                    Duration = rdr.GetString(rdr.GetOrdinal("Duration")),
-                    ActiveYn = rdr.GetInt32(rdr.GetOrdinal("ActiveYn")),
-                    CaseYn = rdr.GetInt32(rdr.GetOrdinal("CaseYn")),
-                    EndlessYn = rdr.GetInt32(rdr.GetOrdinal("EndlessYn")),
-                    Remaining = ""
-                };
+                    Timers.GridData data = new Timers.GridData
+                    {
+                        ID = rdr.GetInt32(rdr.GetOrdinal("ID")),
+                        Name = rdr.GetString(rdr.GetOrdinal("Name")),
+                        CategoryID = rdr.GetInt32(rdr.GetOrdinal("CategoryID")),
+                        StartKeyword = rdr.GetString(rdr.GetOrdinal("StartKeyword")),
+                        EndKeyword = rdr.GetString(rdr.GetOrdinal("EndKeyword")),
+                        WAVFile = rdr.GetString(rdr.GetOrdinal("WAVFile")),
+                        Speech = rdr.GetString(rdr.GetOrdinal("Speech")),
+                        Duration = rdr.GetString(rdr.GetOrdinal("Duration")),
+                        ActiveYn = rdr.GetInt32(rdr.GetOrdinal("ActiveYn")),
+                        CaseYn = rdr.GetInt32(rdr.GetOrdinal("CaseYn")),
+                        EndlessYn = rdr.GetInt32(rdr.GetOrdinal("EndlessYn")),
+                        Remaining = ""
+                    };
 
-                gridData.Add(data);
+                    gridData.Add(data);
+                }
+                catch (Exception)
+                {
+                    // Schema might be partial; skip malformed row
+                    continue;
+                }
             }
 
             rdr.Close();
@@ -433,13 +486,20 @@ namespace ThorneTimer
 
         static public Characters.GridData GetCharacter(SQLiteConnection con, string ID)
         {
+            Characters.GridData data = new Characters.GridData();
+
+            if (!int.TryParse(ID, out int idValue))
+            {
+                // Invalid ID supplied; return empty data
+                return data;
+            }
+
             SQLiteCommand cmd = new SQLiteCommand(con)
             {
-                CommandText = "SELECT * from characters WHERE ID = " + ID + " ORDER BY Name"
+                CommandText = "SELECT * from characters WHERE ID = @id"
             };
+            cmd.Parameters.AddWithValue("@id", idValue);
             SQLiteDataReader rdr = cmd.ExecuteReader();
-
-            Characters.GridData data = new Characters.GridData();
 
             while (rdr.Read())
             {
@@ -450,7 +510,7 @@ namespace ThorneTimer
                 data.MiniViewY = rdr.GetInt32(rdr.GetOrdinal("MiniViewY"));
             }
 
-            rdr.Close();
+            try { rdr.Close(); } catch { }
 
             return data;
         }
@@ -512,10 +572,12 @@ namespace ThorneTimer
 
         static public void DeleteCharacter(SQLiteConnection con, string ID)
         {
+            if (!int.TryParse(ID, out int idValue)) return;
             SQLiteCommand cmd = new SQLiteCommand(con)
             {
-                CommandText = "DELETE FROM characters WHERE ID = " + ID
+                CommandText = "DELETE FROM characters WHERE ID = @id"
             };
+            cmd.Parameters.AddWithValue("@id", idValue);
             cmd.ExecuteNonQuery();
         }
 
@@ -714,10 +776,12 @@ namespace ThorneTimer
 
         static public void DeleteView(SQLiteConnection con, string ID)
         {
+            if (!int.TryParse(ID, out int idValue)) return;
             SQLiteCommand cmd = new SQLiteCommand(con)
             {
-                CommandText = "DELETE FROM miniviews WHERE ID = " + ID
+                CommandText = "DELETE FROM miniviews WHERE ID = @id"
             };
+            cmd.Parameters.AddWithValue("@id", idValue);
             cmd.ExecuteNonQuery();
         }
 
@@ -732,22 +796,19 @@ namespace ThorneTimer
 
             if (Convert.ToString(ID.Value) == "-1")
             {
-                sql += "INSERT INTO miniviews ";
-                sql += "(";
-                sql += "Name,";
-                sql += ") VALUES (";
-                sql += "'" + Convert.ToString(Name.Value) + "', ";
-                sql += ")";
+                cmd.CommandText = "INSERT INTO miniviews (Name) VALUES (@name)";
+                cmd.Parameters.AddWithValue("@name", Convert.ToString(Name.Value));
+                cmd.ExecuteNonQuery();
+                cmd.Parameters.Clear();
             }
             else
             {
-                sql += "UPDATE miniviews SET ";
-                sql += "Name = '" + Convert.ToString(Name.Value) + "', ";
-                sql += "WHERE ID = " + Convert.ToString(ID.Value);
+                cmd.CommandText = "UPDATE miniviews SET Name = @name WHERE ID = @id";
+                cmd.Parameters.AddWithValue("@name", Convert.ToString(Name.Value));
+                cmd.Parameters.AddWithValue("@id", Convert.ToInt32(ID.Value));
+                cmd.ExecuteNonQuery();
+                cmd.Parameters.Clear();
             }
-
-            cmd.CommandText = sql;
-            cmd.ExecuteNonQuery();
 
             // Update ID in Grid When INSERTing
             if (Convert.ToString(ID.Value) == "-1")
