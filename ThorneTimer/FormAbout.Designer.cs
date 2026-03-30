@@ -55,7 +55,7 @@ namespace ThorneTimer
             this.labelAppName.Name = "labelAppName";
             this.labelAppName.Size = new System.Drawing.Size(59, 13);
             this.labelAppName.TabIndex = 1;
-            this.labelAppName.Text = "EQ Timer";
+            this.labelAppName.Text = "Thorne Timer";
             // 
             // labelVersion
             // 
@@ -73,7 +73,7 @@ namespace ThorneTimer
             this.labelCopyright.Name = "labelCopyright";
             this.labelCopyright.Size = new System.Drawing.Size(180, 13);
             this.labelCopyright.TabIndex = 3;
-            this.labelCopyright.Text = "Copyright 2020-2024 Stolistic Games";
+            this.labelCopyright.Text = "Copyright 2026 Draknare Thorne";
             // 
             // buttonOk
             // 

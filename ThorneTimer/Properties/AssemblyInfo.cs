@@ -5,12 +5,12 @@ using System.Runtime.InteropServices;
 // General Information about an assembly is controlled through the following
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("EQ Timer")]
-[assembly: AssemblyDescription("EQ Timer is a log parsing tool that reads through Project 1999 log file and you to specify text for triggering timers, speech and sound.  Using EQ Timer will not only augment your EQ P99 experience, it will make you super cool!")]
+[assembly: AssemblyTitle("Thorne Timer")]
+[assembly: AssemblyDescription("Thorne Timer is a log parsing tool that reads through EQ log files and you to specify text for triggering timers, speech and sound. Using Thorne Timer will not only augment your EQ experience, it will make you super cool!")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("Stolistic Games")]
-[assembly: AssemblyProduct("EQ Timer")]
-[assembly: AssemblyCopyright("Copyright © 2020-2024")]
+[assembly: AssemblyCompany("Draknare Thorne")]
+[assembly: AssemblyProduct("Thorne Timer")]
+[assembly: AssemblyCopyright("Copyright © 2026")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -32,5 +32,5 @@ using System.Runtime.InteropServices;
 // You can specify all the values or you can default the Build and Revision Numbers
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("1.0.1.16")]
-[assembly: AssemblyFileVersion("1.0.1.16")]
+[assembly: AssemblyVersion("1.1.0.1")]
+[assembly: AssemblyFileVersion("1.1.0.1")]

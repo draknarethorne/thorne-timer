@@ -44,7 +44,7 @@
             this.MaximizeBox = false;
             this.MinimizeBox = false;
             this.Name = "MiniView";
-            this.Text = "EQ Timer";
+            this.Text = "Thorne Timer";
             this.TopMost = true;
             this.Load += new System.EventHandler(this.MiniView_Load);
             this.ResumeLayout(false);
