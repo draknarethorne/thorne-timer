@@ -53,7 +53,7 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup>
-    <ApplicationIcon>Resources\timer.ico</ApplicationIcon>
+    <ApplicationIcon>timer.ico</ApplicationIcon>
   </PropertyGroup>
   <PropertyGroup>
     <ManifestCertificateThumbprint>3FAE3EAF6BB915C7B9F57E7A3BC79B8C0FD9DAD2</ManifestCertificateThumbprint>
@@ -192,6 +192,13 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Icon1.ico" />
+    <Content Include="Resources\ThorneTimer.ico" />
+    <Content Include="Resources\ThorneTimerIcon.bmp" />
+    <Content Include="Resources\ThorneTimerIcon.png" />
+    <Content Include="Resources\ThorneTimer.jpg" />
+    <Content Include="Resources\ThorneTimer.png" />
+    <Content Include="Resources\ThorneTimerLogo.png" />
     <Content Include="Resources\timer.ico" />
     <Content Include="Sounds\ring.wav" />
     <Content Include="Sounds\tada.wav" />
@@ -203,6 +210,7 @@
     <Content Include="Sounds\pluck.wav">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+    <Content Include="timer.ico" />
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include=".NETFramework,Version=v4.6.1">

@@ -40,7 +40,7 @@ namespace ThorneTimer
             // 
             // pictureIcon
             // 
-            this.pictureIcon.Image = ((System.Drawing.Image)(resources.GetObject("pictureIcon.Image")));
+            this.pictureIcon.Image = global::ThorneTimer.Properties.Resources.ThorneTimerIcon;
             this.pictureIcon.Location = new System.Drawing.Point(12, 26);
             this.pictureIcon.Name = "pictureIcon";
             this.pictureIcon.Size = new System.Drawing.Size(56, 59);
@@ -53,7 +53,7 @@ namespace ThorneTimer
             this.labelAppName.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.labelAppName.Location = new System.Drawing.Point(74, 26);
             this.labelAppName.Name = "labelAppName";
-            this.labelAppName.Size = new System.Drawing.Size(59, 13);
+            this.labelAppName.Size = new System.Drawing.Size(82, 13);
             this.labelAppName.TabIndex = 1;
             this.labelAppName.Text = "Thorne Timer";
             // 
@@ -71,7 +71,7 @@ namespace ThorneTimer
             this.labelCopyright.AutoSize = true;
             this.labelCopyright.Location = new System.Drawing.Point(74, 72);
             this.labelCopyright.Name = "labelCopyright";
-            this.labelCopyright.Size = new System.Drawing.Size(180, 13);
+            this.labelCopyright.Size = new System.Drawing.Size(162, 13);
             this.labelCopyright.TabIndex = 3;
             this.labelCopyright.Text = "Copyright 2026 Draknare Thorne";
             // 
