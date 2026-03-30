@@ -192,7 +192,6 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="Resources\ThorneTimer.ico" />
-    <Content Include="Resources\ThorneTimerIcon.png" />
     <Content Include="Resources\ThorneTimer.png" />
     <Content Include="Resources\ThorneTimerLogo.png" />
     <Content Include="Sounds\ring.wav" />
