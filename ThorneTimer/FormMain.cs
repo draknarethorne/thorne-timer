@@ -20,6 +20,13 @@ namespace ThorneTimer
 {
     public partial class FormMain : Form
     {
+        // Helper to safely parse int with fallback
+        private int SafeParseInt(string value, int defaultValue)
+        {
+            if (int.TryParse(value, out int result))
+                return result;
+            return defaultValue;
+        }
         public FormMain()
         {
             InitializeComponent();
@@ -54,43 +61,45 @@ namespace ThorneTimer
 
             this.RestoreWindowPosition();
 
-            tbOpacity.Value = Convert.ToInt32(Database.GetSetting(con, "MiniViewOpacity"));
+
+            tbOpacity.Value = SafeParseInt(Database.GetSetting(con, "MiniViewOpacity"), 100);
             miniViews.mvOpacity = tbOpacity.Value;
-            tbFontSize.Value = Convert.ToInt32(Database.GetSetting(con, "MiniViewFontSize"));
+            tbFontSize.Value = SafeParseInt(Database.GetSetting(con, "MiniViewFontSize"), 8);
             miniViews.mvFontSize = tbFontSize.Value;
 
-            miniViews.mvNormForeColor = Convert.ToInt32(Database.GetSetting(con, "MiniViewNormFore"));
+            miniViews.mvNormForeColor = SafeParseInt(Database.GetSetting(con, "MiniViewNormFore"), Color.Black.ToArgb());
             lblNormPickFore.BackColor = Color.FromArgb(miniViews.mvNormForeColor);
-            miniViews.mvNormBackColor = Convert.ToInt32(Database.GetSetting(con, "MiniViewNormBack"));
+            miniViews.mvNormBackColor = SafeParseInt(Database.GetSetting(con, "MiniViewNormBack"), Color.White.ToArgb());
             lblNormPickBack.BackColor = Color.FromArgb(miniViews.mvNormBackColor);
 
-            miniViews.mvWarnForeColor = Convert.ToInt32(Database.GetSetting(con, "MiniViewWarnFore"));
+            miniViews.mvWarnForeColor = SafeParseInt(Database.GetSetting(con, "MiniViewWarnFore"), Color.White.ToArgb());
             lblWarnPickFore.BackColor = Color.FromArgb(miniViews.mvWarnForeColor);
-            miniViews.mvWarnBackColor = Convert.ToInt32(Database.GetSetting(con, "MiniViewWarnBack"));
+            miniViews.mvWarnBackColor = SafeParseInt(Database.GetSetting(con, "MiniViewWarnBack"), Color.Red.ToArgb());
             lblWarnPickBack.BackColor = Color.FromArgb(miniViews.mvWarnBackColor);
             miniViews.mvWarnTime = Database.GetSetting(con, "MiniViewWarnTime");
             txtWarningTime.Text = miniViews.mvWarnTime;
 
-            miniViews.mvShowPing = Convert.ToInt32(Database.GetSetting(con, "MiniViewShowPing"));
+            miniViews.mvShowPing = SafeParseInt(Database.GetSetting(con, "MiniViewShowPing"), 1);
             chkShowPing.Checked = miniViews.ShowPing();
-            miniViews.mvPingForeColor = Convert.ToInt32(Database.GetSetting(con, "MiniViewPingFore"));
+            miniViews.mvPingForeColor = SafeParseInt(Database.GetSetting(con, "MiniViewPingFore"), Color.LightGreen.ToArgb());
             lblPingPickFore.BackColor = Color.FromArgb(miniViews.mvPingForeColor);
-            miniViews.mvPingBackColor = Convert.ToInt32(Database.GetSetting(con, "MiniViewPingBack"));
+            miniViews.mvPingBackColor = SafeParseInt(Database.GetSetting(con, "MiniViewPingBack"), Color.Black.ToArgb());
             lblPingPickBack.BackColor = Color.FromArgb(miniViews.mvPingBackColor);
             miniViews.mvPingTime = Database.GetSetting(con, "MiniViewPingTime");
             txtPingTime.Text = miniViews.mvPingTime;
 
-            miniViews.mvBuffForeColor = Convert.ToInt32(Database.GetSetting(con, "MiniViewBuffFore"));
+            miniViews.mvBuffForeColor = SafeParseInt(Database.GetSetting(con, "MiniViewBuffFore"), Color.Orange.ToArgb());
             lblBuffPickFore.BackColor = Color.FromArgb(miniViews.mvBuffForeColor);
-            miniViews.mvBuffBackColor = Convert.ToInt32(Database.GetSetting(con, "MiniViewBuffBack"));
+            miniViews.mvBuffBackColor = SafeParseInt(Database.GetSetting(con, "MiniViewBuffBack"), Color.Black.ToArgb());
             lblBuffPickBack.BackColor = Color.FromArgb(miniViews.mvBuffBackColor);
 
             UpdateMiniAppearance();
 
+
             activeVoice = Database.GetSetting(con, "ActiveVoice");
-            voiceVolume = Convert.ToInt32(Database.GetSetting(con, "VoiceVolume"));
-            voiceRate = Convert.ToInt32(Database.GetSetting(con, "VoiceRate"));
-            voiceEnabled = Convert.ToInt32(Database.GetSetting(con, "VoiceEnabled"));
+            voiceVolume = SafeParseInt(Database.GetSetting(con, "VoiceVolume"), 100);
+            voiceRate = SafeParseInt(Database.GetSetting(con, "VoiceRate"), -2);
+            voiceEnabled = SafeParseInt(Database.GetSetting(con, "VoiceEnabled"), 1);
             chkVoiceEnabled.Checked = (voiceEnabled == 1);
 
             SetupActiveVoice();
