@@ -173,6 +173,7 @@
     <None Include="..\.editorconfig">
       <Link>.editorconfig</Link>
     </None>
+    <None Include="Docs\active-views\active-views-design.md" />
     <None Include="ThorneTimer.pfx" />
     <None Include="ThorneTimer_TemporaryKey.pfx" />
     <None Include="packages.config" />
