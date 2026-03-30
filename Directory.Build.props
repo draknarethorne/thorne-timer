@@ -1,0 +1,28 @@
+<Project>
+  <!-- Ensure builds that use platform identifier 'AnyCPU' (no space) or 'Any CPU' (with space) get an OutputPath/BaseOutputPath -->
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
+    <BaseOutputPath>bin\</BaseOutputPath>
+    <OutputPath>bin\Debug\</OutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|Any CPU'">
+    <BaseOutputPath>bin\</BaseOutputPath>
+    <OutputPath>bin\Debug\</OutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU'">
+    <BaseOutputPath>bin\</BaseOutputPath>
+    <OutputPath>bin\Release\</OutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|Any CPU'">
+    <BaseOutputPath>bin\</BaseOutputPath>
+    <OutputPath>bin\Release\</OutputPath>
+  </PropertyGroup>
+
+  <!-- Fallback defaults if nothing matched (prevents MSBuild error) -->
+  <PropertyGroup>
+    <BaseOutputPath Condition="'$(BaseOutputPath)'==''">bin\</BaseOutputPath>
+    <OutputPath Condition="'$(OutputPath)'==''">bin\Debug\</OutputPath>
+  </PropertyGroup>
+</Project>

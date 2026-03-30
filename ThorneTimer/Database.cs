@@ -374,9 +374,7 @@ namespace ThorneTimer
             DataGridViewCell EndlessYn = row.Cells[dataGridView.Columns["EndlessYn"].Index];
 
             SQLiteCommand cmd = new SQLiteCommand(con);
-
             string sql = "";
-
             if (Convert.ToString(ID.Value) == "-1")
             {
                 sql += "INSERT INTO timers ";
