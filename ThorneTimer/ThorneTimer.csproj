@@ -53,7 +53,7 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup>
-    <ApplicationIcon>Resources\\ThorneTimer_gold.ico</ApplicationIcon>
+    <ApplicationIcon>ThorneTimer_gold.ico</ApplicationIcon>
   </PropertyGroup>
   <PropertyGroup>
     <ManifestCertificateThumbprint>3FAE3EAF6BB915C7B9F57E7A3BC79B8C0FD9DAD2</ManifestCertificateThumbprint>
@@ -204,7 +204,7 @@
     <Content Include="Sounds\pluck.wav">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
-    <Content Include="ThorneTimer_v2.ico" />
+    <Content Include="ThorneTimer_gold.ico" />
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include=".NETFramework,Version=v4.6.1">
