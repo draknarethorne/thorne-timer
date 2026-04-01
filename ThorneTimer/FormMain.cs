@@ -62,9 +62,9 @@ namespace ThorneTimer
             this.RestoreWindowPosition();
 
 
-            tbOpacity.Value = SafeParseInt(Database.GetSetting(con, "MiniViewOpacity"), 100);
+            tbOpacity.Value = Math.Max(tbOpacity.Minimum, Math.Min(tbOpacity.Maximum, SafeParseInt(Database.GetSetting(con, "MiniViewOpacity"), 100)));
             miniViews.mvOpacity = tbOpacity.Value;
-            tbFontSize.Value = SafeParseInt(Database.GetSetting(con, "MiniViewFontSize"), 8);
+            tbFontSize.Value = Math.Max(tbFontSize.Minimum, Math.Min(tbFontSize.Maximum, SafeParseInt(Database.GetSetting(con, "MiniViewFontSize"), 8)));
             miniViews.mvFontSize = tbFontSize.Value;
 
             miniViews.mvNormForeColor = SafeParseInt(Database.GetSetting(con, "MiniViewNormFore"), Color.Black.ToArgb());
