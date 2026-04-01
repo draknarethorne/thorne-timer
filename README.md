@@ -1,73 +1,145 @@
-Thorne Timer - Setup and Development Notes
-=========================================
+<p align="center">
+  <img src="ThorneTimer/Resources/ThorneTimerLogo.png" alt="Thorne Timer" width="400"/>
+</p>
 
-This document lists the tools and steps required to restore, build and run the project on Windows.
+<h1 align="center">Thorne Timer</h1>
 
-Prerequisites
--------------
-- Visual Studio (2019/2022/2026) with the ".NET desktop development" workload (required for MSBuild and .NET Framework 4.8 support).
-- .NET SDK (for `dotnet restore` convenience). Install from https://dotnet.microsoft.com/download (any modern SDK works for `dotnet restore`).
-- NuGet CLI (optional) — useful if you prefer `nuget restore`. Download `nuget.exe` from https://www.nuget.org/downloads or install with Chocolatey (`choco install nuget.commandline`).
-- MSBuild / Visual Studio Build Tools — included with Visual Studio. If building from CI or CLI, install Visual Studio Build Tools.
-- PowerShell 7 (optional) — nicer CLI scripting (`pwsh`).
-- Git (Git for Windows) — for repo operations.
+<p align="center">
+  <strong>A tactical overlay timer and log event notification system for Project Quarm</strong>
+</p>
 
-Quick install (Chocolatey examples)
-----------------------------------
-Run as Administrator in PowerShell if you use Chocolatey:
+<p align="center">
+  <a href="#features">Features</a> •
+  <a href="#roadmap">Roadmap</a> •
+  <a href="#installation">Installation</a> •
+  <a href="#building-from-source">Building</a> •
+  <a href="#related-projects">Related Projects</a>
+</p>
 
-choco install dotnet --version=7.0.0  # example, install SDK
-choco install nuget.commandline
-choco install visualstudio2022buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.MSBuildTools"
-choco install powershell-core
+---
 
-Project setup steps
--------------------
-1. Clone the repo and switch to the branch you want:
+## About
 
-   git clone https://github.com/draknarethorne/thorne-timer.git
-   cd thorne-timer
-   git checkout active-views
+**Thorne Timer** is a companion desktop application designed to enhance your gameplay experience on [Project Quarm](https://www.projectquarm.com/) — a PoP-era EverQuest server built on [The Al'Kabor Project (TAKP)](https://www.takproject.net/) foundation. It provides real-time timer overlays ("mini views") that float above your game client, giving you precise tracking of spells, abilities, respawns, and custom events.
 
-2. Restore NuGet packages (pick one):
+### Why Thorne Timer?
 
-   dotnet restore "Thorne-Timer.sln"
-   --or--
-   nuget restore "Thorne-Timer.sln"
+The native TAKP UI files can only go so far. While [**Thorne-UI**](https://github.com/draknarethorne/thorne-ui) transforms your in-game interface with enhanced windows, better layouts, and quality-of-life improvements, there are things you simply *cannot* do with XML UI files alone:
 
-3. Build the solution from Developer Command Prompt or a shell with MSBuild on PATH:
+- **Always-visible timers** that persist across zone transitions
+- **Log-triggered automation** that responds to game events in real-time
+- **Voice alerts** and text-to-speech notifications
+- **Multi-character tracking** across boxing sessions
 
-   msbuild "Thorne-Timer.sln" /t:Rebuild /p:Configuration=Debug /p:Platform="Any CPU"
+Thorne Timer fills that gap — it's the overlay companion that lives *outside* the game, watching your log files and giving you the tactical information edge you need.
 
-4. In Visual Studio: open the solution, open Build -> Configuration Manager and ensure the project Platform maps to "Any CPU" and that the project's Build checkbox is checked. If the project does not appear as expected, use the solution's Configuration Manager to add/match platforms.
+---
 
-5. Set the startup project: right-click `ThorneTimer` in Solution Explorer -> Set as Startup Project.
+## Features
 
-Common issues and fixes
------------------------
-- "BaseOutputPath/OutputPath property is not set" — MSBuild couldn't find a matching `<PropertyGroup Condition>` for the active Configuration|Platform. Fixes:
-  - Ensure the solution configuration/platform is `Debug|Any CPU` (note the space) or that the project contains a matching condition for `AnyCPU` (no space). Use Configuration Manager to set Platform to "Any CPU".
-  - Restore NuGet packages so imported targets exist.
+- 🎯 **Mini View Overlays** — Compact, always-on-top timer windows that float over your game
+- ⏱️ **Log Parsing** — Automatically triggers timers from in-game log events
+- 🔊 **Voice & Sound Alerts** — Configurable audio notifications with text-to-speech support
+- 🎨 **Customizable Appearance** — Adjustable colors, opacity, and font sizes for warning/normal/ping states
+- 👥 **Multi-Character Support** — Track active characters and switch contexts on the fly
+- 📁 **Category Organization** — Group timers by category for easy management
 
-- Missing NuGet/targets errors — run `dotnet restore` or install NuGet CLI and run `nuget restore`.
+---
 
-Security / git notes
---------------------
-- Private signing keys (`*.pfx`) should not be committed unless intentionally shared. To stop tracking a key:
+## Roadmap
 
-  git rm --cached ThorneTimer/ThorneTimer_TemporaryKey.pfx
-  echo "ThorneTimer_TemporaryKey.pfx" >> .gitignore
-  git add .gitignore
-  git commit -m "Ignore private pfx key"
+Thorne Timer is evolving into a **tactical HUD** for serious multi-boxing and raid gameplay:
 
-If you want, I can apply the README file into the repo (already committed) and optionally add a `.gitignore` change or perform the `git rm --cached` step for private keys if you confirm.
+| Phase | Description |
+|-------|-------------|
+| **Current** | GUI refinements, icon/visual updates, stability improvements |
+| **Next** | Per-character timer collections — each character maintains their own set of timers |
+| **Planned** | Global timers (all characters), class-specific timers, and category/zone-aware timers |
+| **Future** | Full architecture rework to support spells, abilities, and actions per class with smart timer management |
 
-Useful commands
----------------
-- Restore: `dotnet restore "Thorne-Timer.sln"`
-- Rebuild: `msbuild "Thorne-Timer.sln" /t:Rebuild /p:Configuration=Debug /p:Platform="Any CPU"`
-- Run tests (if any): use the Test Explorer in Visual Studio.
+The goal: the **ultimate timer and notification system** tailored to how *you* play.
 
-Contact
--------
-If you want, I can add CI steps or a script to automate restore + build on your machine or in GitHub Actions.
+---
+
+## Related Projects
+
+The **Thorne** suite is designed to work together for the ultimate Project Quarm experience:
+
+| Project | Description |
+|---------|-------------|
+| [**Thorne-UI**](https://github.com/draknarethorne/thorne-ui) | Custom TAKP UI overhaul — anatomical equipment layouts, multi-color gauges, class-specific slot art, and quality-of-life improvements across 60+ XML files |
+| **Thorne Timer** *(this repo)* | Overlay timer & log notification companion — the features you *can't* build with UI files alone |
+
+> 💡 **Tip:** Use both together! Thorne-UI handles your in-game windows, Thorne Timer handles your external overlays and automation.
+
+---
+
+## Installation
+
+### Pre-built Releases
+> *Coming soon* — check the [Releases](https://github.com/draknarethorne/thorne-timer/releases) page.
+
+### Building from Source
+See [Building from Source](#building-from-source) below.
+
+---
+
+## Building from Source
+
+### Prerequisites
+
+- **Visual Studio 2019/2022/2025+** with the **.NET desktop development** workload
+- **.NET SDK** — for `dotnet restore` ([download](https://dotnet.microsoft.com/download))
+- **Git** — for cloning the repo
+
+### Quick Start
+
+```bash
+# Clone the repository
+git clone https://github.com/draknarethorne/thorne-timer.git
+cd thorne-timer
+
+# Switch to the active development branch
+git checkout active-views
+
+# Restore NuGet packages
+dotnet restore "Thorne-Timer.sln"
+
+# Build (from Developer Command Prompt or with MSBuild on PATH)
+msbuild "Thorne-Timer.sln" /t:Rebuild /p:Configuration=Debug /p:Platform="Any CPU"
+```
+
+### Visual Studio Setup
+
+1. Open `Thorne-Timer.sln` in Visual Studio
+2. Go to **Build → Configuration Manager** and ensure Platform is set to `Any CPU`
+3. Right-click **ThorneTimer** in Solution Explorer → **Set as Startup Project**
+4. Press **F5** to build and run
+
+---
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| `BaseOutputPath/OutputPath property is not set` | Ensure Platform is `Any CPU` (with space) in Configuration Manager. Run `dotnet restore`. |
+| Missing NuGet/targets errors | Run `dotnet restore "Thorne-Timer.sln"` |
+| Old icon showing in Windows | Clear Windows icon cache: delete files in `%localappdata%\Microsoft\Windows\Explorer\iconcache*` and restart Explorer |
+
+---
+
+## Contributing
+
+Contributions, ideas, and feedback are welcome! Feel free to open an issue or submit a pull request.
+
+---
+
+## License
+
+*License information coming soon.*
+
+---
+
+<p align="center">
+  <sub>Built with ☕ for the Project Quarm community by Draknaré Thorne</sub>
+</p>
