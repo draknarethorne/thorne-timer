@@ -295,8 +295,9 @@ FormMain
 
 ## Related Documents
 
-- [CODEBASE-ANALYSIS.md](./CODEBASE-ANALYSIS.md) — Full code review and technical debt
-- [SCHEMA-MIGRATION.md](./SCHEMA-MIGRATION.md) — Database migration details
+- [codebase-analysis.md](./codebase-analysis.md) — Full code review and technical debt
+- [schema-migration.md](./schema-migration.md) — Database migration details
+- [technical-debt.md](./technical-debt.md) — Technical debt tracking
 
 ---
 
