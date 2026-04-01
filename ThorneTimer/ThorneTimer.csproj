@@ -73,7 +73,7 @@
   <PropertyGroup>
     <SignManifests>false</SignManifests>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug2|AnyCPU'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug2|Any CPU'">
     <OutputPath>bin\Debug2\</OutputPath>
   </PropertyGroup>
   <ItemGroup>
