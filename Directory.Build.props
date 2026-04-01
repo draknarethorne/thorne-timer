@@ -20,6 +20,16 @@
     <OutputPath>bin\Release\</OutputPath>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug2|AnyCPU'">
+    <BaseOutputPath>bin\</BaseOutputPath>
+    <OutputPath>bin\Debug2\</OutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug2|Any CPU'">
+    <BaseOutputPath>bin\</BaseOutputPath>
+    <OutputPath>bin\Debug2\</OutputPath>
+  </PropertyGroup>
+
   <!-- Fallback defaults if nothing matched (prevents MSBuild error) -->
   <PropertyGroup>
     <BaseOutputPath Condition="'$(BaseOutputPath)'==''">bin\</BaseOutputPath>

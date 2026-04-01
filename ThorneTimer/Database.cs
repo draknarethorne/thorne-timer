@@ -265,6 +265,15 @@ namespace ThorneTimer
                     cmd.CommandText = "UPDATE settings SET VoiceEnabled = 1 WHERE ID = 1";
                     cmd.ExecuteNonQuery();
                 }
+
+                if (!isTableExist(con, "miniviews"))
+                {
+                    SQLiteCommand cmd = new SQLiteCommand(con)
+                    {
+                        CommandText = "CREATE TABLE miniviews(ID INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT)"
+                    };
+                    cmd.ExecuteNonQuery();
+                }
             }
 
             return con;
@@ -789,8 +798,6 @@ namespace ThorneTimer
             DataGridViewCell Name = row.Cells[dataGridView.Columns["Name"].Index];
 
             SQLiteCommand cmd = new SQLiteCommand(con);
-
-            string sql = "";
 
             if (Convert.ToString(ID.Value) == "-1")
             {
