@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
 [assembly: AssemblyTitle("Thorne Timer")]
-[assembly: AssemblyDescription("Thorne Timer is a log parsing tool that reads through EQ log files and you to specify text for triggering timers, speech and sound. Using Thorne Timer will not only augment your EQ experience, it will make you super cool!")]
+[assembly: AssemblyDescription("Thorne Timer is a log parsing tool that reads through EQ log files and allows you to specify text for triggering timers, speech and sound. Using Thorne Timer will not only augment your EQ experience, it will make you super cool!")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("Draknare Thorne")]
 [assembly: AssemblyProduct("Thorne Timer")]
