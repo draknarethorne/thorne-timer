@@ -159,11 +159,15 @@ git push origin v1.0.0
 ```
 
 The release workflow will automatically:
-1. Build the Release configuration
-2. Package all required files into a ZIP
-3. Create a GitHub Release with download links
+1. **Extract version from tag** (`v0.1.0` → `0.1.0.0`)
+2. **Inject into AssemblyInfo.cs** — the built EXE has the correct version embedded
+3. Build the Release configuration
+4. Package all required files into a ZIP
+5. Create a GitHub Release with download links
 
-**Versioning:** Use semantic versioning (e.g., `v1.0.0`, `v1.1.0`, `v2.0.0-beta`)
+**Versioning:** Use semantic versioning (e.g., `v0.1.0`, `v1.0.0`, `v2.0.0-beta`)
+
+> 💡 **Note:** You don't need to manually update `AssemblyInfo.cs` before releases — the workflow handles it automatically!
 
 ---
 

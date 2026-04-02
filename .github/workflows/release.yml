@@ -13,6 +13,30 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Extract version from tag
+      id: version
+      run: |
+        $tag = "${{ github.ref_name }}"
+        # Remove 'v' prefix: v0.1.0 -> 0.1.0
+        $version = $tag -replace '^v', ''
+        # Convert to 4-part version: 0.1.0 -> 0.1.0.0
+        $parts = $version -split '\.' | Select-Object -First 3
+        while ($parts.Count -lt 4) { $parts += "0" }
+        $assemblyVersion = $parts -join '.'
+        echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+        echo "ASSEMBLY_VERSION=$assemblyVersion" >> $env:GITHUB_OUTPUT
+        echo "Extracted version: $version -> Assembly: $assemblyVersion"
+
+    - name: Update AssemblyInfo.cs with version
+      run: |
+        $file = "ThorneTimer/Properties/AssemblyInfo.cs"
+        $content = Get-Content $file -Raw
+        $newVersion = "${{ steps.version.outputs.ASSEMBLY_VERSION }}"
+        $content = $content -replace 'AssemblyVersion\("[^"]*"\)', "AssemblyVersion(`"$newVersion`")"
+        $content = $content -replace 'AssemblyFileVersion\("[^"]*"\)', "AssemblyFileVersion(`"$newVersion`")"
+        Set-Content $file $content
+        echo "Updated AssemblyInfo.cs to version $newVersion"
+
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
 
