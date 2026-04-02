@@ -58,6 +58,26 @@ namespace ThorneTimer
             return miniView;
         }
 
+        /// <summary>
+        /// Gets the current positions of all views.
+        /// Returns a dictionary keyed by ViewType (Normal, Pet, Buff, Ping).
+        /// </summary>
+        public Dictionary<string, Point> GetCurrentViewPositions()
+        {
+            Dictionary<string, Point> positions = new Dictionary<string, Point>();
+
+            if (miniView != null)
+                positions["Normal"] = miniView.Location;
+            if (petView != null)
+                positions["Pet"] = petView.Location;
+            if (buffView != null)
+                positions["Buff"] = buffView.Location;
+            if (pingView != null)
+                positions["Ping"] = pingView.Location;
+
+            return positions;
+        }
+
         public void AddView(SQLiteConnection con, DataGridView grdViews)
         {
             DataGridViewRow row = grdViews.CurrentRow;
@@ -127,12 +147,40 @@ namespace ThorneTimer
 
             if (miniView == null)
             {
-                Characters.GridData character = Database.GetCharacter(con, activeCharacterID);
+                // Load positions from database (falls back to defaults if not found)
+                Dictionary<string, Database.ViewPositionData> positions = Database.GetViewPositions(con);
 
-                miniView = CreateMiniView(character.MiniViewX, character.MiniViewY);
-                petView = CreateMiniView(character.MiniViewX + 200, character.MiniViewY);
-                buffView = CreateMiniView(character.MiniViewX + 400, character.MiniViewY);
-                pingView = CreateMiniView(character.MiniViewX + 1000, character.MiniViewY, ShowPing());
+                // Get positions for each view type, with fallbacks
+                int normalX = 100, normalY = 100;
+                int petX = 300, petY = 100;
+                int buffX = 500, buffY = 100;
+                int pingX = 1100, pingY = 100;
+
+                if (positions.ContainsKey("Normal"))
+                {
+                    normalX = positions["Normal"].PositionX;
+                    normalY = positions["Normal"].PositionY;
+                }
+                if (positions.ContainsKey("Pet"))
+                {
+                    petX = positions["Pet"].PositionX;
+                    petY = positions["Pet"].PositionY;
+                }
+                if (positions.ContainsKey("Buff"))
+                {
+                    buffX = positions["Buff"].PositionX;
+                    buffY = positions["Buff"].PositionY;
+                }
+                if (positions.ContainsKey("Ping"))
+                {
+                    pingX = positions["Ping"].PositionX;
+                    pingY = positions["Ping"].PositionY;
+                }
+
+                miniView = CreateMiniView(normalX, normalY);
+                petView = CreateMiniView(petX, petY);
+                buffView = CreateMiniView(buffX, buffY);
+                pingView = CreateMiniView(pingX, pingY, ShowPing());
 
                 UpdateMiniAppearance();
 

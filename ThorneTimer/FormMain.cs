@@ -597,6 +597,13 @@ namespace ThorneTimer
                 Database.SaveCharacter(con, grdCharacters, row);
             }
 
+            // Save all view positions to the miniviews table
+            if (miniViews.MiniViewsActive())
+            {
+                Dictionary<string, Point> positions = miniViews.GetCurrentViewPositions();
+                Database.SaveViewPositions(con, positions);
+            }
+
             SetupActiveCharacters();
         }
 

@@ -274,9 +274,108 @@ namespace ThorneTimer
                     };
                     cmd.ExecuteNonQuery();
                 }
+
+                // Add position columns to miniviews table if they don't exist
+                if (!isFieldExist(con, "miniviews", "PositionX"))
+                {
+                    SQLiteCommand cmd = new SQLiteCommand(con)
+                    {
+                        CommandText = "ALTER TABLE miniviews ADD PositionX INTEGER DEFAULT 100"
+                    };
+                    cmd.ExecuteNonQuery();
+
+                    cmd.CommandText = "ALTER TABLE miniviews ADD PositionY INTEGER DEFAULT 100";
+                    cmd.ExecuteNonQuery();
+
+                    cmd.CommandText = "ALTER TABLE miniviews ADD ViewType TEXT DEFAULT 'Normal'";
+                    cmd.ExecuteNonQuery();
+
+                    cmd.CommandText = "ALTER TABLE miniviews ADD SortOrder INTEGER DEFAULT 0";
+                    cmd.ExecuteNonQuery();
+                }
+
+                // Seed default views if miniviews table is empty
+                SeedDefaultViews(con);
             }
 
             return con;
+        }
+
+        /// <summary>
+        /// Creates the 4 default views (Normal, Pet, Buff, Ping) if they don't exist.
+        /// Uses the active character's MiniViewX/Y as the base position.
+        /// </summary>
+        static private void SeedDefaultViews(SQLiteConnection con)
+        {
+            SQLiteCommand cmd = new SQLiteCommand(con)
+            {
+                CommandText = "SELECT COUNT(*) FROM miniviews"
+            };
+            long count = (long)cmd.ExecuteScalar();
+
+            if (count == 0)
+            {
+                // Get base position from active character if available
+                int baseX = 100;
+                int baseY = 100;
+
+                cmd.CommandText = "SELECT ActiveCharacterID FROM settings WHERE ID = 1";
+                object result = cmd.ExecuteScalar();
+                if (result != null && result != DBNull.Value)
+                {
+                    string activeCharId = result.ToString();
+                    cmd.CommandText = "SELECT MiniViewX, MiniViewY FROM characters WHERE ID = @id";
+                    cmd.Parameters.Clear();
+                    cmd.Parameters.AddWithValue("@id", activeCharId);
+                    using (SQLiteDataReader rdr = cmd.ExecuteReader())
+                    {
+                        if (rdr.Read())
+                        {
+                            if (!rdr.IsDBNull(0)) baseX = rdr.GetInt32(0);
+                            if (!rdr.IsDBNull(1)) baseY = rdr.GetInt32(1);
+                        }
+                    }
+                }
+
+                // Insert the 4 default views with positions matching current hardcoded offsets
+                cmd.Parameters.Clear();
+                cmd.CommandText = "INSERT INTO miniviews (Name, ViewType, PositionX, PositionY, SortOrder) VALUES (@name, @type, @x, @y, @order)";
+
+                // Normal view
+                cmd.Parameters.AddWithValue("@name", "Normal Timers");
+                cmd.Parameters.AddWithValue("@type", "Normal");
+                cmd.Parameters.AddWithValue("@x", baseX);
+                cmd.Parameters.AddWithValue("@y", baseY);
+                cmd.Parameters.AddWithValue("@order", 1);
+                cmd.ExecuteNonQuery();
+
+                // Pet view (offset +200)
+                cmd.Parameters.Clear();
+                cmd.Parameters.AddWithValue("@name", "Pet Timers");
+                cmd.Parameters.AddWithValue("@type", "Pet");
+                cmd.Parameters.AddWithValue("@x", baseX + 200);
+                cmd.Parameters.AddWithValue("@y", baseY);
+                cmd.Parameters.AddWithValue("@order", 2);
+                cmd.ExecuteNonQuery();
+
+                // Buff view (offset +400)
+                cmd.Parameters.Clear();
+                cmd.Parameters.AddWithValue("@name", "Buff Timers");
+                cmd.Parameters.AddWithValue("@type", "Buff");
+                cmd.Parameters.AddWithValue("@x", baseX + 400);
+                cmd.Parameters.AddWithValue("@y", baseY);
+                cmd.Parameters.AddWithValue("@order", 3);
+                cmd.ExecuteNonQuery();
+
+                // Ping view (offset +1000)
+                cmd.Parameters.Clear();
+                cmd.Parameters.AddWithValue("@name", "Ping Timers");
+                cmd.Parameters.AddWithValue("@type", "Ping");
+                cmd.Parameters.AddWithValue("@x", baseX + 1000);
+                cmd.Parameters.AddWithValue("@y", baseY);
+                cmd.Parameters.AddWithValue("@order", 4);
+                cmd.ExecuteNonQuery();
+            }
         }
 
         static public bool isFieldExist(SQLiteConnection con, string tableName, string fieldName)
@@ -820,6 +919,75 @@ namespace ThorneTimer
             {
                 cmd.CommandText = "SELECT last_insert_rowid()";
                 row.Cells[dataGridView.Columns["ID"].Index].Value = (long)cmd.ExecuteScalar();
+            }
+        }
+
+        /// <summary>
+        /// Data class for view position information
+        /// </summary>
+        public class ViewPositionData
+        {
+            public int ID { get; set; }
+            public string Name { get; set; }
+            public string ViewType { get; set; }
+            public int PositionX { get; set; }
+            public int PositionY { get; set; }
+            public int SortOrder { get; set; }
+        }
+
+        /// <summary>
+        /// Gets all view positions from the database, ordered by SortOrder.
+        /// Returns a dictionary keyed by ViewType (Normal, Pet, Buff, Ping).
+        /// </summary>
+        static public Dictionary<string, ViewPositionData> GetViewPositions(SQLiteConnection con)
+        {
+            Dictionary<string, ViewPositionData> positions = new Dictionary<string, ViewPositionData>();
+
+            SQLiteCommand cmd = new SQLiteCommand(con)
+            {
+                CommandText = "SELECT ID, Name, ViewType, PositionX, PositionY, SortOrder FROM miniviews ORDER BY SortOrder"
+            };
+
+            using (SQLiteDataReader rdr = cmd.ExecuteReader())
+            {
+                while (rdr.Read())
+                {
+                    ViewPositionData data = new ViewPositionData
+                    {
+                        ID = rdr.GetInt32(rdr.GetOrdinal("ID")),
+                        Name = rdr.IsDBNull(rdr.GetOrdinal("Name")) ? "" : rdr.GetString(rdr.GetOrdinal("Name")),
+                        ViewType = rdr.IsDBNull(rdr.GetOrdinal("ViewType")) ? "Normal" : rdr.GetString(rdr.GetOrdinal("ViewType")),
+                        PositionX = rdr.IsDBNull(rdr.GetOrdinal("PositionX")) ? 100 : rdr.GetInt32(rdr.GetOrdinal("PositionX")),
+                        PositionY = rdr.IsDBNull(rdr.GetOrdinal("PositionY")) ? 100 : rdr.GetInt32(rdr.GetOrdinal("PositionY")),
+                        SortOrder = rdr.IsDBNull(rdr.GetOrdinal("SortOrder")) ? 0 : rdr.GetInt32(rdr.GetOrdinal("SortOrder"))
+                    };
+
+                    // Use ViewType as key for easy lookup
+                    if (!positions.ContainsKey(data.ViewType))
+                    {
+                        positions[data.ViewType] = data;
+                    }
+                }
+            }
+
+            return positions;
+        }
+
+        /// <summary>
+        /// Saves view positions to the database.
+        /// </summary>
+        static public void SaveViewPositions(SQLiteConnection con, Dictionary<string, Point> positions)
+        {
+            SQLiteCommand cmd = new SQLiteCommand(con);
+
+            foreach (var kvp in positions)
+            {
+                cmd.CommandText = "UPDATE miniviews SET PositionX = @x, PositionY = @y WHERE ViewType = @type";
+                cmd.Parameters.Clear();
+                cmd.Parameters.AddWithValue("@x", kvp.Value.X);
+                cmd.Parameters.AddWithValue("@y", kvp.Value.Y);
+                cmd.Parameters.AddWithValue("@type", kvp.Key);
+                cmd.ExecuteNonQuery();
             }
         }
     }
