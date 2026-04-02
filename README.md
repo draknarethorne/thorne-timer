@@ -77,7 +77,14 @@ The **Thorne** suite is designed to work together for the ultimate Project Quarm
 ## Installation
 
 ### Pre-built Releases
-> *Coming soon* — check the [Releases](https://github.com/draknarethorne/thorne-timer/releases) page.
+
+Download the latest release from the [Releases](https://github.com/draknarethorne/thorne-timer/releases) page:
+
+1. Download `ThorneTimer-vX.X.X.zip`
+2. Extract to a folder of your choice
+3. Run `ThorneTimer.exe`
+
+**Requirements:** Windows with .NET Framework 4.8 (included in Windows 10 1903+)
 
 ### Building from Source
 See [Building from Source](#building-from-source) below.
@@ -131,6 +138,32 @@ msbuild "Thorne-Timer.sln" /t:Rebuild /p:Configuration=Debug /p:Platform="Any CP
 ## Contributing
 
 Contributions, ideas, and feedback are welcome! Feel free to open an issue or submit a pull request.
+
+---
+
+## CI/CD
+
+This project uses GitHub Actions for continuous integration and release automation.
+
+| Workflow | Trigger | Purpose |
+|----------|---------|---------|
+| **Build** | Push to `main`/`active-views`, PRs | Compiles Debug & Release, uploads artifacts |
+| **Release** | Push `v*` tags | Builds, packages, and creates GitHub Release |
+
+### Creating a Release
+
+```bash
+# Tag a new version
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The release workflow will automatically:
+1. Build the Release configuration
+2. Package all required files into a ZIP
+3. Create a GitHub Release with download links
+
+**Versioning:** Use semantic versioning (e.g., `v1.0.0`, `v1.1.0`, `v2.0.0-beta`)
 
 ---
 

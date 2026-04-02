@@ -1,0 +1,40 @@
+name: Build
+
+on:
+  push:
+    branches: [ main, active-views ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Setup NuGet
+      uses: NuGet/setup-nuget@v2
+
+    - name: Restore NuGet packages
+      run: nuget restore Thorne-Timer.sln
+
+    - name: Build Debug
+      run: msbuild Thorne-Timer.sln /p:Configuration=Debug /p:Platform="Any CPU" /verbosity:minimal
+
+    - name: Build Release
+      run: msbuild Thorne-Timer.sln /p:Configuration=Release /p:Platform="Any CPU" /verbosity:minimal
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ThorneTimer-Build
+        path: |
+          ThorneTimer/bin/Release/ThorneTimer.exe
+          ThorneTimer/bin/Release/*.dll
+          ThorneTimer/bin/Release/*.config
+        retention-days: 30
