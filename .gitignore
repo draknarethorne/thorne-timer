@@ -7,6 +7,9 @@
 *.user
 *.suo
 *.userosscache
+# Code signing certificates
+*.pfx
+# Solution state
 *.sln.docstates
 # Auto-generated files
 *.log
@@ -48,6 +51,8 @@ Desktop.ini
 *.ldf
 # Others
 *.db
+# Allow the example database shipped with the project
+!ThorneTimer/Data/ThorneTimer.db
 *.bak
 *.backup
 *.tmp

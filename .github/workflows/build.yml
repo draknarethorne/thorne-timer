@@ -2,7 +2,7 @@ name: Build
 
 on:
   push:
-    branches: [ main, active-views ]
+    branches: [ main, active-views, working-on-views ]
   pull_request:
     branches: [ main ]
 

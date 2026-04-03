@@ -1,4 +1,4 @@
-ï»¿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -30,6 +30,26 @@ namespace ThorneTimer
         public FormMain()
         {
             InitializeComponent();
+
+            // Migrate user settings from previous version on first run after upgrade
+            if (Properties.Settings.Default.NeedsUpgrade)
+            {
+                Properties.Settings.Default.Upgrade();
+                Properties.Settings.Default.NeedsUpgrade = false;
+                Properties.Settings.Default.Save();
+            }
+
+            // Resolve initial database: saved path > default (next to exe)
+            string dbPath = Properties.Settings.Default.DatabasePath;
+            if (string.IsNullOrEmpty(dbPath) || !File.Exists(dbPath))
+            {
+                dbPath = Database.GetDefaultDatabasePath();
+                Properties.Settings.Default.DatabasePath = dbPath;
+                Properties.Settings.Default.Save();
+            }
+            con = Database.Connection(dbPath);
+            AddToRecentDatabases(dbPath);
+            UpdateTitleBar(dbPath);
         }
 
         int activeTimers = 0;
@@ -46,15 +66,62 @@ namespace ThorneTimer
         const string noTime = "00:00:00";
         const string pingHour = "00:";
 
-        const string btnStartParsingLog = "Start Parsing Log";
-        const string btnStopParsingLog = "Stop Parsing Log";
+        const string startWatchingText = "Start Watching";
+        const string stopWatchingText = "Stop Watching";
 
         readonly MiniViews miniViews = new MiniViews();
         readonly List<TimerPlus> timers = new List<TimerPlus>();
-        readonly SQLiteConnection con = Database.Connection();
+        SQLiteConnection con;
+
+        Bitmap iconPlay;
+        Bitmap iconStop;
+        Bitmap iconMiniViews;
+
+        private void CreateToolbarIcons()
+        {
+            // Green play triangle (?) — Start Watching
+            iconPlay = new Bitmap(16, 16);
+            using (var g = Graphics.FromImage(iconPlay))
+            {
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (var brush = new SolidBrush(Color.FromArgb(0, 160, 0)))
+                    g.FillPolygon(brush, new[] { new Point(4, 2), new Point(14, 8), new Point(4, 14) });
+            }
+
+            // Red stop square (?) — Stop Watching
+            iconStop = new Bitmap(16, 16);
+            using (var g = Graphics.FromImage(iconStop))
+            {
+                g.Clear(Color.Transparent);
+                using (var brush = new SolidBrush(Color.FromArgb(200, 30, 30)))
+                    g.FillRectangle(brush, 3, 3, 10, 10);
+            }
+
+            // Mini Views icon — four small windows in a grid
+            iconMiniViews = new Bitmap(16, 16);
+            using (var g = Graphics.FromImage(iconMiniViews))
+            {
+                g.Clear(Color.Transparent);
+                using (var pen = new Pen(Color.FromArgb(80, 80, 80)))
+                {
+                    g.DrawRectangle(pen, 1, 1, 6, 5);
+                    g.DrawRectangle(pen, 9, 1, 6, 5);
+                    g.DrawRectangle(pen, 1, 8, 6, 5);
+                    g.DrawRectangle(pen, 9, 8, 6, 5);
+                }
+            }
+
+            // Set initial images
+            tsbStartStopWatching.Image = iconPlay;
+            startStopWatchingToolStripMenuItem.Image = iconPlay;
+            tsbMiniViews.Image = iconMiniViews;
+            miniViewsToolStripMenuItem.Image = iconMiniViews;
+        }
 
         private void FormMain_Load(object sender, EventArgs e)
         {
+            CreateToolbarIcons();
             this.FormClosing += FormMain_FormClosing;
             txtWarningTime.LostFocus += WarningTime_LostFocus;
             txtPingTime.LostFocus += PingTime_LostFocus;
@@ -110,7 +177,6 @@ namespace ThorneTimer
 
             activeCharacterID = Database.GetSetting(con, "ActiveCharacterID");
 
-            //labelLogFile.Text = "Idle";
             if (Properties.Settings.Default.ParseLog)
             {
                 StartLog();
@@ -126,12 +192,418 @@ namespace ThorneTimer
             SetupCharacterGrid();
             SetupCategoriesGrid();
 
+            // Restore persisted column widths
+            LoadColumnWidths("Timers", grdTimers);
+            LoadColumnWidths("Characters", grdCharacters);
+            LoadColumnWidths("Categories", grdCategories);
+
             UpdateMiniView();
+
+            PopulateRecentDatabases();
+        }
+
+        private void UpdateTitleBar(string dbPath)
+        {
+            string dbName = Path.GetFileName(dbPath);
+            this.Text = "Thorne Timer - " + dbName;
+            statusTomePath.Text = dbPath;
+        }
+
+        private void AddToRecentDatabases(string dbPath)
+        {
+            var recent = Properties.Settings.Default.RecentDatabases;
+            if (recent == null)
+            {
+                recent = new System.Collections.Specialized.StringCollection();
+                Properties.Settings.Default.RecentDatabases = recent;
+            }
+
+            // Remove if already present (so it moves to top)
+            for (int i = recent.Count - 1; i >= 0; i--)
+            {
+                if (string.Equals(recent[i], dbPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    recent.RemoveAt(i);
+                }
+            }
+
+            // Insert at the front
+            recent.Insert(0, dbPath);
+
+            // Keep at most 10 entries
+            while (recent.Count > 10)
+            {
+                recent.RemoveAt(recent.Count - 1);
+            }
+
+            Properties.Settings.Default.Save();
+        }
+
+        private void PopulateRecentDatabases()
+        {
+            openRecentToolStripMenuItem.DropDownItems.Clear();
+
+            var recent = Properties.Settings.Default.RecentDatabases;
+            if (recent == null || recent.Count == 0)
+            {
+                openRecentToolStripMenuItem.Enabled = false;
+                return;
+            }
+
+            openRecentToolStripMenuItem.Enabled = true;
+            foreach (string path in recent)
+            {
+                if (string.IsNullOrEmpty(path))
+                    continue;
+
+                ToolStripMenuItem item = new ToolStripMenuItem(path);
+                item.Click += (s, ev) =>
+                {
+                    if (File.Exists(path))
+                    {
+                        OpenDatabase(path);
+                    }
+                    else
+                    {
+                        MessageBox.Show("Tome not found:\n" + path, "Tome Not Found",
+                            MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                };
+                openRecentToolStripMenuItem.DropDownItems.Add(item);
+            }
+        }
+
+        private void OpenDatabase(string dbPath)
+        {
+            // Save current state before switching
+            SaveDataTimers();
+            SaveDataCharacters();
+            SaveDataCategories();
+
+            // Snapshot what was running so we can restore after reload
+            bool wasParsingLog = (tsbStartStopWatching.Text == stopWatchingText);
+            bool wasMiniViewActive = miniViews.MiniViewsActive();
+
+            // Stop all running timers
+            StopAllTimers();
+
+            // Stop log parsing
+            if (wasParsingLog)
+            {
+                StopLog();
+            }
+
+            // Hide mini views
+            if (wasMiniViewActive)
+            {
+                HideMiniView();
+            }
+
+            // Remember previous database in case the new one fails
+            string previousDbPath = Properties.Settings.Default.DatabasePath;
+
+            // Close old connection
+            try { con.Close(); } catch { }
+
+            // Try to open the new database
+            try
+            {
+                con = Database.Connection(dbPath);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    "Unable to open the tome:\n" + dbPath +
+                    "\n\n" + ex.Message,
+                    "Invalid Tome",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+
+                // Re-open the previous database so the app stays usable
+                if (!string.IsNullOrEmpty(previousDbPath) && File.Exists(previousDbPath))
+                {
+                    con = Database.Connection(previousDbPath);
+                }
+                else
+                {
+                    con = Database.Connection(Database.GetDefaultDatabasePath());
+                }
+
+                ReloadFromDatabase();
+                UpdateTitleBar(Properties.Settings.Default.DatabasePath);
+                PopulateRecentDatabases();
+
+                if (wasParsingLog) StartLog();
+                if (wasMiniViewActive) ShowMiniView();
+                return;
+            }
+
+            // Save the new path and add to recent list
+            Properties.Settings.Default.DatabasePath = dbPath;
+            AddToRecentDatabases(dbPath);
+
+            // Reload all UI from new database
+            ReloadFromDatabase();
+
+            UpdateTitleBar(dbPath);
+            PopulateRecentDatabases();
+
+            // Restore log parsing and mini views to their previous state
+            if (wasParsingLog)
+            {
+                StartLog();
+            }
+
+            if (wasMiniViewActive)
+            {
+                ShowMiniView();
+            }
+        }
+
+        private void ReloadFromDatabase()
+        {
+            // Reload settings from new database
+            tbOpacity.Value = Math.Max(tbOpacity.Minimum, Math.Min(tbOpacity.Maximum, SafeParseInt(Database.GetSetting(con, "MiniViewOpacity"), 100)));
+            miniViews.mvOpacity = tbOpacity.Value;
+            tbFontSize.Value = Math.Max(tbFontSize.Minimum, Math.Min(tbFontSize.Maximum, SafeParseInt(Database.GetSetting(con, "MiniViewFontSize"), 8)));
+            miniViews.mvFontSize = tbFontSize.Value;
+
+            miniViews.mvNormForeColor = SafeParseInt(Database.GetSetting(con, "MiniViewNormFore"), Color.Black.ToArgb());
+            lblNormPickFore.BackColor = Color.FromArgb(miniViews.mvNormForeColor);
+            miniViews.mvNormBackColor = SafeParseInt(Database.GetSetting(con, "MiniViewNormBack"), Color.White.ToArgb());
+            lblNormPickBack.BackColor = Color.FromArgb(miniViews.mvNormBackColor);
+
+            miniViews.mvWarnForeColor = SafeParseInt(Database.GetSetting(con, "MiniViewWarnFore"), Color.White.ToArgb());
+            lblWarnPickFore.BackColor = Color.FromArgb(miniViews.mvWarnForeColor);
+            miniViews.mvWarnBackColor = SafeParseInt(Database.GetSetting(con, "MiniViewWarnBack"), Color.Red.ToArgb());
+            lblWarnPickBack.BackColor = Color.FromArgb(miniViews.mvWarnBackColor);
+            miniViews.mvWarnTime = Database.GetSetting(con, "MiniViewWarnTime");
+            txtWarningTime.Text = miniViews.mvWarnTime;
+
+            miniViews.mvShowPing = SafeParseInt(Database.GetSetting(con, "MiniViewShowPing"), 1);
+            chkShowPing.Checked = miniViews.ShowPing();
+            miniViews.mvPingForeColor = SafeParseInt(Database.GetSetting(con, "MiniViewPingFore"), Color.LightGreen.ToArgb());
+            lblPingPickFore.BackColor = Color.FromArgb(miniViews.mvPingForeColor);
+            miniViews.mvPingBackColor = SafeParseInt(Database.GetSetting(con, "MiniViewPingBack"), Color.Black.ToArgb());
+            lblPingPickBack.BackColor = Color.FromArgb(miniViews.mvPingBackColor);
+            miniViews.mvPingTime = Database.GetSetting(con, "MiniViewPingTime");
+            txtPingTime.Text = miniViews.mvPingTime;
+
+            miniViews.mvBuffForeColor = SafeParseInt(Database.GetSetting(con, "MiniViewBuffFore"), Color.Orange.ToArgb());
+            lblBuffPickFore.BackColor = Color.FromArgb(miniViews.mvBuffForeColor);
+            miniViews.mvBuffBackColor = SafeParseInt(Database.GetSetting(con, "MiniViewBuffBack"), Color.Black.ToArgb());
+            lblBuffPickBack.BackColor = Color.FromArgb(miniViews.mvBuffBackColor);
+
+            UpdateMiniAppearance();
+
+            activeVoice = Database.GetSetting(con, "ActiveVoice");
+            voiceVolume = SafeParseInt(Database.GetSetting(con, "VoiceVolume"), 100);
+            voiceRate = SafeParseInt(Database.GetSetting(con, "VoiceRate"), -2);
+            voiceEnabled = SafeParseInt(Database.GetSetting(con, "VoiceEnabled"), 1);
+            chkVoiceEnabled.Checked = (voiceEnabled == 1);
+
+            activeCharacterID = Database.GetSetting(con, "ActiveCharacterID");
+
+            // Unhook event handlers before tearing down grids to prevent
+            // validation firing against columns that no longer exist.
+            grdTimers.RowValidating -= ValidateRowTimers;
+            grdCharacters.RowValidating -= ValidateRowCharacters;
+            grdCharacters.CellClick -= grdCharacters_CellClick;
+            grdCategories.RowValidating -= ValidateRowCategories;
+
+            // Reload grids
+            SetupActiveCharacters();
+            grdTimers.DataSource = null;
+            grdTimers.Columns.Clear();
+            SetupTimerGrid();
+            grdCharacters.DataSource = null;
+            grdCharacters.Columns.Clear();
+            SetupCharacterGrid();
+            grdCategories.DataSource = null;
+            grdCategories.Columns.Clear();
+            SetupCategoriesGrid();
+
+            UpdateMiniView();
+        }
+
+        private string GetDataDirectory()
+        {
+            string exePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
+            return Path.Combine(Path.GetDirectoryName(exePath), "Data");
+        }
+
+        private void newDatabaseToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            string dataDir = GetDataDirectory();
+            if (!Directory.Exists(dataDir))
+            {
+                Directory.CreateDirectory(dataDir);
+            }
+
+            SaveFileDialog dlg = new SaveFileDialog
+            {
+                Title = "New Tome",
+                Filter = "Tome files (*.tdb)|*.tdb|Database files (*.db)|*.db",
+                InitialDirectory = dataDir,
+                FileName = "ThorneTimer.tdb",
+                OverwritePrompt = true,
+                AutoUpgradeEnabled = true
+            };
+
+            if (dlg.ShowDialog() == DialogResult.OK)
+            {
+                // If the file already exists, delete it so Connection() creates a fresh one
+                if (File.Exists(dlg.FileName))
+                {
+                    File.Delete(dlg.FileName);
+                }
+
+                OpenDatabase(dlg.FileName);
+            }
+        }
+
+        private void openDatabaseToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            string currentDir = Path.GetDirectoryName(
+                Properties.Settings.Default.DatabasePath ?? Database.GetDefaultDatabasePath());
+
+            OpenFileDialog dlg = new OpenFileDialog
+            {
+                Title = "Open Tome",
+                Filter = "Tome files (*.tdb)|*.tdb|Database files (*.db)|*.db|All files (*.*)|*.*",
+                InitialDirectory = currentDir,
+                DereferenceLinks = false,
+                AutoUpgradeEnabled = true
+            };
+
+            if (dlg.ShowDialog() != DialogResult.OK)
+                return;
+
+            string selectedPath = dlg.FileName;
+            string selectedName = Path.GetFileName(selectedPath);
+
+            // EQTimer.db: migrate it into Data\ as ThorneTimer.tdb instead of opening in place
+            if (string.Equals(selectedName, "EQTimer.db", StringComparison.OrdinalIgnoreCase))
+            {
+                string dataDir = GetDataDirectory();
+                if (!Directory.Exists(dataDir))
+                {
+                    Directory.CreateDirectory(dataDir);
+                }
+
+                string targetPath = Path.Combine(dataDir, "ThorneTimer.tdb");
+
+                if (File.Exists(targetPath))
+                {
+                    DialogResult result = MessageBox.Show(
+                        "A tome named \"ThorneTimer.tdb\" already exists in the Data folder.\n\n" +
+                        "Yes \u2014 Replace the existing tome\n" +
+                        "No \u2014 Save with a different name",
+                        "Tome Already Exists",
+                        MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+
+                    if (result == DialogResult.Cancel)
+                        return;
+
+                    if (result == DialogResult.No)
+                    {
+                        // Let them pick a different name
+                        SaveFileDialog saveDlg = new SaveFileDialog
+                        {
+                            Title = "Save Migrated Tome As",
+                            Filter = "Tome files (*.tdb)|*.tdb|Database files (*.db)|*.db",
+                            InitialDirectory = dataDir,
+                            FileName = "ThorneTimer.tdb",
+                            OverwritePrompt = true,
+                            AutoUpgradeEnabled = true
+                        };
+
+                        if (saveDlg.ShowDialog() != DialogResult.OK)
+                            return;
+
+                        targetPath = saveDlg.FileName;
+                    }
+                    else
+                    {
+                        // Yes — replace the existing one
+                        string currentDbPath = Properties.Settings.Default.DatabasePath ?? "";
+                        if (string.Equals(Path.GetFullPath(currentDbPath), Path.GetFullPath(targetPath), StringComparison.OrdinalIgnoreCase))
+                        {
+                            try { con.Close(); } catch { }
+                        }
+
+                        File.Delete(targetPath);
+                    }
+                }
+
+                File.Copy(selectedPath, targetPath);
+
+                MessageBox.Show(
+                    "Your EQTimer tome has been migrated to:\n" + targetPath +
+                    "\n\nAll your timers, characters, and settings have been preserved." +
+                    "\nThe original EQTimer.db was not modified.",
+                    "Tome Migrated",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                OpenDatabase(targetPath);
+                return;
+            }
+
+            // Any other database: open it directly wherever it lives
+            OpenDatabase(selectedPath);
+        }
+
+        private void saveDatabaseAsToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            string currentDbPath = Properties.Settings.Default.DatabasePath ?? Database.GetDefaultDatabasePath();
+            string dataDir = GetDataDirectory();
+            if (!Directory.Exists(dataDir))
+            {
+                Directory.CreateDirectory(dataDir);
+            }
+
+            SaveFileDialog dlg = new SaveFileDialog
+            {
+                Title = "Save Tome As",
+                Filter = "Tome files (*.tdb)|*.tdb|Database files (*.db)|*.db",
+                InitialDirectory = dataDir,
+                FileName = Path.GetFileName(currentDbPath),
+                OverwritePrompt = true,
+                AutoUpgradeEnabled = true
+            };
+
+            if (dlg.ShowDialog() != DialogResult.OK)
+                return;
+
+            // Don't allow saving over the currently open database
+            if (string.Equals(Path.GetFullPath(dlg.FileName), Path.GetFullPath(currentDbPath), StringComparison.OrdinalIgnoreCase))
+            {
+                MessageBox.Show(
+                    "The tome is already open under that name.",
+                    "Save Tome As",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            // Save any pending changes before copying
+            SaveDataTimers();
+            SaveDataCharacters();
+            SaveDataCategories();
+
+            // Copy the current database to the new location
+            File.Copy(currentDbPath, dlg.FileName, true);
+
+            // Switch to the new copy
+            OpenDatabase(dlg.FileName);
         }
 
         private void FormMain_FormClosing(Object sender, FormClosingEventArgs e)
         {
             SaveProperties();
+
+            // Persist column widths
+            Database.SaveColumnWidths(con, "Timers", grdTimers);
+            Database.SaveColumnWidths(con, "Characters", grdCharacters);
+            Database.SaveColumnWidths(con, "Categories", grdCategories);
 
             SaveDataTimers();
             SaveDataCharacters();
@@ -141,13 +613,50 @@ namespace ThorneTimer
                 tParseLog.Abort();
         }
 
+        /// <summary>
+        /// Returns true if the given rectangle is at least partially visible
+        /// on any connected monitor. Returns false only when 100% of the
+        /// window would be offscreen.
+        /// </summary>
+        static public bool IsVisibleOnAnyScreen(Rectangle rect)
+        {
+            foreach (Screen screen in Screen.AllScreens)
+            {
+                if (screen.WorkingArea.IntersectsWith(rect))
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Ensures a window position is visible on at least one monitor.
+        /// If the window is entirely offscreen, clamps it to 10 pixels
+        /// inside the nearest screen's working area.
+        /// </summary>
+        static public Point EnsureVisibleOnScreen(Point location, Size size)
+        {
+            Rectangle windowRect = new Rectangle(location, size);
+            if (IsVisibleOnAnyScreen(windowRect))
+                return location;
+
+            // Entirely offscreen — clamp to nearest screen with a small inset
+            const int inset = 10;
+            Screen nearest = Screen.FromPoint(location);
+            Rectangle area = nearest.WorkingArea;
+            int x = Math.Max(area.Left + inset, Math.Min(location.X, area.Right - size.Width - inset));
+            int y = Math.Max(area.Top + inset, Math.Min(location.Y, area.Bottom - size.Height - inset));
+            return new Point(x, y);
+        }
+
         private void RestoreWindowPosition()
         {
             if (Properties.Settings.Default.HasSetDefaults)
             {
                 this.WindowState = Properties.Settings.Default.WindowState;
-                this.Location = Properties.Settings.Default.Location;
-                this.Size = Properties.Settings.Default.Size;
+                Point loc = Properties.Settings.Default.Location;
+                Size sz = Properties.Settings.Default.Size;
+                this.Location = EnsureVisibleOnScreen(loc, sz);
+                this.Size = sz;
             }
         }
 
@@ -166,7 +675,7 @@ namespace ThorneTimer
                 Properties.Settings.Default.Size = this.RestoreBounds.Size;
             }
 
-            Properties.Settings.Default.ParseLog = (bool)(btnStartStopLog.Text == btnStopParsingLog);
+            Properties.Settings.Default.ParseLog = (bool)(tsbStartStopWatching.Text == stopWatchingText);
             Properties.Settings.Default.MiniView = miniViews.MiniViewsActive();
             if (grdTimers.SortedColumn != null)
             {
@@ -181,9 +690,45 @@ namespace ThorneTimer
             Properties.Settings.Default.Save();
         }
 
+        /// <summary>
+        /// Applies saved column widths from the database to a grid.
+        /// Silently skips columns that no longer exist.
+        /// </summary>
+        private void LoadColumnWidths(string gridName, DataGridView grid)
+        {
+            try
+            {
+                Dictionary<string, int> widths = Database.GetColumnWidths(con, gridName);
+                foreach (var kvp in widths)
+                {
+                    if (grid.Columns.Contains(kvp.Key))
+                    {
+                        DataGridViewColumn col = grid.Columns[kvp.Key];
+                        if (col.Visible && kvp.Value >= col.MinimumWidth)
+                        {
+                            col.Width = kvp.Value;
+                        }
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                // Database may not have the table yet; ignore
+            }
+        }
+
         void GrdTimers_DataError(object sender, DataGridViewDataErrorEventArgs e)
         {
             // (No need to write anything in here)
+        }
+
+        void GrdTimers_EditingControlShowing(object sender, DataGridViewEditingControlShowingEventArgs e)
+        {
+            if (e.Control is ComboBox)
+            {
+                e.CellStyle.BackColor = Color.White;
+                e.CellStyle.ForeColor = Color.Black;
+            }
         }
 
         private void ResetTimersGridColumns()
@@ -193,6 +738,7 @@ namespace ThorneTimer
             grdTimers.Columns["Name"].DisplayIndex = i++;
             grdTimers.Columns["Count"].DisplayIndex = i++;
             grdTimers.Columns["CategoryID"].DisplayIndex = i++;
+            grdTimers.Columns["Style"].DisplayIndex = i++;
             grdTimers.Columns["StartKeyword"].DisplayIndex = i++;
             grdTimers.Columns["EndKeyword"].DisplayIndex = i++;
             grdTimers.Columns["WAV"].DisplayIndex = i++;
@@ -217,6 +763,7 @@ namespace ThorneTimer
             grdTimers.Columns["Remaining"].SortMode = DataGridViewColumnSortMode.NotSortable;
             grdTimers.Columns["CaseYn"].SortMode = DataGridViewColumnSortMode.NotSortable;
             grdTimers.Columns["EndlessYn"].SortMode = DataGridViewColumnSortMode.NotSortable;
+            grdTimers.Columns["Style"].SortMode = DataGridViewColumnSortMode.Automatic;
             grdTimers.Columns["StartStop"].SortMode = DataGridViewColumnSortMode.NotSortable;
 
             RepaintTimerGrid(true);
@@ -268,8 +815,7 @@ namespace ThorneTimer
                 }
 
                 String timerText = "Timers: " + grdTimers.RowCount + "   Active: " + activeTimers + "   Running: " + runningTimers;
-                labelTimerCount.Invoke(new Action(() => labelTimerCount.Text = timerText));
-                //labelTimerCount.Text = timerText;
+                statusTimerStats.GetCurrentParent()?.Invoke(new Action(() => statusTimerStats.Text = timerText));
             }
             catch
             {
@@ -296,13 +842,13 @@ namespace ThorneTimer
         {
             string oldActiveCharacterID = activeCharacterID;
 
-            cboActiveCharacter.DataSource = Database.GetActiveCharacters(con);
+            tscActiveCharacter.ComboBox.DataSource = Database.GetActiveCharacters(con);
 
-            foreach (ComboBoxItem item in (List<ComboBoxItem>)cboActiveCharacter.DataSource)
+            foreach (ComboBoxItem item in (List<ComboBoxItem>)tscActiveCharacter.ComboBox.DataSource)
             {
                 if (Convert.ToString(item.Value) == oldActiveCharacterID)
                 {
-                    cboActiveCharacter.SelectedItem = item;
+                    tscActiveCharacter.SelectedItem = item;
                     break;
                 }
             }
@@ -347,7 +893,8 @@ namespace ThorneTimer
                 ValueType = typeof(ComboBoxItem),
                 DisplayMember = "Text",
                 ValueMember = "Value",
-                DataSource = Database.GetGridCategories(con)
+                DataSource = Database.GetGridCategories(con),
+                FlatStyle = FlatStyle.Flat
             };
             grdTimers.Columns.Add(cboCategory);
 
@@ -406,6 +953,18 @@ namespace ThorneTimer
             grdTimers.Columns[11].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCellsExceptHeader;
             grdTimers.Columns[11].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
 
+            DataGridViewComboBoxColumn cboRole = new DataGridViewComboBoxColumn
+            {
+                HeaderText = "Style",
+                Name = "Style",
+                DataPropertyName = "Style",
+                FlatStyle = FlatStyle.Flat
+            };
+            cboRole.Items.AddRange("Normal", "Buff", "Pet", "Ping");
+            grdTimers.Columns.Add(cboRole);
+            grdTimers.Columns["Style"].Width = 85;
+            grdTimers.Columns["Style"].MinimumWidth = 60;
+
             DataGridViewButtonColumn buttonWAV = new DataGridViewButtonColumn
             {
                 HeaderText = "Play",
@@ -440,6 +999,7 @@ namespace ThorneTimer
             grdTimers.DataSource = Database.GetTimers(con);
 
             grdTimers.RowValidating += ValidateRowTimers;
+            grdTimers.EditingControlShowing += GrdTimers_EditingControlShowing;
 
             string sortName = (Properties.Settings.Default.SortColumn.Length > 0) ? Properties.Settings.Default.SortColumn : "Name";
             DataGridViewColumn sortColumn = grdTimers.Columns[sortName];
@@ -920,16 +1480,34 @@ namespace ThorneTimer
                 countCell.Value = counter.ToString();
 
                 btnCell.UseColumnTextForButtonValue = false;
-                if (TimerPlus.GetMilliseconds(durationText) != 0)
+                DataGridViewCell styleCell = grdTimers.Rows[rowIndex].Cells[grdTimers.Columns["Style"].Index];
+                string style = Convert.ToString(styleCell.Value);
+
+                if (style == "Ping")
                 {
-                    DataGridViewCell endKeywordCell = grdTimers.Rows[rowIndex].Cells[grdTimers.Columns["EndKeyword"].Index];
-                    string endKeyword = (string)endKeywordCell.Value + "";
-                    if (BuffTimer(endKeyword))
+                    // Ping timers use their own Duration (per-timer ping countdown)
+                    string pingText = durationText;
+                    if (TimerPlus.GetMilliseconds(pingText) == 0)
+                    {
+                        // Fallback to global ping time if Duration is still zero
+                        pingText = pingHour + miniViews.mvPingTime;
+                    }
+                    if (TimerPlus.GetMilliseconds(pingText) != 0)
+                    {
+                        btnCell.Value = Timers.btnPing;
+                        StartTimer(rowIndex, grdTimers.Columns["Remaining"].Index, pingText, TimerPlus.TimerType.Ping);
+                    }
+
+                    PlayTimerSounds(rowIndex);
+                }
+                else if (TimerPlus.GetMilliseconds(durationText) != 0)
+                {
+                    if (style == "Buff")
                     {
                         btnCell.Value = Timers.btnBuff;
                         StartTimer(rowIndex, grdTimers.Columns["Remaining"].Index, durationText, TimerPlus.TimerType.Buff);
                     }
-                    else if (PetTimer(endKeyword))
+                    else if (style == "Pet")
                     {
                         btnCell.Value = Timers.btnPet;
                         StartTimer(rowIndex, grdTimers.Columns["Remaining"].Index, durationText, TimerPlus.TimerType.Pet);
@@ -939,17 +1517,6 @@ namespace ThorneTimer
                         btnCell.Value = Timers.btnStop;
                         StartTimer(rowIndex, grdTimers.Columns["Remaining"].Index, durationText, TimerPlus.TimerType.Normal);
                     }
-                }
-                else
-                {
-                    string pingText = pingHour + miniViews.mvPingTime;
-                    if (TimerPlus.GetMilliseconds(pingText) != 0)
-                    {
-                        btnCell.Value = Timers.btnPing;
-                        StartTimer(rowIndex, grdTimers.Columns["Remaining"].Index, pingText, TimerPlus.TimerType.Ping);
-                    }
-
-                    PlayTimerSounds(rowIndex);
                 }
             }
         }
@@ -1165,7 +1732,7 @@ namespace ThorneTimer
 
         private void ToggleLog()
         {
-            if (btnStartStopLog.Text == btnStartParsingLog)
+            if (tsbStartStopWatching.Text == startWatchingText)
             {
                 StartLog();
             }
@@ -1177,7 +1744,7 @@ namespace ThorneTimer
 
         private void RestartLog()
         {
-            if (btnStartStopLog.Text == btnStopParsingLog)
+            if (tsbStartStopWatching.Text == stopWatchingText)
             {
                 StopLog();
                 StartLog();
@@ -1190,11 +1757,13 @@ namespace ThorneTimer
 
             string filePath = character.LogFile;
 
-            if (filePath.Length > 0 && File.Exists(filePath))
+            if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
             {
-                btnStartStopLog.Text = "Stop Parsing Log";
-                btnStartStopLog.BackColor = Color.LightGreen;
-                labelLogFile.Text = filePath;
+                tsbStartStopWatching.Text = stopWatchingText;
+                tsbStartStopWatching.Image = iconStop;
+                startStopWatchingToolStripMenuItem.Text = "&Stop Watching";
+                startStopWatchingToolStripMenuItem.Image = iconStop;
+                statusParsing.Text = "Watching: " + Path.GetFileName(filePath);
 
                 // Process Events on Another Thread
                 tParseLog = new Thread(new ThreadStart(ParseLog));
@@ -1204,15 +1773,16 @@ namespace ThorneTimer
 
         private void StopLog()
         {
-            btnStartStopLog.Text = "Start Parsing Log";
-            btnStartStopLog.BackColor = btnAddTimer.BackColor;
-            btnStartStopLog.UseVisualStyleBackColor = true;
-            labelLogFile.Text = "Idle";
+            tsbStartStopWatching.Text = startWatchingText;
+            tsbStartStopWatching.Image = iconPlay;
+            startStopWatchingToolStripMenuItem.Text = "&Start Watching";
+            startStopWatchingToolStripMenuItem.Image = iconPlay;
+            statusParsing.Text = "Idle";
 
             tParseLog.Abort();
         }
 
-        private void btnStartStopLog_Click(object sender, EventArgs e)
+        private void tsbStartStopWatching_Click(object sender, EventArgs e)
         {
             ToggleLog();
         }
@@ -1316,11 +1886,15 @@ namespace ThorneTimer
                         {
                             TriggerRowTimer(btnCell, r);
                         }
-                        else if (Timers.TimerRunning((string)btnCell.Value) && ResetTimer(endKeyword))
+                        else if (Timers.TimerRunning((string)btnCell.Value))
                         {
-                            // Reset the timer since it has the reset tags present
-                            StopRowTimer(btnCell, r);
-                            StartRowTimer(btnCell, r);
+                            // Buff and Pet timers reset when their start keyword fires again
+                            string style = Convert.ToString(grdTimers.Rows[r].Cells[grdTimers.Columns["Style"].Index].Value);
+                            if (style == "Buff" || style == "Pet")
+                            {
+                                StopRowTimer(btnCell, r);
+                                StartRowTimer(btnCell, r);
+                            }
                         }
                     }
 
@@ -1336,47 +1910,13 @@ namespace ThorneTimer
             }
         }
 
-        private bool PetTimer(string endKeyword)
-        {
-            return CheckTimer(endKeyword, "#");
-        }
-
-        private bool BuffTimer(string endKeyword)
-        {
-            return CheckTimer(endKeyword, "@");
-        }
-
-        private bool ValidEndKeyword(string endKeyword)
-        {
-            return CheckTimer(endKeyword, "@#$*");
-        }
-
-        private bool CheckTimer(string endKeyword, string checkChar)
-        {
-            bool bReset = false;
-            if (endKeyword.Length > 0)
-            {
-                string endChar = endKeyword.Substring(0, 1);
-                if ((endChar == checkChar))
-                {
-                    bReset = true;
-                }
-            }
-            return bReset;
-        }
-
-        private bool ResetTimer(string endKeyword)
-        {
-            return BuffTimer(endKeyword) || PetTimer(endKeyword);
-        }
-
         private void ParseLog()
         {
             Characters.GridData character = Database.GetCharacter(con, activeCharacterID);
 
             string filePath = character.LogFile;
 
-            if (filePath.Length > 0 && File.Exists(filePath))
+            if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
             {
                 var initialFileSize = new FileInfo(filePath).Length;
                 var lastReadLength = initialFileSize;
@@ -1515,9 +2055,9 @@ namespace ThorneTimer
             }
         }
 
-        private void cboActiveCharacter_SelectedIndexChanged(object sender, EventArgs e)
+        private void tscActiveCharacter_SelectedIndexChanged(object sender, EventArgs e)
         {
-            activeCharacterID = (cboActiveCharacter.SelectedItem as ComboBoxItem).Value.ToString();
+            activeCharacterID = (tscActiveCharacter.SelectedItem as ComboBoxItem).Value.ToString();
 
             Database.SetSetting(con, "ActiveCharacterID", activeCharacterID);
 
@@ -1586,7 +2126,9 @@ namespace ThorneTimer
         {
             if (miniViews.CreateMiniViews(con, activeCharacterID))
             {
-                btnMiniView.BackColor = Color.LightGreen;
+                tsbMiniViews.Checked = true;
+                tsbMiniViews.BackColor = Color.LightGreen;
+                miniViewsToolStripMenuItem.Checked = true;
 
                 UpdateMiniView();
             }
@@ -1604,16 +2146,20 @@ namespace ThorneTimer
 
         private void HideMiniView()
         {
-            if (miniViews.DestroyMiniViews())
+            if (miniViews.MiniViewsActive())
             {
+                // Save positions while the views still exist
                 SaveDataCharacters();
 
-                btnMiniView.BackColor = btnAddTimer.BackColor;
-                btnMiniView.UseVisualStyleBackColor = true;
+                miniViews.DestroyMiniViews();
+
+                tsbMiniViews.Checked = false;
+                tsbMiniViews.BackColor = Color.Empty;
+                miniViewsToolStripMenuItem.Checked = false;
             }
         }
 
-        private void btnMiniView_Click(object sender, EventArgs e)
+        private void tsbMiniViews_Click(object sender, EventArgs e)
         {
             if (miniViews.MiniViewsHidden())
             {

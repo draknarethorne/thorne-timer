@@ -8,6 +8,10 @@ on:
 jobs:
   build-and-release:
     runs-on: windows-latest
+    permissions:
+      contents: write
+    env:
+      HAS_SIGNING_CERT: ${{ secrets.SIGNING_CERTIFICATE != '' }}
 
     steps:
     - name: Checkout code
@@ -56,7 +60,28 @@ jobs:
         copy ThorneTimer\bin\Release\*.dll release-package\
         copy ThorneTimer\bin\Release\ThorneTimer.exe.config release-package\
         copy README.md release-package\
+        xcopy ThorneTimer\bin\Release\x64 release-package\x64\ /E /I /Y
+        xcopy ThorneTimer\bin\Release\x86 release-package\x86\ /E /I /Y
+        xcopy ThorneTimer\bin\Release\Sounds release-package\Sounds\ /E /I /Y
+        xcopy ThorneTimer\bin\Release\Data release-package\Data\ /E /I /Y
       shell: cmd
+
+    - name: Sign executable
+      if: env.HAS_SIGNING_CERT == 'true'
+      run: |
+        # Decode the base64-encoded .pfx from GitHub secret
+        $pfxBytes = [Convert]::FromBase64String("${{ secrets.SIGNING_CERTIFICATE }}")
+        $pfxPath = Join-Path $env:RUNNER_TEMP "code_signing.pfx"
+        [IO.File]::WriteAllBytes($pfxPath, $pfxBytes)
+
+        # Find signtool.exe (available on windows-latest runners)
+        $signtool = Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits" -Recurse -Filter signtool.exe | Where-Object { $_.FullName -match "x64" } | Select-Object -First 1 -ExpandProperty FullName
+
+        # Sign ThorneTimer.exe
+        & $signtool sign /f $pfxPath /p "${{ secrets.PFX_PASSWORD }}" /fd sha256 /tr http://timestamp.digicert.com /td sha256 "release-package\ThorneTimer.exe"
+
+        # Clean up
+        Remove-Item $pfxPath
 
     - name: Create ZIP archive
       run: Compress-Archive -Path release-package\* -DestinationPath ThorneTimer-${{ github.ref_name }}.zip
@@ -66,18 +91,32 @@ jobs:
       with:
         name: Thorne Timer ${{ github.ref_name }}
         body: |
-          ## Thorne Timer ${{ github.ref_name }}
-          
-          A lightweight overlay timer for EverQuest / Project Quarm.
-          
-          ### Installation
-          1. Download `ThorneTimer-${{ github.ref_name }}.zip`
+          ## ⚔️ Thorne Timer ${{ github.ref_name }}
+
+          **A tactical overlay timer and log event notification system for [Project Quarm](https://www.projectquarm.com/).**
+
+          Thorne Timer watches your EverQuest log files in real-time and gives you always-on-top timer overlays, voice alerts, and event-driven notifications — the tactical edge you can't get from UI files alone.
+
+          ---
+
+          ### 📦 Installation
+          1. Download **`ThorneTimer-${{ github.ref_name }}.zip`** below
           2. Extract to a folder of your choice
-          3. Run `ThorneTimer.exe`
-          
-          ### Requirements
-          - Windows with .NET Framework 4.8
+          3. Run **`ThorneTimer.exe`**
+          4. Point it at your EQ log file and you're ready to go
+
+          > 🔄 **Upgrading?** Your tome (`.tdb` database) will be migrated automatically — all your timers, characters, and settings are preserved.
+
+          ### 🖥️ Requirements
+          - Windows with .NET Framework 4.8 (included in Windows 10 1903+)
           - EverQuest with logging enabled (`/log on`)
+
+          ### 🔗 Links
+          - 📖 [README & Documentation](https://github.com/draknarethorne/thorne-timer#readme)
+          - 🐛 [Report an Issue](https://github.com/draknarethorne/thorne-timer/issues)
+          - 🎨 [Thorne-UI](https://github.com/draknarethorne/thorne-ui) — the companion in-game UI overhaul
+        generate_release_notes: true
+        append_body: true
         files: ThorneTimer-${{ github.ref_name }}.zip
         draft: false
         prerelease: ${{ contains(github.ref_name, '-') }}

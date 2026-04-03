@@ -42,7 +42,7 @@ namespace ThorneTimer
             // 
             this.labelAppName.AutoSize = true;
             this.labelAppName.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.labelAppName.Location = new System.Drawing.Point(74, 26);
+            this.labelAppName.Location = new System.Drawing.Point(98, 26);
             this.labelAppName.Name = "labelAppName";
             this.labelAppName.Size = new System.Drawing.Size(82, 13);
             this.labelAppName.TabIndex = 1;
@@ -51,7 +51,7 @@ namespace ThorneTimer
             // labelVersion
             // 
             this.labelVersion.AutoSize = true;
-            this.labelVersion.Location = new System.Drawing.Point(74, 48);
+            this.labelVersion.Location = new System.Drawing.Point(98, 48);
             this.labelVersion.Name = "labelVersion";
             this.labelVersion.Size = new System.Drawing.Size(74, 13);
             this.labelVersion.TabIndex = 2;
@@ -60,7 +60,7 @@ namespace ThorneTimer
             // labelCopyright
             // 
             this.labelCopyright.AutoSize = true;
-            this.labelCopyright.Location = new System.Drawing.Point(74, 72);
+            this.labelCopyright.Location = new System.Drawing.Point(98, 72);
             this.labelCopyright.Name = "labelCopyright";
             this.labelCopyright.Size = new System.Drawing.Size(162, 13);
             this.labelCopyright.TabIndex = 3;
@@ -79,7 +79,7 @@ namespace ThorneTimer
             // pictureIcon
             // 
             this.pictureIcon.Image = global::ThorneTimer.Properties.Resources.ThorneTimer;
-            this.pictureIcon.Location = new System.Drawing.Point(3, 26);
+            this.pictureIcon.Location = new System.Drawing.Point(17, 26);
             this.pictureIcon.Name = "pictureIcon";
             this.pictureIcon.Size = new System.Drawing.Size(65, 59);
             this.pictureIcon.SizeMode = System.Windows.Forms.PictureBoxSizeMode.StretchImage;

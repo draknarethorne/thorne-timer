@@ -106,5 +106,40 @@ namespace ThorneTimer.Properties {
                 this["SortColumn"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string DatabasePath {
+            get {
+                return ((string)(this["DatabasePath"]));
+            }
+            set {
+                this["DatabasePath"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        public global::System.Collections.Specialized.StringCollection RecentDatabases {
+            get {
+                return ((global::System.Collections.Specialized.StringCollection)(this["RecentDatabases"]));
+            }
+            set {
+                this["RecentDatabases"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool NeedsUpgrade {
+            get {
+                return ((bool)(this["NeedsUpgrade"]));
+            }
+            set {
+                this["NeedsUpgrade"] = value;
+            }
+        }
     }
 }

@@ -119,13 +119,16 @@ namespace ThorneTimer
             return result;
         }
 
-        private MiniView CreateMiniView(int x = 100, int y = 100, bool showView = true)
+        private MiniView CreateMiniView(int x = 100, int y = 100, bool showView = true, string title = null)
         {
             MiniView view = new MiniView
             {
-                StartPosition = FormStartPosition.Manual,
-                Location = new Point(x, y)
+                StartPosition = FormStartPosition.Manual
             };
+            if (!string.IsNullOrEmpty(title))
+                view.Text = title;
+            Point loc = FormMain.EnsureVisibleOnScreen(new Point(x, y), view.Size);
+            view.Location = loc;
 
             if (showView)
             {
@@ -150,37 +153,45 @@ namespace ThorneTimer
                 // Load positions from database (falls back to defaults if not found)
                 Dictionary<string, Database.ViewPositionData> positions = Database.GetViewPositions(con);
 
-                // Get positions for each view type, with fallbacks
+                // Get positions and names for each view type, with fallbacks
                 int normalX = 100, normalY = 100;
                 int petX = 300, petY = 100;
                 int buffX = 500, buffY = 100;
                 int pingX = 1100, pingY = 100;
+                string normalName = "Normal Timers";
+                string petName = "Pet Timers";
+                string buffName = "Buff Timers";
+                string pingName = "Ping Timers";
 
                 if (positions.ContainsKey("Normal"))
                 {
                     normalX = positions["Normal"].PositionX;
                     normalY = positions["Normal"].PositionY;
+                    if (!string.IsNullOrEmpty(positions["Normal"].Name)) normalName = positions["Normal"].Name;
                 }
                 if (positions.ContainsKey("Pet"))
                 {
                     petX = positions["Pet"].PositionX;
                     petY = positions["Pet"].PositionY;
+                    if (!string.IsNullOrEmpty(positions["Pet"].Name)) petName = positions["Pet"].Name;
                 }
                 if (positions.ContainsKey("Buff"))
                 {
                     buffX = positions["Buff"].PositionX;
                     buffY = positions["Buff"].PositionY;
+                    if (!string.IsNullOrEmpty(positions["Buff"].Name)) buffName = positions["Buff"].Name;
                 }
                 if (positions.ContainsKey("Ping"))
                 {
                     pingX = positions["Ping"].PositionX;
                     pingY = positions["Ping"].PositionY;
+                    if (!string.IsNullOrEmpty(positions["Ping"].Name)) pingName = positions["Ping"].Name;
                 }
 
-                miniView = CreateMiniView(normalX, normalY);
-                petView = CreateMiniView(petX, petY);
-                buffView = CreateMiniView(buffX, buffY);
-                pingView = CreateMiniView(pingX, pingY, ShowPing());
+                miniView = CreateMiniView(normalX, normalY, true, normalName);
+                petView = CreateMiniView(petX, petY, true, petName);
+                buffView = CreateMiniView(buffX, buffY, true, buffName);
+                pingView = CreateMiniView(pingX, pingY, ShowPing(), pingName);
 
                 UpdateMiniAppearance();
 
@@ -286,20 +297,16 @@ namespace ThorneTimer
                     {
                         DataGridViewCell cellName = row.Cells[grdTimers.Columns["Name"].Index];
                         DataGridViewCell cellRemaining = row.Cells[grdTimers.Columns["Remaining"].Index];
-                        DataGridViewCell cellEndkeyword = row.Cells[grdTimers.Columns["EndKeyword"].Index];
+                        DataGridViewCell cellStyle = row.Cells[grdTimers.Columns["Style"].Index];
 
-                        string endKeyword = (string)cellEndkeyword.Value + "";
-                        string endTag = "";
-                        if (endKeyword.Length > 0)
-                        {
-                            endTag = endKeyword.Substring(0, 1);
-                        }
+                        string style = Convert.ToString(cellStyle.Value);
+                        string styleTag = (style.Length > 0) ? style.Substring(0, 1) : "";
 
                         MiniView.MiniData md = new MiniView.MiniData
                         {
                             Name = (string)cellName.Value,
                             Remaining = (string)cellRemaining.Value,
-                            Tag = endTag
+                            Tag = styleTag
                         };
 
                         if (Timers.PetTimer((string)cellStartStop.Value))

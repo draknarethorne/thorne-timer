@@ -10,18 +10,69 @@ namespace ThorneTimer
 {
     class Database
     {
-     static public SQLiteConnection Connection()
+        /// <summary>
+        /// Returns the default database path in the Data subdirectory
+        /// relative to the running executable.
+        /// </summary>
+        static public string GetDefaultDatabasePath()
         {
-        string exePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
-        string basePath = Path.GetDirectoryName(exePath);
-        string newDbName = Path.Combine(basePath, "ThorneTimer.db");
-        string oldDbName = Path.Combine(basePath, "EQTimer.db");
+            string exePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
+            string basePath = Path.GetDirectoryName(exePath);
+            return Path.Combine(basePath, "Data", "ThorneTimer.tdb");
+        }
+
+        /// <summary>
+        /// Opens a connection to the database at the specified path.
+        /// If the file doesn't exist, a new database is created with default schema.
+        /// </summary>
+        static public SQLiteConnection Connection(string dbPath)
+        {
+            string newDbName = dbPath;
+            string exePath = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+            string oldDbName = Path.Combine(exePath, "EQTimer.db");
 
        bool newDatabase = false;
-        // Migration: If ThorneTimer.db does not exist but EQTimer.db does, copy it
+        // Migration: If ThorneTimer.db does not exist but EQTimer.db does (next to exe), copy it
         if (!File.Exists(newDbName) && File.Exists(oldDbName))
         {
+        string directory = Path.GetDirectoryName(newDbName);
+        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
         File.Copy(oldDbName, newDbName);
+        MessageBox.Show(
+            "Your EQTimer tome has been migrated to:\n" + newDbName +
+            "\n\nAll your timers, characters, and settings have been preserved." +
+            "\nThe original EQTimer.db was not modified.",
+            "Tome Migrated",
+            MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        // Migration: If target doesn't exist but ThorneTimer.db is next to exe (pre-Data layout), copy it
+        if (!File.Exists(newDbName))
+        {
+        string legacyDb = Path.Combine(exePath, "ThorneTimer.db");
+        if (!File.Exists(legacyDb))
+        {
+            // Also check for old .db in the Data folder (pre-.tdb rename)
+            legacyDb = Path.Combine(exePath, "Data", "ThorneTimer.db");
+        }
+        if (File.Exists(legacyDb) && !string.Equals(Path.GetFullPath(legacyDb), Path.GetFullPath(newDbName), StringComparison.OrdinalIgnoreCase))
+        {
+            string directory = Path.GetDirectoryName(newDbName);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+            File.Copy(legacyDb, newDbName);
+            MessageBox.Show(
+                "Your tome has been moved to:\n" + newDbName +
+                "\n\nAll your data has been preserved." +
+                "\nThe original file was not modified.",
+                "Tome Migrated",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
         }
 
         if (!File.Exists(newDbName))
@@ -48,7 +99,7 @@ namespace ThorneTimer
             {
                 SQLiteCommand cmd = new SQLiteCommand(con)
                 {
-                    CommandText = "CREATE TABLE timers(ID INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT, CategoryID INTEGER, StartKeyword TEXT, EndKeyword TEXT, WAVFile TEXT, Speech TEXT, Duration TEXT, ActiveYn INTEGER, CaseYn INTEGER, EndlessYn INTEGER)"
+                    CommandText = "CREATE TABLE timers(ID INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT, CategoryID INTEGER, StartKeyword TEXT, EndKeyword TEXT, WAVFile TEXT, Speech TEXT, Duration TEXT, ActiveYn INTEGER, CaseYn INTEGER, EndlessYn INTEGER, Style TEXT DEFAULT 'Normal')"
                 };
                 cmd.ExecuteNonQuery();
 
@@ -62,7 +113,11 @@ namespace ThorneTimer
                 cmd.ExecuteNonQuery();
 
                 // Create miniviews table used by the UI
-                cmd.CommandText = "CREATE TABLE miniviews(ID INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT)";
+                cmd.CommandText = "CREATE TABLE miniviews(ID INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT, PositionX INTEGER DEFAULT 100, PositionY INTEGER DEFAULT 100, ViewType TEXT DEFAULT 'Normal', SortOrder INTEGER DEFAULT 0)";
+                cmd.ExecuteNonQuery();
+
+                // Create grid_columns table for persisting column widths across sessions
+                cmd.CommandText = "CREATE TABLE grid_columns(ID INTEGER PRIMARY KEY AUTOINCREMENT, GridName TEXT, ColumnName TEXT, Width INTEGER)";
                 cmd.ExecuteNonQuery();
 
                 // Insert default settings with sensible defaults for all known columns
@@ -294,11 +349,91 @@ namespace ThorneTimer
                     cmd.ExecuteNonQuery();
                 }
 
+                // Add Style column to timers table and migrate legacy prefix conventions
+                if (!isFieldExist(con, "timers", "Style"))
+                {
+                    SQLiteCommand cmd = new SQLiteCommand(con)
+                    {
+                        CommandText = "ALTER TABLE timers ADD Style TEXT DEFAULT 'Normal'"
+                    };
+                    cmd.ExecuteNonQuery();
+
+                    // Infer Style from legacy EndKeyword prefixes and Duration
+                    cmd.CommandText = "UPDATE timers SET Style = 'Buff' WHERE EndKeyword LIKE '@%'";
+                    cmd.ExecuteNonQuery();
+
+                    cmd.CommandText = "UPDATE timers SET Style = 'Pet' WHERE EndKeyword LIKE '#%'";
+                    cmd.ExecuteNonQuery();
+
+                    cmd.CommandText = "UPDATE timers SET Style = 'Ping' WHERE Duration = '00:00:00' AND Style = 'Normal'";
+                    cmd.ExecuteNonQuery();
+
+                    // Set Ping timers' Duration to the current ping time setting so each timer owns its countdown
+                    string pingTime = GetSetting(con, "MiniViewPingTime");
+                    if (string.IsNullOrEmpty(pingTime)) pingTime = "00:30";
+                    cmd.CommandText = "UPDATE timers SET Duration = @pingDuration WHERE Style = 'Ping'";
+                    cmd.Parameters.Clear();
+                    cmd.Parameters.AddWithValue("@pingDuration", "00:" + pingTime);
+                    cmd.ExecuteNonQuery();
+
+                    // Strip the legacy @/# prefixes from EndKeyword (handle @@ and ## before single)
+                    cmd.Parameters.Clear();
+                    cmd.CommandText = "UPDATE timers SET EndKeyword = SUBSTR(EndKeyword, 3) WHERE Style = 'Buff' AND EndKeyword LIKE '@@%'";
+                    cmd.ExecuteNonQuery();
+
+                    cmd.CommandText = "UPDATE timers SET EndKeyword = SUBSTR(EndKeyword, 2) WHERE Style = 'Buff' AND EndKeyword LIKE '@%'";
+                    cmd.ExecuteNonQuery();
+
+                    cmd.CommandText = "UPDATE timers SET EndKeyword = SUBSTR(EndKeyword, 3) WHERE Style = 'Pet' AND EndKeyword LIKE '##%'";
+                    cmd.ExecuteNonQuery();
+
+                    cmd.CommandText = "UPDATE timers SET EndKeyword = SUBSTR(EndKeyword, 2) WHERE Style = 'Pet' AND EndKeyword LIKE '#%'";
+                    cmd.ExecuteNonQuery();
+                }
+
+                // Create grid_columns table if it doesn't exist (for column width persistence)
+                if (!isTableExist(con, "grid_columns"))
+                {
+                    SQLiteCommand cmd = new SQLiteCommand(con)
+                    {
+                        CommandText = "CREATE TABLE grid_columns(ID INTEGER PRIMARY KEY AUTOINCREMENT, GridName TEXT, ColumnName TEXT, Width INTEGER)"
+                    };
+                    cmd.ExecuteNonQuery();
+                }
+
+                // Populate Duration for Ping timers that still have 00:00:00
+                // (handles databases where Style was added before per-timer duration code existed)
+                if (isFieldExist(con, "timers", "Style"))
+                {
+                    SQLiteCommand cmd = new SQLiteCommand(con)
+                    {
+                        CommandText = "SELECT COUNT(*) FROM timers WHERE Style = 'Ping' AND Duration = '00:00:00'"
+                    };
+                    long pingCount = (long)cmd.ExecuteScalar();
+                    if (pingCount > 0)
+                    {
+                        string pingTime = GetSetting(con, "MiniViewPingTime");
+                        if (string.IsNullOrEmpty(pingTime)) pingTime = "00:30";
+                        cmd.CommandText = "UPDATE timers SET Duration = @pingDuration WHERE Style = 'Ping' AND Duration = '00:00:00'";
+                        cmd.Parameters.Clear();
+                        cmd.Parameters.AddWithValue("@pingDuration", "00:" + pingTime);
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+
                 // Seed default views if miniviews table is empty
                 SeedDefaultViews(con);
             }
 
             return con;
+        }
+
+        /// <summary>
+        /// Opens a connection using the default database path (Data subdirectory next to the executable).
+        /// </summary>
+        static public SQLiteConnection Connection()
+        {
+            return Connection(GetDefaultDatabasePath());
         }
 
         /// <summary>
@@ -480,6 +615,7 @@ namespace ThorneTimer
             DataGridViewCell ActiveYn = row.Cells[dataGridView.Columns["ActiveYn"].Index];
             DataGridViewCell CaseYn = row.Cells[dataGridView.Columns["CaseYn"].Index];
             DataGridViewCell EndlessYn = row.Cells[dataGridView.Columns["EndlessYn"].Index];
+            DataGridViewCell Style = row.Cells[dataGridView.Columns["Style"].Index];
 
             SQLiteCommand cmd = new SQLiteCommand(con);
             string sql = "";
@@ -496,7 +632,8 @@ namespace ThorneTimer
                 sql += "Duration,";
                 sql += "ActiveYn,";
                 sql += "CaseYn,";
-                sql += "EndlessYn";
+                sql += "EndlessYn,";
+                sql += "Style";
                 sql += ") VALUES (";
                 sql += "'" + Convert.ToString(Name.Value) + "',";
                 sql += "" + Convert.ToInt32(CategoryID.Value) + ",";
@@ -507,7 +644,8 @@ namespace ThorneTimer
                 sql += "'" + Convert.ToString(Duration.Value) + "',";
                 sql += "" + Convert.ToInt32(ActiveYn.Value) + ",";
                 sql += "" + Convert.ToInt32(CaseYn.Value) + ",";
-                sql += "" + Convert.ToInt32(EndlessYn.Value) + "";
+                sql += "" + Convert.ToInt32(EndlessYn.Value) + ",";
+                sql += "'" + Convert.ToString(Style.Value) + "'";
                 sql += ")";
             } else
             {
@@ -521,7 +659,8 @@ namespace ThorneTimer
                 sql += "Duration = '" + Convert.ToString(Duration.Value) + "', ";
                 sql += "ActiveYn = " + Convert.ToString(ActiveYn.Value) + ", ";
                 sql += "CaseYn = " + Convert.ToString(CaseYn.Value) + ", ";
-                sql += "EndlessYn = " + Convert.ToString(EndlessYn.Value) + " ";
+                sql += "EndlessYn = " + Convert.ToString(EndlessYn.Value) + ", ";
+                sql += "Style = '" + Convert.ToString(Style.Value) + "' ";
                 sql += "WHERE ID = " + Convert.ToString(ID.Value);
             }
 
@@ -573,6 +712,7 @@ namespace ThorneTimer
                         ActiveYn = rdr.GetInt32(rdr.GetOrdinal("ActiveYn")),
                         CaseYn = rdr.GetInt32(rdr.GetOrdinal("CaseYn")),
                         EndlessYn = rdr.GetInt32(rdr.GetOrdinal("EndlessYn")),
+                        Style = rdr.IsDBNull(rdr.GetOrdinal("Style")) ? "Normal" : rdr.GetString(rdr.GetOrdinal("Style")),
                         Remaining = ""
                     };
 
@@ -987,6 +1127,61 @@ namespace ThorneTimer
                 cmd.Parameters.AddWithValue("@x", kvp.Value.X);
                 cmd.Parameters.AddWithValue("@y", kvp.Value.Y);
                 cmd.Parameters.AddWithValue("@type", kvp.Key);
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        /// <summary>
+        /// Gets saved column widths for a grid from the database.
+        /// Returns a dictionary keyed by ColumnName with Width values.
+        /// </summary>
+        static public Dictionary<string, int> GetColumnWidths(SQLiteConnection con, string gridName)
+        {
+            Dictionary<string, int> widths = new Dictionary<string, int>();
+
+            SQLiteCommand cmd = new SQLiteCommand(con)
+            {
+                CommandText = "SELECT ColumnName, Width FROM grid_columns WHERE GridName = @grid"
+            };
+            cmd.Parameters.AddWithValue("@grid", gridName);
+
+            using (SQLiteDataReader rdr = cmd.ExecuteReader())
+            {
+                while (rdr.Read())
+                {
+                    string colName = rdr.GetString(0);
+                    int width = rdr.GetInt32(1);
+                    widths[colName] = width;
+                }
+            }
+
+            return widths;
+        }
+
+        /// <summary>
+        /// Saves column widths for a grid to the database.
+        /// Only saves visible, resizable columns.
+        /// </summary>
+        static public void SaveColumnWidths(SQLiteConnection con, string gridName, DataGridView grid)
+        {
+            SQLiteCommand cmd = new SQLiteCommand(con);
+
+            // Delete existing entries for this grid
+            cmd.CommandText = "DELETE FROM grid_columns WHERE GridName = @grid";
+            cmd.Parameters.AddWithValue("@grid", gridName);
+            cmd.ExecuteNonQuery();
+
+            // Insert current widths for visible, resizable columns
+            foreach (DataGridViewColumn col in grid.Columns)
+            {
+                if (!col.Visible || col.Resizable == DataGridViewTriState.False)
+                    continue;
+
+                cmd.CommandText = "INSERT INTO grid_columns (GridName, ColumnName, Width) VALUES (@grid, @col, @width)";
+                cmd.Parameters.Clear();
+                cmd.Parameters.AddWithValue("@grid", gridName);
+                cmd.Parameters.AddWithValue("@col", col.Name);
+                cmd.Parameters.AddWithValue("@width", col.Width);
                 cmd.ExecuteNonQuery();
             }
         }
