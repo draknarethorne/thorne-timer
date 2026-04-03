@@ -22,6 +22,7 @@ namespace ThorneTimer
             public long ActiveYn { get; set; }
             public long CaseYn { get; set; }
             public long EndlessYn { get; set; }
+            public string Style { get; set; }
         }
 
         static public string btnStart = "Start";

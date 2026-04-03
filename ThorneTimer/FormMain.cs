@@ -601,6 +601,7 @@ namespace ThorneTimer
             grdTimers.Columns["Name"].DisplayIndex = i++;
             grdTimers.Columns["Count"].DisplayIndex = i++;
             grdTimers.Columns["CategoryID"].DisplayIndex = i++;
+            grdTimers.Columns["Style"].DisplayIndex = i++;
             grdTimers.Columns["StartKeyword"].DisplayIndex = i++;
             grdTimers.Columns["EndKeyword"].DisplayIndex = i++;
             grdTimers.Columns["WAV"].DisplayIndex = i++;
@@ -625,6 +626,7 @@ namespace ThorneTimer
             grdTimers.Columns["Remaining"].SortMode = DataGridViewColumnSortMode.NotSortable;
             grdTimers.Columns["CaseYn"].SortMode = DataGridViewColumnSortMode.NotSortable;
             grdTimers.Columns["EndlessYn"].SortMode = DataGridViewColumnSortMode.NotSortable;
+            grdTimers.Columns["Style"].SortMode = DataGridViewColumnSortMode.Automatic;
             grdTimers.Columns["StartStop"].SortMode = DataGridViewColumnSortMode.NotSortable;
 
             RepaintTimerGrid(true);
@@ -813,6 +815,18 @@ namespace ThorneTimer
             grdTimers.Columns[11].MinimumWidth = 40;
             grdTimers.Columns[11].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCellsExceptHeader;
             grdTimers.Columns[11].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+
+            DataGridViewComboBoxColumn cboRole = new DataGridViewComboBoxColumn
+            {
+                HeaderText = "Style",
+                Name = "Style",
+                DataPropertyName = "Style",
+                FlatStyle = FlatStyle.Flat
+            };
+            cboRole.Items.AddRange("Normal", "Buff", "Pet", "Ping");
+            grdTimers.Columns.Add(cboRole);
+            grdTimers.Columns["Style"].Width = 70;
+            grdTimers.Columns["Style"].MinimumWidth = 60;
 
             DataGridViewButtonColumn buttonWAV = new DataGridViewButtonColumn
             {
@@ -1328,16 +1342,34 @@ namespace ThorneTimer
                 countCell.Value = counter.ToString();
 
                 btnCell.UseColumnTextForButtonValue = false;
-                if (TimerPlus.GetMilliseconds(durationText) != 0)
+                DataGridViewCell styleCell = grdTimers.Rows[rowIndex].Cells[grdTimers.Columns["Style"].Index];
+                string style = Convert.ToString(styleCell.Value);
+
+                if (style == "Ping")
                 {
-                    DataGridViewCell endKeywordCell = grdTimers.Rows[rowIndex].Cells[grdTimers.Columns["EndKeyword"].Index];
-                    string endKeyword = (string)endKeywordCell.Value + "";
-                    if (BuffTimer(endKeyword))
+                    // Ping timers use their own Duration (per-timer ping countdown)
+                    string pingText = durationText;
+                    if (TimerPlus.GetMilliseconds(pingText) == 0)
+                    {
+                        // Fallback to global ping time if Duration is still zero
+                        pingText = pingHour + miniViews.mvPingTime;
+                    }
+                    if (TimerPlus.GetMilliseconds(pingText) != 0)
+                    {
+                        btnCell.Value = Timers.btnPing;
+                        StartTimer(rowIndex, grdTimers.Columns["Remaining"].Index, pingText, TimerPlus.TimerType.Ping);
+                    }
+
+                    PlayTimerSounds(rowIndex);
+                }
+                else if (TimerPlus.GetMilliseconds(durationText) != 0)
+                {
+                    if (style == "Buff")
                     {
                         btnCell.Value = Timers.btnBuff;
                         StartTimer(rowIndex, grdTimers.Columns["Remaining"].Index, durationText, TimerPlus.TimerType.Buff);
                     }
-                    else if (PetTimer(endKeyword))
+                    else if (style == "Pet")
                     {
                         btnCell.Value = Timers.btnPet;
                         StartTimer(rowIndex, grdTimers.Columns["Remaining"].Index, durationText, TimerPlus.TimerType.Pet);
@@ -1347,17 +1379,6 @@ namespace ThorneTimer
                         btnCell.Value = Timers.btnStop;
                         StartTimer(rowIndex, grdTimers.Columns["Remaining"].Index, durationText, TimerPlus.TimerType.Normal);
                     }
-                }
-                else
-                {
-                    string pingText = pingHour + miniViews.mvPingTime;
-                    if (TimerPlus.GetMilliseconds(pingText) != 0)
-                    {
-                        btnCell.Value = Timers.btnPing;
-                        StartTimer(rowIndex, grdTimers.Columns["Remaining"].Index, pingText, TimerPlus.TimerType.Ping);
-                    }
-
-                    PlayTimerSounds(rowIndex);
                 }
             }
         }
@@ -1724,11 +1745,15 @@ namespace ThorneTimer
                         {
                             TriggerRowTimer(btnCell, r);
                         }
-                        else if (Timers.TimerRunning((string)btnCell.Value) && ResetTimer(endKeyword))
+                        else if (Timers.TimerRunning((string)btnCell.Value))
                         {
-                            // Reset the timer since it has the reset tags present
-                            StopRowTimer(btnCell, r);
-                            StartRowTimer(btnCell, r);
+                            // Buff and Pet timers reset when their start keyword fires again
+                            string style = Convert.ToString(grdTimers.Rows[r].Cells[grdTimers.Columns["Style"].Index].Value);
+                            if (style == "Buff" || style == "Pet")
+                            {
+                                StopRowTimer(btnCell, r);
+                                StartRowTimer(btnCell, r);
+                            }
                         }
                     }
 
@@ -1742,40 +1767,6 @@ namespace ThorneTimer
                     }
                 }
             }
-        }
-
-        private bool PetTimer(string endKeyword)
-        {
-            return CheckTimer(endKeyword, "#");
-        }
-
-        private bool BuffTimer(string endKeyword)
-        {
-            return CheckTimer(endKeyword, "@");
-        }
-
-        private bool ValidEndKeyword(string endKeyword)
-        {
-            return CheckTimer(endKeyword, "@#$*");
-        }
-
-        private bool CheckTimer(string endKeyword, string checkChar)
-        {
-            bool bReset = false;
-            if (endKeyword.Length > 0)
-            {
-                string endChar = endKeyword.Substring(0, 1);
-                if ((endChar == checkChar))
-                {
-                    bReset = true;
-                }
-            }
-            return bReset;
-        }
-
-        private bool ResetTimer(string endKeyword)
-        {
-            return BuffTimer(endKeyword) || PetTimer(endKeyword);
         }
 
         private void ParseLog()

@@ -286,20 +286,16 @@ namespace ThorneTimer
                     {
                         DataGridViewCell cellName = row.Cells[grdTimers.Columns["Name"].Index];
                         DataGridViewCell cellRemaining = row.Cells[grdTimers.Columns["Remaining"].Index];
-                        DataGridViewCell cellEndkeyword = row.Cells[grdTimers.Columns["EndKeyword"].Index];
+                        DataGridViewCell cellStyle = row.Cells[grdTimers.Columns["Style"].Index];
 
-                        string endKeyword = (string)cellEndkeyword.Value + "";
-                        string endTag = "";
-                        if (endKeyword.Length > 0)
-                        {
-                            endTag = endKeyword.Substring(0, 1);
-                        }
+                        string style = Convert.ToString(cellStyle.Value);
+                        string styleTag = (style.Length > 0) ? style.Substring(0, 1) : "";
 
                         MiniView.MiniData md = new MiniView.MiniData
                         {
                             Name = (string)cellName.Value,
                             Remaining = (string)cellRemaining.Value,
-                            Tag = endTag
+                            Tag = styleTag
                         };
 
                         if (Timers.PetTimer((string)cellStartStop.Value))

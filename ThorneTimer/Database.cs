@@ -99,7 +99,7 @@ namespace ThorneTimer
             {
                 SQLiteCommand cmd = new SQLiteCommand(con)
                 {
-                    CommandText = "CREATE TABLE timers(ID INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT, CategoryID INTEGER, StartKeyword TEXT, EndKeyword TEXT, WAVFile TEXT, Speech TEXT, Duration TEXT, ActiveYn INTEGER, CaseYn INTEGER, EndlessYn INTEGER)"
+                    CommandText = "CREATE TABLE timers(ID INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT, CategoryID INTEGER, StartKeyword TEXT, EndKeyword TEXT, WAVFile TEXT, Speech TEXT, Duration TEXT, ActiveYn INTEGER, CaseYn INTEGER, EndlessYn INTEGER, Style TEXT DEFAULT 'Normal')"
                 };
                 cmd.ExecuteNonQuery();
 
@@ -345,6 +345,68 @@ namespace ThorneTimer
                     cmd.ExecuteNonQuery();
                 }
 
+                // Add Style column to timers table and migrate legacy prefix conventions
+                if (!isFieldExist(con, "timers", "Style"))
+                {
+                    SQLiteCommand cmd = new SQLiteCommand(con)
+                    {
+                        CommandText = "ALTER TABLE timers ADD Style TEXT DEFAULT 'Normal'"
+                    };
+                    cmd.ExecuteNonQuery();
+
+                    // Infer Style from legacy EndKeyword prefixes and Duration
+                    cmd.CommandText = "UPDATE timers SET Style = 'Buff' WHERE EndKeyword LIKE '@%'";
+                    cmd.ExecuteNonQuery();
+
+                    cmd.CommandText = "UPDATE timers SET Style = 'Pet' WHERE EndKeyword LIKE '#%'";
+                    cmd.ExecuteNonQuery();
+
+                    cmd.CommandText = "UPDATE timers SET Style = 'Ping' WHERE Duration = '00:00:00' AND Style = 'Normal'";
+                    cmd.ExecuteNonQuery();
+
+                    // Set Ping timers' Duration to the current ping time setting so each timer owns its countdown
+                    string pingTime = GetSetting(con, "MiniViewPingTime");
+                    if (string.IsNullOrEmpty(pingTime)) pingTime = "00:30";
+                    cmd.CommandText = "UPDATE timers SET Duration = @pingDuration WHERE Style = 'Ping'";
+                    cmd.Parameters.Clear();
+                    cmd.Parameters.AddWithValue("@pingDuration", "00:" + pingTime);
+                    cmd.ExecuteNonQuery();
+
+                    // Strip the legacy @/# prefixes from EndKeyword (handle @@ and ## before single)
+                    cmd.Parameters.Clear();
+                    cmd.CommandText = "UPDATE timers SET EndKeyword = SUBSTR(EndKeyword, 3) WHERE Style = 'Buff' AND EndKeyword LIKE '@@%'";
+                    cmd.ExecuteNonQuery();
+
+                    cmd.CommandText = "UPDATE timers SET EndKeyword = SUBSTR(EndKeyword, 2) WHERE Style = 'Buff' AND EndKeyword LIKE '@%'";
+                    cmd.ExecuteNonQuery();
+
+                    cmd.CommandText = "UPDATE timers SET EndKeyword = SUBSTR(EndKeyword, 3) WHERE Style = 'Pet' AND EndKeyword LIKE '##%'";
+                    cmd.ExecuteNonQuery();
+
+                    cmd.CommandText = "UPDATE timers SET EndKeyword = SUBSTR(EndKeyword, 2) WHERE Style = 'Pet' AND EndKeyword LIKE '#%'";
+                    cmd.ExecuteNonQuery();
+                }
+
+                // Populate Duration for Ping timers that still have 00:00:00
+                // (handles databases where Style was added before per-timer duration code existed)
+                if (isFieldExist(con, "timers", "Style"))
+                {
+                    SQLiteCommand cmd = new SQLiteCommand(con)
+                    {
+                        CommandText = "SELECT COUNT(*) FROM timers WHERE Style = 'Ping' AND Duration = '00:00:00'"
+                    };
+                    long pingCount = (long)cmd.ExecuteScalar();
+                    if (pingCount > 0)
+                    {
+                        string pingTime = GetSetting(con, "MiniViewPingTime");
+                        if (string.IsNullOrEmpty(pingTime)) pingTime = "00:30";
+                        cmd.CommandText = "UPDATE timers SET Duration = @pingDuration WHERE Style = 'Ping' AND Duration = '00:00:00'";
+                        cmd.Parameters.Clear();
+                        cmd.Parameters.AddWithValue("@pingDuration", "00:" + pingTime);
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+
                 // Seed default views if miniviews table is empty
                 SeedDefaultViews(con);
             }
@@ -539,6 +601,7 @@ namespace ThorneTimer
             DataGridViewCell ActiveYn = row.Cells[dataGridView.Columns["ActiveYn"].Index];
             DataGridViewCell CaseYn = row.Cells[dataGridView.Columns["CaseYn"].Index];
             DataGridViewCell EndlessYn = row.Cells[dataGridView.Columns["EndlessYn"].Index];
+            DataGridViewCell Style = row.Cells[dataGridView.Columns["Style"].Index];
 
             SQLiteCommand cmd = new SQLiteCommand(con);
             string sql = "";
@@ -555,7 +618,8 @@ namespace ThorneTimer
                 sql += "Duration,";
                 sql += "ActiveYn,";
                 sql += "CaseYn,";
-                sql += "EndlessYn";
+                sql += "EndlessYn,";
+                sql += "Style";
                 sql += ") VALUES (";
                 sql += "'" + Convert.ToString(Name.Value) + "',";
                 sql += "" + Convert.ToInt32(CategoryID.Value) + ",";
@@ -566,7 +630,8 @@ namespace ThorneTimer
                 sql += "'" + Convert.ToString(Duration.Value) + "',";
                 sql += "" + Convert.ToInt32(ActiveYn.Value) + ",";
                 sql += "" + Convert.ToInt32(CaseYn.Value) + ",";
-                sql += "" + Convert.ToInt32(EndlessYn.Value) + "";
+                sql += "" + Convert.ToInt32(EndlessYn.Value) + ",";
+                sql += "'" + Convert.ToString(Style.Value) + "'";
                 sql += ")";
             } else
             {
@@ -580,7 +645,8 @@ namespace ThorneTimer
                 sql += "Duration = '" + Convert.ToString(Duration.Value) + "', ";
                 sql += "ActiveYn = " + Convert.ToString(ActiveYn.Value) + ", ";
                 sql += "CaseYn = " + Convert.ToString(CaseYn.Value) + ", ";
-                sql += "EndlessYn = " + Convert.ToString(EndlessYn.Value) + " ";
+                sql += "EndlessYn = " + Convert.ToString(EndlessYn.Value) + ", ";
+                sql += "Style = '" + Convert.ToString(Style.Value) + "' ";
                 sql += "WHERE ID = " + Convert.ToString(ID.Value);
             }
 
@@ -632,6 +698,7 @@ namespace ThorneTimer
                         ActiveYn = rdr.GetInt32(rdr.GetOrdinal("ActiveYn")),
                         CaseYn = rdr.GetInt32(rdr.GetOrdinal("CaseYn")),
                         EndlessYn = rdr.GetInt32(rdr.GetOrdinal("EndlessYn")),
+                        Style = rdr.IsDBNull(rdr.GetOrdinal("Style")) ? "Normal" : rdr.GetString(rdr.GetOrdinal("Style")),
                         Remaining = ""
                     };
 
