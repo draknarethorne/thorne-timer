@@ -205,10 +205,10 @@ namespace ThorneTimer
         {
             bool result = true;
 
-            SetMiniAppearance(miniView, "No Timers");
-            SetMiniAppearance(petView, "No Pet");
-            SetMiniAppearance(buffView, "No Buffs");
-            SetMiniAppearance(pingView, "...", ShowPing());
+            SetMiniAppearance(miniView, "Timers", true, mvNormForeColor, mvNormBackColor);
+            SetMiniAppearance(petView, "Pet", true, mvBuffForeColor, mvBuffBackColor);
+            SetMiniAppearance(buffView, "Buffs", true, mvBuffForeColor, mvBuffBackColor);
+            SetMiniAppearance(pingView, "Ping", ShowPing(), mvPingForeColor, mvPingBackColor);
 
             return result;
         }
@@ -241,7 +241,7 @@ namespace ThorneTimer
             return null;
         }
 
-        private void SetMiniAppearance(MiniView view, String timerText, bool showView = true)
+        private void SetMiniAppearance(MiniView view, String timerText, bool showView, int viewForeColor, int viewBackColor)
         {
             if (view != null)
             {
@@ -249,7 +249,8 @@ namespace ThorneTimer
                              Color.FromArgb(mvWarnForeColor), Color.FromArgb(mvWarnBackColor), mvWarnTime,
                              Color.FromArgb(mvPingForeColor), Color.FromArgb(mvPingBackColor),
                              Color.FromArgb(mvBuffForeColor), Color.FromArgb(mvBuffBackColor),
-                             timerText);
+                             timerText,
+                             Color.FromArgb(viewForeColor), Color.FromArgb(viewBackColor));
                 if (showView)
                 {
                     view.Show();
@@ -297,16 +298,11 @@ namespace ThorneTimer
                     {
                         DataGridViewCell cellName = row.Cells[grdTimers.Columns["Name"].Index];
                         DataGridViewCell cellRemaining = row.Cells[grdTimers.Columns["Remaining"].Index];
-                        DataGridViewCell cellStyle = row.Cells[grdTimers.Columns["Style"].Index];
-
-                        string style = Convert.ToString(cellStyle.Value);
-                        string styleTag = (style.Length > 0) ? style.Substring(0, 1) : "";
 
                         MiniView.MiniData md = new MiniView.MiniData
                         {
                             Name = (string)cellName.Value,
-                            Remaining = (string)cellRemaining.Value,
-                            Tag = styleTag
+                            Remaining = (string)cellRemaining.Value
                         };
 
                         if (Timers.PetTimer((string)cellStartStop.Value))
