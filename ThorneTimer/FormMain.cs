@@ -31,6 +31,14 @@ namespace ThorneTimer
         {
             InitializeComponent();
 
+            // Migrate user settings from previous version on first run after upgrade
+            if (Properties.Settings.Default.NeedsUpgrade)
+            {
+                Properties.Settings.Default.Upgrade();
+                Properties.Settings.Default.NeedsUpgrade = false;
+                Properties.Settings.Default.Save();
+            }
+
             // Resolve initial database: saved path > default (next to exe)
             string dbPath = Properties.Settings.Default.DatabasePath;
             if (string.IsNullOrEmpty(dbPath) || !File.Exists(dbPath))

@@ -30,7 +30,6 @@
         {
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(FormMain));
             this.toolStrip = new System.Windows.Forms.ToolStrip();
-            this.tslActiveCharacter = new System.Windows.Forms.ToolStripLabel();
             this.tscActiveCharacter = new System.Windows.Forms.ToolStripComboBox();
             this.toolStripSeparator3 = new System.Windows.Forms.ToolStripSeparator();
             this.tsbStartStopWatching = new System.Windows.Forms.ToolStripButton();
@@ -131,7 +130,6 @@
             // toolStrip
             // 
             this.toolStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.tslActiveCharacter,
             this.tscActiveCharacter,
             this.toolStripSeparator3,
             this.tsbStartStopWatching,
@@ -142,17 +140,12 @@
             this.toolStrip.Size = new System.Drawing.Size(1152, 25);
             this.toolStrip.TabIndex = 21;
             // 
-            // tslActiveCharacter
-            // 
-            this.tslActiveCharacter.Name = "tslActiveCharacter";
-            this.tslActiveCharacter.Size = new System.Drawing.Size(61, 22);
-            this.tslActiveCharacter.Text = "Character:";
-            // 
             // tscActiveCharacter
             // 
             this.tscActiveCharacter.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.tscActiveCharacter.Name = "tscActiveCharacter";
             this.tscActiveCharacter.Size = new System.Drawing.Size(140, 25);
+            this.tscActiveCharacter.ToolTipText = "Active Character";
             this.tscActiveCharacter.SelectedIndexChanged += new System.EventHandler(this.tscActiveCharacter_SelectedIndexChanged);
             // 
             // toolStripSeparator3
@@ -987,7 +980,6 @@
 
         #endregion
         private System.Windows.Forms.ToolStrip toolStrip;
-        private System.Windows.Forms.ToolStripLabel tslActiveCharacter;
         private System.Windows.Forms.ToolStripComboBox tscActiveCharacter;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator3;
         private System.Windows.Forms.ToolStripButton tsbStartStopWatching;
