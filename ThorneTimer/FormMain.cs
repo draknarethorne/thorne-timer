@@ -138,6 +138,11 @@ namespace ThorneTimer
             SetupCharacterGrid();
             SetupCategoriesGrid();
 
+            // Restore persisted column widths
+            LoadColumnWidths("Timers", grdTimers);
+            LoadColumnWidths("Characters", grdCharacters);
+            LoadColumnWidths("Categories", grdCategories);
+
             UpdateMiniView();
 
             PopulateRecentDatabases();
@@ -541,6 +546,11 @@ namespace ThorneTimer
         {
             SaveProperties();
 
+            // Persist column widths
+            Database.SaveColumnWidths(con, "Timers", grdTimers);
+            Database.SaveColumnWidths(con, "Characters", grdCharacters);
+            Database.SaveColumnWidths(con, "Categories", grdCategories);
+
             SaveDataTimers();
             SaveDataCharacters();
             SaveDataCategories();
@@ -624,6 +634,33 @@ namespace ThorneTimer
 
             Properties.Settings.Default.HasSetDefaults = true;
             Properties.Settings.Default.Save();
+        }
+
+        /// <summary>
+        /// Applies saved column widths from the database to a grid.
+        /// Silently skips columns that no longer exist.
+        /// </summary>
+        private void LoadColumnWidths(string gridName, DataGridView grid)
+        {
+            try
+            {
+                Dictionary<string, int> widths = Database.GetColumnWidths(con, gridName);
+                foreach (var kvp in widths)
+                {
+                    if (grid.Columns.Contains(kvp.Key))
+                    {
+                        DataGridViewColumn col = grid.Columns[kvp.Key];
+                        if (col.Visible && kvp.Value >= col.MinimumWidth)
+                        {
+                            col.Width = kvp.Value;
+                        }
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                // Database may not have the table yet; ignore
+            }
         }
 
         void GrdTimers_DataError(object sender, DataGridViewDataErrorEventArgs e)
@@ -872,7 +909,7 @@ namespace ThorneTimer
             };
             cboRole.Items.AddRange("Normal", "Buff", "Pet", "Ping");
             grdTimers.Columns.Add(cboRole);
-            grdTimers.Columns["Style"].Width = 70;
+            grdTimers.Columns["Style"].Width = 85;
             grdTimers.Columns["Style"].MinimumWidth = 60;
 
             DataGridViewButtonColumn buttonWAV = new DataGridViewButtonColumn

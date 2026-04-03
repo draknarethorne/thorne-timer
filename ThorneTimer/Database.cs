@@ -116,6 +116,10 @@ namespace ThorneTimer
                 cmd.CommandText = "CREATE TABLE miniviews(ID INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT, PositionX INTEGER DEFAULT 100, PositionY INTEGER DEFAULT 100, ViewType TEXT DEFAULT 'Normal', SortOrder INTEGER DEFAULT 0)";
                 cmd.ExecuteNonQuery();
 
+                // Create grid_columns table for persisting column widths across sessions
+                cmd.CommandText = "CREATE TABLE grid_columns(ID INTEGER PRIMARY KEY AUTOINCREMENT, GridName TEXT, ColumnName TEXT, Width INTEGER)";
+                cmd.ExecuteNonQuery();
+
                 // Insert default settings with sensible defaults for all known columns
                 cmd.CommandText = "INSERT INTO settings(ID, ActiveCharacterID, ActiveVoice, MiniViewFontSize, MiniViewWarnFore, MiniViewWarnBack, MiniViewWarnTime, MiniViewOpacity, VoiceVolume, VoiceRate, VoiceEnabled, MiniViewNormFore, MiniViewNormBack, MiniViewShowPing, MiniViewPingFore, MiniViewPingBack, MiniViewPingTime, MiniViewBuffFore, MiniViewBuffBack) VALUES(@id,@activeChar,@activeVoice,@fontSize,@warnFore,@warnBack,@warnTime,@opacity,@voiceVolume,@voiceRate,@voiceEnabled,@normFore,@normBack,@showPing,@pingFore,@pingBack,@pingTime,@buffFore,@buffBack)";
                 cmd.Parameters.AddWithValue("@id", 1);
@@ -384,6 +388,16 @@ namespace ThorneTimer
                     cmd.ExecuteNonQuery();
 
                     cmd.CommandText = "UPDATE timers SET EndKeyword = SUBSTR(EndKeyword, 2) WHERE Style = 'Pet' AND EndKeyword LIKE '#%'";
+                    cmd.ExecuteNonQuery();
+                }
+
+                // Create grid_columns table if it doesn't exist (for column width persistence)
+                if (!isTableExist(con, "grid_columns"))
+                {
+                    SQLiteCommand cmd = new SQLiteCommand(con)
+                    {
+                        CommandText = "CREATE TABLE grid_columns(ID INTEGER PRIMARY KEY AUTOINCREMENT, GridName TEXT, ColumnName TEXT, Width INTEGER)"
+                    };
                     cmd.ExecuteNonQuery();
                 }
 
@@ -1113,6 +1127,61 @@ namespace ThorneTimer
                 cmd.Parameters.AddWithValue("@x", kvp.Value.X);
                 cmd.Parameters.AddWithValue("@y", kvp.Value.Y);
                 cmd.Parameters.AddWithValue("@type", kvp.Key);
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        /// <summary>
+        /// Gets saved column widths for a grid from the database.
+        /// Returns a dictionary keyed by ColumnName with Width values.
+        /// </summary>
+        static public Dictionary<string, int> GetColumnWidths(SQLiteConnection con, string gridName)
+        {
+            Dictionary<string, int> widths = new Dictionary<string, int>();
+
+            SQLiteCommand cmd = new SQLiteCommand(con)
+            {
+                CommandText = "SELECT ColumnName, Width FROM grid_columns WHERE GridName = @grid"
+            };
+            cmd.Parameters.AddWithValue("@grid", gridName);
+
+            using (SQLiteDataReader rdr = cmd.ExecuteReader())
+            {
+                while (rdr.Read())
+                {
+                    string colName = rdr.GetString(0);
+                    int width = rdr.GetInt32(1);
+                    widths[colName] = width;
+                }
+            }
+
+            return widths;
+        }
+
+        /// <summary>
+        /// Saves column widths for a grid to the database.
+        /// Only saves visible, resizable columns.
+        /// </summary>
+        static public void SaveColumnWidths(SQLiteConnection con, string gridName, DataGridView grid)
+        {
+            SQLiteCommand cmd = new SQLiteCommand(con);
+
+            // Delete existing entries for this grid
+            cmd.CommandText = "DELETE FROM grid_columns WHERE GridName = @grid";
+            cmd.Parameters.AddWithValue("@grid", gridName);
+            cmd.ExecuteNonQuery();
+
+            // Insert current widths for visible, resizable columns
+            foreach (DataGridViewColumn col in grid.Columns)
+            {
+                if (!col.Visible || col.Resizable == DataGridViewTriState.False)
+                    continue;
+
+                cmd.CommandText = "INSERT INTO grid_columns (GridName, ColumnName, Width) VALUES (@grid, @col, @width)";
+                cmd.Parameters.Clear();
+                cmd.Parameters.AddWithValue("@grid", gridName);
+                cmd.Parameters.AddWithValue("@col", col.Name);
+                cmd.Parameters.AddWithValue("@width", col.Width);
                 cmd.ExecuteNonQuery();
             }
         }
