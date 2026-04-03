@@ -11,13 +11,14 @@ namespace ThorneTimer
     class Database
     {
         /// <summary>
-        /// Returns the default database path next to the running executable.
+        /// Returns the default database path in the Data subdirectory
+        /// relative to the running executable.
         /// </summary>
         static public string GetDefaultDatabasePath()
         {
             string exePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
             string basePath = Path.GetDirectoryName(exePath);
-            return Path.Combine(basePath, "ThorneTimer.db");
+            return Path.Combine(basePath, "Data", "ThorneTimer.db");
         }
 
         /// <summary>
@@ -27,14 +28,34 @@ namespace ThorneTimer
         static public SQLiteConnection Connection(string dbPath)
         {
             string newDbName = dbPath;
-            string basePath = Path.GetDirectoryName(newDbName);
-            string oldDbName = Path.Combine(basePath, "EQTimer.db");
+            string exePath = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+            string oldDbName = Path.Combine(exePath, "EQTimer.db");
 
        bool newDatabase = false;
-        // Migration: If ThorneTimer.db does not exist but EQTimer.db does, copy it
+        // Migration: If ThorneTimer.db does not exist but EQTimer.db does (next to exe), copy it
         if (!File.Exists(newDbName) && File.Exists(oldDbName))
         {
+        string directory = Path.GetDirectoryName(newDbName);
+        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
         File.Copy(oldDbName, newDbName);
+        }
+
+        // Migration: If target doesn't exist but ThorneTimer.db is next to exe (pre-Data layout), copy it
+        if (!File.Exists(newDbName))
+        {
+        string legacyDb = Path.Combine(exePath, "ThorneTimer.db");
+        if (File.Exists(legacyDb) && !string.Equals(Path.GetFullPath(legacyDb), Path.GetFullPath(newDbName), StringComparison.OrdinalIgnoreCase))
+        {
+            string directory = Path.GetDirectoryName(newDbName);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+            File.Copy(legacyDb, newDbName);
+        }
         }
 
         if (!File.Exists(newDbName))
@@ -315,7 +336,7 @@ namespace ThorneTimer
         }
 
         /// <summary>
-        /// Opens a connection using the default database path (next to the executable).
+        /// Opens a connection using the default database path (Data subdirectory next to the executable).
         /// </summary>
         static public SQLiteConnection Connection()
         {
