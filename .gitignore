@@ -48,6 +48,8 @@ Desktop.ini
 *.ldf
 # Others
 *.db
+# Allow the example database shipped with the project
+!ThorneTimer/Data/ThorneTimer.db
 *.bak
 *.backup
 *.tmp

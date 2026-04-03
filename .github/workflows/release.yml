@@ -59,6 +59,7 @@ jobs:
         xcopy ThorneTimer\bin\Release\x64 release-package\x64\ /E /I /Y
         xcopy ThorneTimer\bin\Release\x86 release-package\x86\ /E /I /Y
         xcopy ThorneTimer\bin\Release\Sounds release-package\Sounds\ /E /I /Y
+        xcopy ThorneTimer\bin\Release\Data release-package\Data\ /E /I /Y
       shell: cmd
 
     - name: Create ZIP archive
