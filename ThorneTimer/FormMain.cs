@@ -58,15 +58,62 @@ namespace ThorneTimer
         const string noTime = "00:00:00";
         const string pingHour = "00:";
 
-        const string btnStartParsingLog = "Start Parsing Log";
-        const string btnStopParsingLog = "Stop Parsing Log";
+        const string startWatchingText = "Start Watching";
+        const string stopWatchingText = "Stop Watching";
 
         readonly MiniViews miniViews = new MiniViews();
         readonly List<TimerPlus> timers = new List<TimerPlus>();
         SQLiteConnection con;
 
+        Bitmap iconPlay;
+        Bitmap iconStop;
+        Bitmap iconMiniViews;
+
+        private void CreateToolbarIcons()
+        {
+            // Green play triangle (?) — Start Watching
+            iconPlay = new Bitmap(16, 16);
+            using (var g = Graphics.FromImage(iconPlay))
+            {
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (var brush = new SolidBrush(Color.FromArgb(0, 160, 0)))
+                    g.FillPolygon(brush, new[] { new Point(4, 2), new Point(14, 8), new Point(4, 14) });
+            }
+
+            // Red stop square (?) — Stop Watching
+            iconStop = new Bitmap(16, 16);
+            using (var g = Graphics.FromImage(iconStop))
+            {
+                g.Clear(Color.Transparent);
+                using (var brush = new SolidBrush(Color.FromArgb(200, 30, 30)))
+                    g.FillRectangle(brush, 3, 3, 10, 10);
+            }
+
+            // Mini Views icon — four small windows in a grid
+            iconMiniViews = new Bitmap(16, 16);
+            using (var g = Graphics.FromImage(iconMiniViews))
+            {
+                g.Clear(Color.Transparent);
+                using (var pen = new Pen(Color.FromArgb(80, 80, 80)))
+                {
+                    g.DrawRectangle(pen, 1, 1, 6, 5);
+                    g.DrawRectangle(pen, 9, 1, 6, 5);
+                    g.DrawRectangle(pen, 1, 8, 6, 5);
+                    g.DrawRectangle(pen, 9, 8, 6, 5);
+                }
+            }
+
+            // Set initial images
+            tsbStartStopWatching.Image = iconPlay;
+            startStopWatchingToolStripMenuItem.Image = iconPlay;
+            tsbMiniViews.Image = iconMiniViews;
+            miniViewsToolStripMenuItem.Image = iconMiniViews;
+        }
+
         private void FormMain_Load(object sender, EventArgs e)
         {
+            CreateToolbarIcons();
             this.FormClosing += FormMain_FormClosing;
             txtWarningTime.LostFocus += WarningTime_LostFocus;
             txtPingTime.LostFocus += PingTime_LostFocus;
@@ -122,7 +169,6 @@ namespace ThorneTimer
 
             activeCharacterID = Database.GetSetting(con, "ActiveCharacterID");
 
-            //labelLogFile.Text = "Idle";
             if (Properties.Settings.Default.ParseLog)
             {
                 StartLog();
@@ -227,7 +273,7 @@ namespace ThorneTimer
             SaveDataCategories();
 
             // Snapshot what was running so we can restore after reload
-            bool wasParsingLog = (btnStartStopLog.Text == btnStopParsingLog);
+            bool wasParsingLog = (tsbStartStopWatching.Text == stopWatchingText);
             bool wasMiniViewActive = miniViews.MiniViewsActive();
 
             // Stop all running timers
@@ -621,7 +667,7 @@ namespace ThorneTimer
                 Properties.Settings.Default.Size = this.RestoreBounds.Size;
             }
 
-            Properties.Settings.Default.ParseLog = (bool)(btnStartStopLog.Text == btnStopParsingLog);
+            Properties.Settings.Default.ParseLog = (bool)(tsbStartStopWatching.Text == stopWatchingText);
             Properties.Settings.Default.MiniView = miniViews.MiniViewsActive();
             if (grdTimers.SortedColumn != null)
             {
@@ -761,7 +807,6 @@ namespace ThorneTimer
                 }
 
                 String timerText = "Timers: " + grdTimers.RowCount + "   Active: " + activeTimers + "   Running: " + runningTimers;
-                labelTimerCount.Invoke(new Action(() => labelTimerCount.Text = timerText));
                 statusTimerStats.GetCurrentParent()?.Invoke(new Action(() => statusTimerStats.Text = timerText));
             }
             catch
@@ -789,13 +834,13 @@ namespace ThorneTimer
         {
             string oldActiveCharacterID = activeCharacterID;
 
-            cboActiveCharacter.DataSource = Database.GetActiveCharacters(con);
+            tscActiveCharacter.ComboBox.DataSource = Database.GetActiveCharacters(con);
 
-            foreach (ComboBoxItem item in (List<ComboBoxItem>)cboActiveCharacter.DataSource)
+            foreach (ComboBoxItem item in (List<ComboBoxItem>)tscActiveCharacter.ComboBox.DataSource)
             {
                 if (Convert.ToString(item.Value) == oldActiveCharacterID)
                 {
-                    cboActiveCharacter.SelectedItem = item;
+                    tscActiveCharacter.SelectedItem = item;
                     break;
                 }
             }
@@ -1679,7 +1724,7 @@ namespace ThorneTimer
 
         private void ToggleLog()
         {
-            if (btnStartStopLog.Text == btnStartParsingLog)
+            if (tsbStartStopWatching.Text == startWatchingText)
             {
                 StartLog();
             }
@@ -1691,7 +1736,7 @@ namespace ThorneTimer
 
         private void RestartLog()
         {
-            if (btnStartStopLog.Text == btnStopParsingLog)
+            if (tsbStartStopWatching.Text == stopWatchingText)
             {
                 StopLog();
                 StartLog();
@@ -1706,10 +1751,11 @@ namespace ThorneTimer
 
             if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
             {
-                btnStartStopLog.Text = "Stop Parsing Log";
-                btnStartStopLog.BackColor = Color.LightGreen;
-                labelLogFile.Text = filePath;
-                statusParsing.Text = "Parsing";
+                tsbStartStopWatching.Text = stopWatchingText;
+                tsbStartStopWatching.Image = iconStop;
+                startStopWatchingToolStripMenuItem.Text = "&Stop Watching";
+                startStopWatchingToolStripMenuItem.Image = iconStop;
+                statusParsing.Text = "Watching: " + Path.GetFileName(filePath);
 
                 // Process Events on Another Thread
                 tParseLog = new Thread(new ThreadStart(ParseLog));
@@ -1719,16 +1765,16 @@ namespace ThorneTimer
 
         private void StopLog()
         {
-            btnStartStopLog.Text = "Start Parsing Log";
-            btnStartStopLog.BackColor = btnAddTimer.BackColor;
-            btnStartStopLog.UseVisualStyleBackColor = true;
-            labelLogFile.Text = "Idle";
+            tsbStartStopWatching.Text = startWatchingText;
+            tsbStartStopWatching.Image = iconPlay;
+            startStopWatchingToolStripMenuItem.Text = "&Start Watching";
+            startStopWatchingToolStripMenuItem.Image = iconPlay;
             statusParsing.Text = "Idle";
 
             tParseLog.Abort();
         }
 
-        private void btnStartStopLog_Click(object sender, EventArgs e)
+        private void tsbStartStopWatching_Click(object sender, EventArgs e)
         {
             ToggleLog();
         }
@@ -2001,9 +2047,9 @@ namespace ThorneTimer
             }
         }
 
-        private void cboActiveCharacter_SelectedIndexChanged(object sender, EventArgs e)
+        private void tscActiveCharacter_SelectedIndexChanged(object sender, EventArgs e)
         {
-            activeCharacterID = (cboActiveCharacter.SelectedItem as ComboBoxItem).Value.ToString();
+            activeCharacterID = (tscActiveCharacter.SelectedItem as ComboBoxItem).Value.ToString();
 
             Database.SetSetting(con, "ActiveCharacterID", activeCharacterID);
 
@@ -2072,7 +2118,9 @@ namespace ThorneTimer
         {
             if (miniViews.CreateMiniViews(con, activeCharacterID))
             {
-                btnMiniView.BackColor = Color.LightGreen;
+                tsbMiniViews.Checked = true;
+                tsbMiniViews.BackColor = Color.LightGreen;
+                miniViewsToolStripMenuItem.Checked = true;
 
                 UpdateMiniView();
             }
@@ -2097,12 +2145,13 @@ namespace ThorneTimer
 
                 miniViews.DestroyMiniViews();
 
-                btnMiniView.BackColor = btnAddTimer.BackColor;
-                btnMiniView.UseVisualStyleBackColor = true;
+                tsbMiniViews.Checked = false;
+                tsbMiniViews.BackColor = Color.Empty;
+                miniViewsToolStripMenuItem.Checked = false;
             }
         }
 
-        private void btnMiniView_Click(object sender, EventArgs e)
+        private void tsbMiniViews_Click(object sender, EventArgs e)
         {
             if (miniViews.MiniViewsHidden())
             {

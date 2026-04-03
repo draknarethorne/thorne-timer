@@ -29,8 +29,13 @@
         private void InitializeComponent()
         {
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(FormMain));
-            this.lblActiveChar = new System.Windows.Forms.Label();
-            this.btnStartStopLog = new System.Windows.Forms.Button();
+            this.toolStrip = new System.Windows.Forms.ToolStrip();
+            this.tslActiveCharacter = new System.Windows.Forms.ToolStripLabel();
+            this.tscActiveCharacter = new System.Windows.Forms.ToolStripComboBox();
+            this.toolStripSeparator3 = new System.Windows.Forms.ToolStripSeparator();
+            this.tsbStartStopWatching = new System.Windows.Forms.ToolStripButton();
+            this.toolStripSeparator4 = new System.Windows.Forms.ToolStripSeparator();
+            this.tsbMiniViews = new System.Windows.Forms.ToolStripButton();
             this.menuStrip1 = new System.Windows.Forms.MenuStrip();
             this.fileToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.newDatabaseToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -46,7 +51,6 @@
             this.tabTimers = new System.Windows.Forms.TabPage();
             this.btnResetCounts = new System.Windows.Forms.Button();
             this.buttonStopAll = new System.Windows.Forms.Button();
-            this.labelTimerCount = new System.Windows.Forms.Label();
             this.btnAddTimer = new System.Windows.Forms.Button();
             this.btnDeleteTimer = new System.Windows.Forms.Button();
             this.grdTimers = new System.Windows.Forms.DataGridView();
@@ -96,10 +100,11 @@
             this.lblWarnPickFore = new System.Windows.Forms.Label();
             this.lblWarningColors = new System.Windows.Forms.Label();
             this.lblFontSize = new System.Windows.Forms.Label();
-            this.cboActiveCharacter = new System.Windows.Forms.ComboBox();
-            this.btnMiniView = new System.Windows.Forms.Button();
+            this.viewToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.miniViewsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.watchToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.startStopWatchingToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.colorDialog1 = new System.Windows.Forms.ColorDialog();
-            this.labelLogFile = new System.Windows.Forms.Label();
             this.statusStrip = new System.Windows.Forms.StatusStrip();
             this.statusTomePath = new System.Windows.Forms.ToolStripStatusLabel();
             this.statusParsing = new System.Windows.Forms.ToolStripStatusLabel();
@@ -123,31 +128,67 @@
             ((System.ComponentModel.ISupportInitialize)(this.tbOpacity)).BeginInit();
             this.SuspendLayout();
             // 
-            // lblActiveChar
+            // toolStrip
             // 
-            this.lblActiveChar.AutoSize = true;
-            this.lblActiveChar.Location = new System.Drawing.Point(9, 37);
-            this.lblActiveChar.Name = "lblActiveChar";
-            this.lblActiveChar.Size = new System.Drawing.Size(89, 13);
-            this.lblActiveChar.TabIndex = 3;
-            this.lblActiveChar.Text = "Active Character:";
+            this.toolStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.tslActiveCharacter,
+            this.tscActiveCharacter,
+            this.toolStripSeparator3,
+            this.tsbStartStopWatching,
+            this.toolStripSeparator4,
+            this.tsbMiniViews});
+            this.toolStrip.Location = new System.Drawing.Point(0, 24);
+            this.toolStrip.Name = "toolStrip";
+            this.toolStrip.Size = new System.Drawing.Size(1152, 25);
+            this.toolStrip.TabIndex = 21;
             // 
-            // btnStartStopLog
+            // tslActiveCharacter
             // 
-            this.btnStartStopLog.BackColor = System.Drawing.SystemColors.Control;
-            this.btnStartStopLog.Location = new System.Drawing.Point(231, 32);
-            this.btnStartStopLog.Name = "btnStartStopLog";
-            this.btnStartStopLog.Size = new System.Drawing.Size(116, 23);
-            this.btnStartStopLog.TabIndex = 6;
-            this.btnStartStopLog.Text = "Start Parsing Log";
-            this.btnStartStopLog.UseVisualStyleBackColor = true;
-            this.btnStartStopLog.Click += new System.EventHandler(this.btnStartStopLog_Click);
+            this.tslActiveCharacter.Name = "tslActiveCharacter";
+            this.tslActiveCharacter.Size = new System.Drawing.Size(61, 22);
+            this.tslActiveCharacter.Text = "Character:";
+            // 
+            // tscActiveCharacter
+            // 
+            this.tscActiveCharacter.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.tscActiveCharacter.Name = "tscActiveCharacter";
+            this.tscActiveCharacter.Size = new System.Drawing.Size(140, 25);
+            this.tscActiveCharacter.SelectedIndexChanged += new System.EventHandler(this.tscActiveCharacter_SelectedIndexChanged);
+            // 
+            // toolStripSeparator3
+            // 
+            this.toolStripSeparator3.Name = "toolStripSeparator3";
+            this.toolStripSeparator3.Size = new System.Drawing.Size(6, 25);
+            // 
+            // tsbStartStopWatching
+            // 
+            this.tsbStartStopWatching.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.ImageAndText;
+            this.tsbStartStopWatching.Name = "tsbStartStopWatching";
+            this.tsbStartStopWatching.Size = new System.Drawing.Size(90, 22);
+            this.tsbStartStopWatching.Text = "Start Watching";
+            this.tsbStartStopWatching.Click += new System.EventHandler(this.tsbStartStopWatching_Click);
+            // 
+            // toolStripSeparator4
+            // 
+            this.toolStripSeparator4.Name = "toolStripSeparator4";
+            this.toolStripSeparator4.Size = new System.Drawing.Size(6, 25);
+            // 
+            // tsbMiniViews
+            // 
+            this.tsbMiniViews.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.ImageAndText;
+            this.tsbMiniViews.Name = "tsbMiniViews";
+            this.tsbMiniViews.Size = new System.Drawing.Size(70, 22);
+            this.tsbMiniViews.Text = "Mini Views";
+            this.tsbMiniViews.ToolTipText = "Toggle Mini Views";
+            this.tsbMiniViews.Click += new System.EventHandler(this.tsbMiniViews_Click);
             // 
             // menuStrip1
             // 
             this.menuStrip1.BackColor = System.Drawing.SystemColors.MenuBar;
             this.menuStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.fileToolStripMenuItem,
+            this.viewToolStripMenuItem,
+            this.watchToolStripMenuItem,
             this.helpToolStripMenuItem});
             this.menuStrip1.Location = new System.Drawing.Point(0, 0);
             this.menuStrip1.Name = "menuStrip1";
@@ -228,6 +269,36 @@
             this.aboutToolStripMenuItem.Text = "&About";
             this.aboutToolStripMenuItem.Click += new System.EventHandler(this.aboutToolStripMenuItem_Click);
             // 
+            // viewToolStripMenuItem
+            // 
+            this.viewToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.miniViewsToolStripMenuItem});
+            this.viewToolStripMenuItem.Name = "viewToolStripMenuItem";
+            this.viewToolStripMenuItem.Size = new System.Drawing.Size(44, 20);
+            this.viewToolStripMenuItem.Text = "&View";
+            // 
+            // miniViewsToolStripMenuItem
+            // 
+            this.miniViewsToolStripMenuItem.Name = "miniViewsToolStripMenuItem";
+            this.miniViewsToolStripMenuItem.Size = new System.Drawing.Size(134, 22);
+            this.miniViewsToolStripMenuItem.Text = "&Mini Views";
+            this.miniViewsToolStripMenuItem.Click += new System.EventHandler(this.tsbMiniViews_Click);
+            // 
+            // watchToolStripMenuItem
+            // 
+            this.watchToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.startStopWatchingToolStripMenuItem});
+            this.watchToolStripMenuItem.Name = "watchToolStripMenuItem";
+            this.watchToolStripMenuItem.Size = new System.Drawing.Size(54, 20);
+            this.watchToolStripMenuItem.Text = "&Watch";
+            // 
+            // startStopWatchingToolStripMenuItem
+            // 
+            this.startStopWatchingToolStripMenuItem.Name = "startStopWatchingToolStripMenuItem";
+            this.startStopWatchingToolStripMenuItem.Size = new System.Drawing.Size(160, 22);
+            this.startStopWatchingToolStripMenuItem.Text = "&Start Watching";
+            this.startStopWatchingToolStripMenuItem.Click += new System.EventHandler(this.tsbStartStopWatching_Click);
+            // 
             // tabCtrlMain
             // 
             this.tabCtrlMain.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
@@ -238,7 +309,7 @@
             this.tabCtrlMain.Controls.Add(this.tabCategories);
             this.tabCtrlMain.Controls.Add(this.tabViews);
             this.tabCtrlMain.Controls.Add(this.tabSettings);
-            this.tabCtrlMain.Location = new System.Drawing.Point(12, 61);
+            this.tabCtrlMain.Location = new System.Drawing.Point(12, 52);
             this.tabCtrlMain.Name = "tabCtrlMain";
             this.tabCtrlMain.SelectedIndex = 0;
             this.tabCtrlMain.Size = new System.Drawing.Size(1128, 433);
@@ -249,7 +320,6 @@
             this.tabTimers.BackColor = System.Drawing.SystemColors.Control;
             this.tabTimers.Controls.Add(this.btnResetCounts);
             this.tabTimers.Controls.Add(this.buttonStopAll);
-            this.tabTimers.Controls.Add(this.labelTimerCount);
             this.tabTimers.Controls.Add(this.btnAddTimer);
             this.tabTimers.Controls.Add(this.btnDeleteTimer);
             this.tabTimers.Controls.Add(this.grdTimers);
@@ -283,17 +353,6 @@
             this.buttonStopAll.Text = "Stop All";
             this.buttonStopAll.UseVisualStyleBackColor = true;
             this.buttonStopAll.Click += new System.EventHandler(this.btnStopAll_Click);
-            // 
-            // labelTimerCount
-            // 
-            this.labelTimerCount.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.labelTimerCount.AutoSize = true;
-            this.labelTimerCount.Location = new System.Drawing.Point(766, 383);
-            this.labelTimerCount.Name = "labelTimerCount";
-            this.labelTimerCount.Size = new System.Drawing.Size(162, 13);
-            this.labelTimerCount.TabIndex = 16;
-            this.labelTimerCount.Text = "Timers: 0   Active: 0   Running: 0";
-            this.labelTimerCount.TextAlign = System.Drawing.ContentAlignment.TopRight;
             // 
             // btnAddTimer
             // 
@@ -853,37 +912,6 @@
             this.lblFontSize.TabIndex = 13;
             this.lblFontSize.Text = "Font Size:";
             // 
-            // cboActiveCharacter
-            // 
-            this.cboActiveCharacter.FormattingEnabled = true;
-            this.cboActiveCharacter.Location = new System.Drawing.Point(104, 32);
-            this.cboActiveCharacter.Name = "cboActiveCharacter";
-            this.cboActiveCharacter.Size = new System.Drawing.Size(121, 21);
-            this.cboActiveCharacter.TabIndex = 10;
-            this.cboActiveCharacter.SelectedIndexChanged += new System.EventHandler(this.cboActiveCharacter_SelectedIndexChanged);
-            // 
-            // btnMiniView
-            // 
-            this.btnMiniView.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnMiniView.BackColor = System.Drawing.SystemColors.Control;
-            this.btnMiniView.Location = new System.Drawing.Point(1055, 32);
-            this.btnMiniView.Name = "btnMiniView";
-            this.btnMiniView.Size = new System.Drawing.Size(75, 23);
-            this.btnMiniView.TabIndex = 13;
-            this.btnMiniView.Text = "Mini View";
-            this.btnMiniView.UseVisualStyleBackColor = true;
-            this.btnMiniView.Click += new System.EventHandler(this.btnMiniView_Click);
-            // 
-            // labelLogFile
-            // 
-            this.labelLogFile.AutoSize = true;
-            this.labelLogFile.BackColor = System.Drawing.SystemColors.Window;
-            this.labelLogFile.Location = new System.Drawing.Point(362, 37);
-            this.labelLogFile.Name = "labelLogFile";
-            this.labelLogFile.Size = new System.Drawing.Size(24, 13);
-            this.labelLogFile.TabIndex = 15;
-            this.labelLogFile.Text = "Idle";
-            // 
             // statusStrip
             // 
             this.statusStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
@@ -924,11 +952,7 @@
             this.ClientSize = new System.Drawing.Size(1152, 524);
             this.Controls.Add(this.statusStrip);
             this.Controls.Add(this.tabCtrlMain);
-            this.Controls.Add(this.labelLogFile);
-            this.Controls.Add(this.btnMiniView);
-            this.Controls.Add(this.cboActiveCharacter);
-            this.Controls.Add(this.btnStartStopLog);
-            this.Controls.Add(this.lblActiveChar);
+            this.Controls.Add(this.toolStrip);
             this.Controls.Add(this.menuStrip1);
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.MainMenuStrip = this.menuStrip1;
@@ -962,8 +986,13 @@
         }
 
         #endregion
-        private System.Windows.Forms.Label lblActiveChar;
-        private System.Windows.Forms.Button btnStartStopLog;
+        private System.Windows.Forms.ToolStrip toolStrip;
+        private System.Windows.Forms.ToolStripLabel tslActiveCharacter;
+        private System.Windows.Forms.ToolStripComboBox tscActiveCharacter;
+        private System.Windows.Forms.ToolStripSeparator toolStripSeparator3;
+        private System.Windows.Forms.ToolStripButton tsbStartStopWatching;
+        private System.Windows.Forms.ToolStripSeparator toolStripSeparator4;
+        private System.Windows.Forms.ToolStripButton tsbMiniViews;
         private System.Windows.Forms.MenuStrip menuStrip1;
         private System.Windows.Forms.ToolStripMenuItem fileToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem exitToolStripMenuItem;
@@ -976,14 +1005,16 @@
         private System.Windows.Forms.DataGridView grdCharacters;
         private System.Windows.Forms.Button btnAddCharacter;
         private System.Windows.Forms.Button btnDeleteCharacter;
-        private System.Windows.Forms.ComboBox cboActiveCharacter;
+        private System.Windows.Forms.ToolStripMenuItem viewToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem miniViewsToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem watchToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem startStopWatchingToolStripMenuItem;
         private System.Windows.Forms.TabPage tabCategories;
         private System.Windows.Forms.Button btnAddCategory;
         private System.Windows.Forms.Button btnDeleteCategory;
         private System.Windows.Forms.DataGridView grdCategories;
         private System.Windows.Forms.ComboBox cboActiveVoice;
         private System.Windows.Forms.Label lblActiveVoice;
-        private System.Windows.Forms.Button btnMiniView;
         private System.Windows.Forms.TabPage tabSettings;
         private System.Windows.Forms.TrackBar tbFontSize;
         private System.Windows.Forms.Label lblFontSize;
@@ -1007,8 +1038,6 @@
         private System.Windows.Forms.Label lblNormalColors;
         private System.Windows.Forms.ToolStripMenuItem helpToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem aboutToolStripMenuItem;
-        private System.Windows.Forms.Label labelLogFile;
-        private System.Windows.Forms.Label labelTimerCount;
         private System.Windows.Forms.Label lblPingColors;
         private System.Windows.Forms.Label lblPingPickBack;
         private System.Windows.Forms.Label lblPingPickFore;
