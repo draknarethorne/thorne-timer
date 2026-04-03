@@ -206,7 +206,7 @@ namespace ThorneTimer
                     }
                     else
                     {
-                        MessageBox.Show("Database file not found:\n" + path, "File Not Found",
+                        MessageBox.Show("Tome not found:\n" + path, "Tome Not Found",
                             MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     }
                 };
@@ -240,11 +240,43 @@ namespace ThorneTimer
                 HideMiniView();
             }
 
+            // Remember previous database in case the new one fails
+            string previousDbPath = Properties.Settings.Default.DatabasePath;
+
             // Close old connection
             try { con.Close(); } catch { }
 
-            // Open new database
-            con = Database.Connection(dbPath);
+            // Try to open the new database
+            try
+            {
+                con = Database.Connection(dbPath);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    "Unable to open the tome:\n" + dbPath +
+                    "\n\n" + ex.Message,
+                    "Invalid Tome",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+
+                // Re-open the previous database so the app stays usable
+                if (!string.IsNullOrEmpty(previousDbPath) && File.Exists(previousDbPath))
+                {
+                    con = Database.Connection(previousDbPath);
+                }
+                else
+                {
+                    con = Database.Connection(Database.GetDefaultDatabasePath());
+                }
+
+                ReloadFromDatabase();
+                UpdateTitleBar(Properties.Settings.Default.DatabasePath);
+                PopulateRecentDatabases();
+
+                if (wasParsingLog) StartLog();
+                if (wasMiniViewActive) ShowMiniView();
+                return;
+            }
 
             // Save the new path and add to recent list
             Properties.Settings.Default.DatabasePath = dbPath;
@@ -334,6 +366,42 @@ namespace ThorneTimer
             UpdateMiniView();
         }
 
+        private string GetDataDirectory()
+        {
+            string exePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
+            return Path.Combine(Path.GetDirectoryName(exePath), "Data");
+        }
+
+        private void newDatabaseToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            string dataDir = GetDataDirectory();
+            if (!Directory.Exists(dataDir))
+            {
+                Directory.CreateDirectory(dataDir);
+            }
+
+            SaveFileDialog dlg = new SaveFileDialog
+            {
+                Title = "New Tome",
+                Filter = "Database files (*.db)|*.db",
+                InitialDirectory = dataDir,
+                FileName = "ThorneTimer.db",
+                OverwritePrompt = true,
+                AutoUpgradeEnabled = true
+            };
+
+            if (dlg.ShowDialog() == DialogResult.OK)
+            {
+                // If the file already exists, delete it so Connection() creates a fresh one
+                if (File.Exists(dlg.FileName))
+                {
+                    File.Delete(dlg.FileName);
+                }
+
+                OpenDatabase(dlg.FileName);
+            }
+        }
+
         private void openDatabaseToolStripMenuItem_Click(object sender, EventArgs e)
         {
             string currentDir = Path.GetDirectoryName(
@@ -341,17 +409,132 @@ namespace ThorneTimer
 
             OpenFileDialog dlg = new OpenFileDialog
             {
-                Title = "Open Timer Database",
+                Title = "Open Tome",
                 Filter = "Database files (*.db)|*.db|All files (*.*)|*.*",
                 InitialDirectory = currentDir,
                 DereferenceLinks = false,
                 AutoUpgradeEnabled = true
             };
 
-            if (dlg.ShowDialog() == DialogResult.OK)
+            if (dlg.ShowDialog() != DialogResult.OK)
+                return;
+
+            string selectedPath = dlg.FileName;
+            string selectedName = Path.GetFileName(selectedPath);
+
+            // EQTimer.db: migrate it into Data\ as ThorneTimer.db instead of opening in place
+            if (string.Equals(selectedName, "EQTimer.db", StringComparison.OrdinalIgnoreCase))
             {
-                OpenDatabase(dlg.FileName);
+                string dataDir = GetDataDirectory();
+                if (!Directory.Exists(dataDir))
+                {
+                    Directory.CreateDirectory(dataDir);
+                }
+
+                string targetPath = Path.Combine(dataDir, "ThorneTimer.db");
+
+                if (File.Exists(targetPath))
+                {
+                    DialogResult result = MessageBox.Show(
+                        "A tome named \"ThorneTimer.db\" already exists in the Data folder.\n\n" +
+                        "Yes \u2014 Replace the existing tome\n" +
+                        "No \u2014 Save with a different name",
+                        "Tome Already Exists",
+                        MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+
+                    if (result == DialogResult.Cancel)
+                        return;
+
+                    if (result == DialogResult.No)
+                    {
+                        // Let them pick a different name
+                        SaveFileDialog saveDlg = new SaveFileDialog
+                        {
+                            Title = "Save Migrated Tome As",
+                            Filter = "Database files (*.db)|*.db",
+                            InitialDirectory = dataDir,
+                            FileName = "ThorneTimer.db",
+                            OverwritePrompt = true,
+                            AutoUpgradeEnabled = true
+                        };
+
+                        if (saveDlg.ShowDialog() != DialogResult.OK)
+                            return;
+
+                        targetPath = saveDlg.FileName;
+                    }
+                    else
+                    {
+                        // Yes — replace the existing one
+                        string currentDbPath = Properties.Settings.Default.DatabasePath ?? "";
+                        if (string.Equals(Path.GetFullPath(currentDbPath), Path.GetFullPath(targetPath), StringComparison.OrdinalIgnoreCase))
+                        {
+                            try { con.Close(); } catch { }
+                        }
+
+                        File.Delete(targetPath);
+                    }
+                }
+
+                File.Copy(selectedPath, targetPath);
+
+                MessageBox.Show(
+                    "Your EQTimer tome has been migrated to:\n" + targetPath +
+                    "\n\nAll your timers, characters, and settings have been preserved." +
+                    "\nThe original EQTimer.db was not modified.",
+                    "Tome Migrated",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                OpenDatabase(targetPath);
+                return;
             }
+
+            // Any other database: open it directly wherever it lives
+            OpenDatabase(selectedPath);
+        }
+
+        private void saveDatabaseAsToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            string currentDbPath = Properties.Settings.Default.DatabasePath ?? Database.GetDefaultDatabasePath();
+            string dataDir = GetDataDirectory();
+            if (!Directory.Exists(dataDir))
+            {
+                Directory.CreateDirectory(dataDir);
+            }
+
+            SaveFileDialog dlg = new SaveFileDialog
+            {
+                Title = "Save Tome As",
+                Filter = "Database files (*.db)|*.db",
+                InitialDirectory = dataDir,
+                FileName = Path.GetFileName(currentDbPath),
+                OverwritePrompt = true,
+                AutoUpgradeEnabled = true
+            };
+
+            if (dlg.ShowDialog() != DialogResult.OK)
+                return;
+
+            // Don't allow saving over the currently open database
+            if (string.Equals(Path.GetFullPath(dlg.FileName), Path.GetFullPath(currentDbPath), StringComparison.OrdinalIgnoreCase))
+            {
+                MessageBox.Show(
+                    "The tome is already open under that name.",
+                    "Save Tome As",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            // Save any pending changes before copying
+            SaveDataTimers();
+            SaveDataCharacters();
+            SaveDataCategories();
+
+            // Copy the current database to the new location
+            File.Copy(currentDbPath, dlg.FileName, true);
+
+            // Switch to the new copy
+            OpenDatabase(dlg.FileName);
         }
 
         private void FormMain_FormClosing(Object sender, FormClosingEventArgs e)

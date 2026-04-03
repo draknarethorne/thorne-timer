@@ -41,6 +41,12 @@ namespace ThorneTimer
             Directory.CreateDirectory(directory);
         }
         File.Copy(oldDbName, newDbName);
+        MessageBox.Show(
+            "Your EQTimer tome has been migrated to:\n" + newDbName +
+            "\n\nAll your timers, characters, and settings have been preserved." +
+            "\nThe original EQTimer.db was not modified.",
+            "Tome Migrated",
+            MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         // Migration: If target doesn't exist but ThorneTimer.db is next to exe (pre-Data layout), copy it
@@ -55,6 +61,12 @@ namespace ThorneTimer
                 Directory.CreateDirectory(directory);
             }
             File.Copy(legacyDb, newDbName);
+            MessageBox.Show(
+                "Your tome has been moved to:\n" + newDbName +
+                "\n\nAll your data has been preserved." +
+                "\nThe original file was not modified.",
+                "Tome Migrated",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         }
 
