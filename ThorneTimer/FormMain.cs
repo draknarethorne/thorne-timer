@@ -151,8 +151,8 @@ namespace ThorneTimer
         private void UpdateTitleBar(string dbPath)
         {
             string dbName = Path.GetFileName(dbPath);
-            string dbDir = Path.GetDirectoryName(dbPath);
-            this.Text = "Thorne Timer - " + dbName + "  [" + dbDir + "]";
+            this.Text = "Thorne Timer - " + dbName;
+            statusTomePath.Text = dbPath;
         }
 
         private void AddToRecentDatabases(string dbPath)
@@ -762,7 +762,7 @@ namespace ThorneTimer
 
                 String timerText = "Timers: " + grdTimers.RowCount + "   Active: " + activeTimers + "   Running: " + runningTimers;
                 labelTimerCount.Invoke(new Action(() => labelTimerCount.Text = timerText));
-                //labelTimerCount.Text = timerText;
+                statusTimerStats.GetCurrentParent()?.Invoke(new Action(() => statusTimerStats.Text = timerText));
             }
             catch
             {
@@ -1709,6 +1709,7 @@ namespace ThorneTimer
                 btnStartStopLog.Text = "Stop Parsing Log";
                 btnStartStopLog.BackColor = Color.LightGreen;
                 labelLogFile.Text = filePath;
+                statusParsing.Text = "Parsing";
 
                 // Process Events on Another Thread
                 tParseLog = new Thread(new ThreadStart(ParseLog));
@@ -1722,6 +1723,7 @@ namespace ThorneTimer
             btnStartStopLog.BackColor = btnAddTimer.BackColor;
             btnStartStopLog.UseVisualStyleBackColor = true;
             labelLogFile.Text = "Idle";
+            statusParsing.Text = "Idle";
 
             tParseLog.Abort();
         }

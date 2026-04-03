@@ -100,6 +100,10 @@
             this.btnMiniView = new System.Windows.Forms.Button();
             this.colorDialog1 = new System.Windows.Forms.ColorDialog();
             this.labelLogFile = new System.Windows.Forms.Label();
+            this.statusStrip = new System.Windows.Forms.StatusStrip();
+            this.statusTomePath = new System.Windows.Forms.ToolStripStatusLabel();
+            this.statusParsing = new System.Windows.Forms.ToolStripStatusLabel();
+            this.statusTimerStats = new System.Windows.Forms.ToolStripStatusLabel();
             this.menuStrip1.SuspendLayout();
             this.tabCtrlMain.SuspendLayout();
             this.tabTimers.SuspendLayout();
@@ -880,12 +884,45 @@
             this.labelLogFile.TabIndex = 15;
             this.labelLogFile.Text = "Idle";
             // 
+            // statusStrip
+            // 
+            this.statusStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.statusTomePath,
+            this.statusParsing,
+            this.statusTimerStats});
+            this.statusStrip.Location = new System.Drawing.Point(0, 502);
+            this.statusStrip.Name = "statusStrip";
+            this.statusStrip.Size = new System.Drawing.Size(1152, 22);
+            this.statusStrip.TabIndex = 20;
+            // 
+            // statusTomePath
+            // 
+            this.statusTomePath.Name = "statusTomePath";
+            this.statusTomePath.Size = new System.Drawing.Size(0, 17);
+            this.statusTomePath.Spring = true;
+            this.statusTomePath.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            // 
+            // statusParsing
+            // 
+            this.statusParsing.BorderSides = System.Windows.Forms.ToolStripStatusLabelBorderSides.Left;
+            this.statusParsing.Name = "statusParsing";
+            this.statusParsing.Size = new System.Drawing.Size(27, 17);
+            this.statusParsing.Text = "Idle";
+            // 
+            // statusTimerStats
+            // 
+            this.statusTimerStats.BorderSides = System.Windows.Forms.ToolStripStatusLabelBorderSides.Left;
+            this.statusTimerStats.Name = "statusTimerStats";
+            this.statusTimerStats.Size = new System.Drawing.Size(162, 17);
+            this.statusTimerStats.Text = "Timers: 0   Active: 0   Running: 0";
+            // 
             // FormMain
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.SystemColors.Window;
             this.ClientSize = new System.Drawing.Size(1152, 524);
+            this.Controls.Add(this.statusStrip);
             this.Controls.Add(this.tabCtrlMain);
             this.Controls.Add(this.labelLogFile);
             this.Controls.Add(this.btnMiniView);
@@ -996,6 +1033,10 @@
         private System.Windows.Forms.ToolStripMenuItem openRecentToolStripMenuItem;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator2;
+        private System.Windows.Forms.StatusStrip statusStrip;
+        private System.Windows.Forms.ToolStripStatusLabel statusTomePath;
+        private System.Windows.Forms.ToolStripStatusLabel statusParsing;
+        private System.Windows.Forms.ToolStripStatusLabel statusTimerStats;
     }
 }
 
