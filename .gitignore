@@ -7,6 +7,9 @@
 *.user
 *.suo
 *.userosscache
+# Code signing certificates
+*.pfx
+# Solution state
 *.sln.docstates
 # Auto-generated files
 *.log

@@ -10,6 +10,8 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: write
+    env:
+      HAS_SIGNING_CERT: ${{ secrets.SIGNING_CERTIFICATE != '' }}
 
     steps:
     - name: Checkout code
@@ -63,6 +65,23 @@ jobs:
         xcopy ThorneTimer\bin\Release\Sounds release-package\Sounds\ /E /I /Y
         xcopy ThorneTimer\bin\Release\Data release-package\Data\ /E /I /Y
       shell: cmd
+
+    - name: Sign executable
+      if: env.HAS_SIGNING_CERT == 'true'
+      run: |
+        # Decode the base64-encoded .pfx from GitHub secret
+        $pfxBytes = [Convert]::FromBase64String("${{ secrets.SIGNING_CERTIFICATE }}")
+        $pfxPath = Join-Path $env:RUNNER_TEMP "code_signing.pfx"
+        [IO.File]::WriteAllBytes($pfxPath, $pfxBytes)
+
+        # Find signtool.exe (available on windows-latest runners)
+        $signtool = Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits" -Recurse -Filter signtool.exe | Where-Object { $_.FullName -match "x64" } | Select-Object -First 1 -ExpandProperty FullName
+
+        # Sign ThorneTimer.exe
+        & $signtool sign /f $pfxPath /p "${{ secrets.PFX_PASSWORD }}" /fd sha256 /tr http://timestamp.digicert.com /td sha256 "release-package\ThorneTimer.exe"
+
+        # Clean up
+        Remove-Item $pfxPath
 
     - name: Create ZIP archive
       run: Compress-Archive -Path release-package\* -DestinationPath ThorneTimer-${{ github.ref_name }}.zip
