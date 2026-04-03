@@ -208,7 +208,7 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="ThorneTimer_gold.ico" />
-    <Content Include="Data\ThorneTimer.db">
+    <Content Include="Data\ThorneTimer.tdb">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

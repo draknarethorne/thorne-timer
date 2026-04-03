@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -383,9 +383,9 @@ namespace ThorneTimer
             SaveFileDialog dlg = new SaveFileDialog
             {
                 Title = "New Tome",
-                Filter = "Database files (*.db)|*.db",
+                Filter = "Tome files (*.tdb)|*.tdb|Database files (*.db)|*.db",
                 InitialDirectory = dataDir,
-                FileName = "ThorneTimer.db",
+                FileName = "ThorneTimer.tdb",
                 OverwritePrompt = true,
                 AutoUpgradeEnabled = true
             };
@@ -410,7 +410,7 @@ namespace ThorneTimer
             OpenFileDialog dlg = new OpenFileDialog
             {
                 Title = "Open Tome",
-                Filter = "Database files (*.db)|*.db|All files (*.*)|*.*",
+                Filter = "Tome files (*.tdb)|*.tdb|Database files (*.db)|*.db|All files (*.*)|*.*",
                 InitialDirectory = currentDir,
                 DereferenceLinks = false,
                 AutoUpgradeEnabled = true
@@ -422,7 +422,7 @@ namespace ThorneTimer
             string selectedPath = dlg.FileName;
             string selectedName = Path.GetFileName(selectedPath);
 
-            // EQTimer.db: migrate it into Data\ as ThorneTimer.db instead of opening in place
+            // EQTimer.db: migrate it into Data\ as ThorneTimer.tdb instead of opening in place
             if (string.Equals(selectedName, "EQTimer.db", StringComparison.OrdinalIgnoreCase))
             {
                 string dataDir = GetDataDirectory();
@@ -431,12 +431,12 @@ namespace ThorneTimer
                     Directory.CreateDirectory(dataDir);
                 }
 
-                string targetPath = Path.Combine(dataDir, "ThorneTimer.db");
+                string targetPath = Path.Combine(dataDir, "ThorneTimer.tdb");
 
                 if (File.Exists(targetPath))
                 {
                     DialogResult result = MessageBox.Show(
-                        "A tome named \"ThorneTimer.db\" already exists in the Data folder.\n\n" +
+                        "A tome named \"ThorneTimer.tdb\" already exists in the Data folder.\n\n" +
                         "Yes \u2014 Replace the existing tome\n" +
                         "No \u2014 Save with a different name",
                         "Tome Already Exists",
@@ -451,9 +451,9 @@ namespace ThorneTimer
                         SaveFileDialog saveDlg = new SaveFileDialog
                         {
                             Title = "Save Migrated Tome As",
-                            Filter = "Database files (*.db)|*.db",
+                            Filter = "Tome files (*.tdb)|*.tdb|Database files (*.db)|*.db",
                             InitialDirectory = dataDir,
-                            FileName = "ThorneTimer.db",
+                            FileName = "ThorneTimer.tdb",
                             OverwritePrompt = true,
                             AutoUpgradeEnabled = true
                         };
@@ -465,7 +465,7 @@ namespace ThorneTimer
                     }
                     else
                     {
-                        // Yes — replace the existing one
+                        // Yes � replace the existing one
                         string currentDbPath = Properties.Settings.Default.DatabasePath ?? "";
                         if (string.Equals(Path.GetFullPath(currentDbPath), Path.GetFullPath(targetPath), StringComparison.OrdinalIgnoreCase))
                         {
@@ -505,7 +505,7 @@ namespace ThorneTimer
             SaveFileDialog dlg = new SaveFileDialog
             {
                 Title = "Save Tome As",
-                Filter = "Database files (*.db)|*.db",
+                Filter = "Tome files (*.tdb)|*.tdb|Database files (*.db)|*.db",
                 InitialDirectory = dataDir,
                 FileName = Path.GetFileName(currentDbPath),
                 OverwritePrompt = true,
@@ -1598,7 +1598,7 @@ namespace ThorneTimer
 
             string filePath = character.LogFile;
 
-            if (filePath.Length > 0 && File.Exists(filePath))
+            if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
             {
                 btnStartStopLog.Text = "Stop Parsing Log";
                 btnStartStopLog.BackColor = Color.LightGreen;
@@ -1784,7 +1784,7 @@ namespace ThorneTimer
 
             string filePath = character.LogFile;
 
-            if (filePath.Length > 0 && File.Exists(filePath))
+            if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
             {
                 var initialFileSize = new FileInfo(filePath).Length;
                 var lastReadLength = initialFileSize;

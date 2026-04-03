@@ -18,7 +18,7 @@ namespace ThorneTimer
         {
             string exePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
             string basePath = Path.GetDirectoryName(exePath);
-            return Path.Combine(basePath, "Data", "ThorneTimer.db");
+            return Path.Combine(basePath, "Data", "ThorneTimer.tdb");
         }
 
         /// <summary>
@@ -53,6 +53,11 @@ namespace ThorneTimer
         if (!File.Exists(newDbName))
         {
         string legacyDb = Path.Combine(exePath, "ThorneTimer.db");
+        if (!File.Exists(legacyDb))
+        {
+            // Also check for old .db in the Data folder (pre-.tdb rename)
+            legacyDb = Path.Combine(exePath, "Data", "ThorneTimer.db");
+        }
         if (File.Exists(legacyDb) && !string.Equals(Path.GetFullPath(legacyDb), Path.GetFullPath(newDbName), StringComparison.OrdinalIgnoreCase))
         {
             string directory = Path.GetDirectoryName(newDbName);
@@ -108,7 +113,7 @@ namespace ThorneTimer
                 cmd.ExecuteNonQuery();
 
                 // Create miniviews table used by the UI
-                cmd.CommandText = "CREATE TABLE miniviews(ID INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT)";
+                cmd.CommandText = "CREATE TABLE miniviews(ID INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT, PositionX INTEGER DEFAULT 100, PositionY INTEGER DEFAULT 100, ViewType TEXT DEFAULT 'Normal', SortOrder INTEGER DEFAULT 0)";
                 cmd.ExecuteNonQuery();
 
                 // Insert default settings with sensible defaults for all known columns
