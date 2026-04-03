@@ -549,13 +549,50 @@ namespace ThorneTimer
                 tParseLog.Abort();
         }
 
+        /// <summary>
+        /// Returns true if the given rectangle is at least partially visible
+        /// on any connected monitor. Returns false only when 100% of the
+        /// window would be offscreen.
+        /// </summary>
+        static public bool IsVisibleOnAnyScreen(Rectangle rect)
+        {
+            foreach (Screen screen in Screen.AllScreens)
+            {
+                if (screen.WorkingArea.IntersectsWith(rect))
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Ensures a window position is visible on at least one monitor.
+        /// If the window is entirely offscreen, clamps it to 10 pixels
+        /// inside the nearest screen's working area.
+        /// </summary>
+        static public Point EnsureVisibleOnScreen(Point location, Size size)
+        {
+            Rectangle windowRect = new Rectangle(location, size);
+            if (IsVisibleOnAnyScreen(windowRect))
+                return location;
+
+            // Entirely offscreen — clamp to nearest screen with a small inset
+            const int inset = 10;
+            Screen nearest = Screen.FromPoint(location);
+            Rectangle area = nearest.WorkingArea;
+            int x = Math.Max(area.Left + inset, Math.Min(location.X, area.Right - size.Width - inset));
+            int y = Math.Max(area.Top + inset, Math.Min(location.Y, area.Bottom - size.Height - inset));
+            return new Point(x, y);
+        }
+
         private void RestoreWindowPosition()
         {
             if (Properties.Settings.Default.HasSetDefaults)
             {
                 this.WindowState = Properties.Settings.Default.WindowState;
-                this.Location = Properties.Settings.Default.Location;
-                this.Size = Properties.Settings.Default.Size;
+                Point loc = Properties.Settings.Default.Location;
+                Size sz = Properties.Settings.Default.Size;
+                this.Location = EnsureVisibleOnScreen(loc, sz);
+                this.Size = sz;
             }
         }
 
@@ -592,6 +629,15 @@ namespace ThorneTimer
         void GrdTimers_DataError(object sender, DataGridViewDataErrorEventArgs e)
         {
             // (No need to write anything in here)
+        }
+
+        void GrdTimers_EditingControlShowing(object sender, DataGridViewEditingControlShowingEventArgs e)
+        {
+            if (e.Control is ComboBox)
+            {
+                e.CellStyle.BackColor = Color.White;
+                e.CellStyle.ForeColor = Color.Black;
+            }
         }
 
         private void ResetTimersGridColumns()
@@ -757,7 +803,8 @@ namespace ThorneTimer
                 ValueType = typeof(ComboBoxItem),
                 DisplayMember = "Text",
                 ValueMember = "Value",
-                DataSource = Database.GetGridCategories(con)
+                DataSource = Database.GetGridCategories(con),
+                FlatStyle = FlatStyle.Flat
             };
             grdTimers.Columns.Add(cboCategory);
 
@@ -862,6 +909,7 @@ namespace ThorneTimer
             grdTimers.DataSource = Database.GetTimers(con);
 
             grdTimers.RowValidating += ValidateRowTimers;
+            grdTimers.EditingControlShowing += GrdTimers_EditingControlShowing;
 
             string sortName = (Properties.Settings.Default.SortColumn.Length > 0) ? Properties.Settings.Default.SortColumn : "Name";
             DataGridViewColumn sortColumn = grdTimers.Columns[sortName];

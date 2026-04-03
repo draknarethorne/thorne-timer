@@ -123,9 +123,10 @@ namespace ThorneTimer
         {
             MiniView view = new MiniView
             {
-                StartPosition = FormStartPosition.Manual,
-                Location = new Point(x, y)
+                StartPosition = FormStartPosition.Manual
             };
+            Point loc = FormMain.EnsureVisibleOnScreen(new Point(x, y), view.Size);
+            view.Location = loc;
 
             if (showView)
             {
