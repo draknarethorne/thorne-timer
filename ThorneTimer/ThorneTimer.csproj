@@ -173,6 +173,9 @@
     <None Include="..\.editorconfig">
       <Link>.editorconfig</Link>
     </None>
+    <Content Include="Data\ThorneTimer_Draknare.tdb">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <None Include="Docs\active-views\active-views-design.md" />
     <None Include="Docs\active-views\codebase-analysis.md" />
     <None Include="Docs\active-views\schema-migration.md" />
