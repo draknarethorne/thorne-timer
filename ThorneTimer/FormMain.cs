@@ -30,6 +30,18 @@ namespace ThorneTimer
         public FormMain()
         {
             InitializeComponent();
+
+            // Resolve initial database: saved path > default (next to exe)
+            string dbPath = Properties.Settings.Default.DatabasePath;
+            if (string.IsNullOrEmpty(dbPath) || !File.Exists(dbPath))
+            {
+                dbPath = Database.GetDefaultDatabasePath();
+                Properties.Settings.Default.DatabasePath = dbPath;
+                Properties.Settings.Default.Save();
+            }
+            con = Database.Connection(dbPath);
+            AddToRecentDatabases(dbPath);
+            UpdateTitleBar(dbPath);
         }
 
         int activeTimers = 0;
@@ -51,7 +63,7 @@ namespace ThorneTimer
 
         readonly MiniViews miniViews = new MiniViews();
         readonly List<TimerPlus> timers = new List<TimerPlus>();
-        readonly SQLiteConnection con = Database.Connection();
+        SQLiteConnection con;
 
         private void FormMain_Load(object sender, EventArgs e)
         {
@@ -127,6 +139,219 @@ namespace ThorneTimer
             SetupCategoriesGrid();
 
             UpdateMiniView();
+
+            PopulateRecentDatabases();
+        }
+
+        private void UpdateTitleBar(string dbPath)
+        {
+            string dbName = Path.GetFileName(dbPath);
+            string dbDir = Path.GetDirectoryName(dbPath);
+            this.Text = "Thorne Timer - " + dbName + "  [" + dbDir + "]";
+        }
+
+        private void AddToRecentDatabases(string dbPath)
+        {
+            var recent = Properties.Settings.Default.RecentDatabases;
+            if (recent == null)
+            {
+                recent = new System.Collections.Specialized.StringCollection();
+                Properties.Settings.Default.RecentDatabases = recent;
+            }
+
+            // Remove if already present (so it moves to top)
+            for (int i = recent.Count - 1; i >= 0; i--)
+            {
+                if (string.Equals(recent[i], dbPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    recent.RemoveAt(i);
+                }
+            }
+
+            // Insert at the front
+            recent.Insert(0, dbPath);
+
+            // Keep at most 10 entries
+            while (recent.Count > 10)
+            {
+                recent.RemoveAt(recent.Count - 1);
+            }
+
+            Properties.Settings.Default.Save();
+        }
+
+        private void PopulateRecentDatabases()
+        {
+            openRecentToolStripMenuItem.DropDownItems.Clear();
+
+            var recent = Properties.Settings.Default.RecentDatabases;
+            if (recent == null || recent.Count == 0)
+            {
+                openRecentToolStripMenuItem.Enabled = false;
+                return;
+            }
+
+            openRecentToolStripMenuItem.Enabled = true;
+            foreach (string path in recent)
+            {
+                if (string.IsNullOrEmpty(path))
+                    continue;
+
+                ToolStripMenuItem item = new ToolStripMenuItem(path);
+                item.Click += (s, ev) =>
+                {
+                    if (File.Exists(path))
+                    {
+                        OpenDatabase(path);
+                    }
+                    else
+                    {
+                        MessageBox.Show("Database file not found:\n" + path, "File Not Found",
+                            MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                };
+                openRecentToolStripMenuItem.DropDownItems.Add(item);
+            }
+        }
+
+        private void OpenDatabase(string dbPath)
+        {
+            // Save current state before switching
+            SaveDataTimers();
+            SaveDataCharacters();
+            SaveDataCategories();
+
+            // Snapshot what was running so we can restore after reload
+            bool wasParsingLog = (btnStartStopLog.Text == btnStopParsingLog);
+            bool wasMiniViewActive = miniViews.MiniViewsActive();
+
+            // Stop all running timers
+            StopAllTimers();
+
+            // Stop log parsing
+            if (wasParsingLog)
+            {
+                StopLog();
+            }
+
+            // Hide mini views
+            if (wasMiniViewActive)
+            {
+                HideMiniView();
+            }
+
+            // Close old connection
+            try { con.Close(); } catch { }
+
+            // Open new database
+            con = Database.Connection(dbPath);
+
+            // Save the new path and add to recent list
+            Properties.Settings.Default.DatabasePath = dbPath;
+            AddToRecentDatabases(dbPath);
+
+            // Reload all UI from new database
+            ReloadFromDatabase();
+
+            UpdateTitleBar(dbPath);
+            PopulateRecentDatabases();
+
+            // Restore log parsing and mini views to their previous state
+            if (wasParsingLog)
+            {
+                StartLog();
+            }
+
+            if (wasMiniViewActive)
+            {
+                ShowMiniView();
+            }
+        }
+
+        private void ReloadFromDatabase()
+        {
+            // Reload settings from new database
+            tbOpacity.Value = Math.Max(tbOpacity.Minimum, Math.Min(tbOpacity.Maximum, SafeParseInt(Database.GetSetting(con, "MiniViewOpacity"), 100)));
+            miniViews.mvOpacity = tbOpacity.Value;
+            tbFontSize.Value = Math.Max(tbFontSize.Minimum, Math.Min(tbFontSize.Maximum, SafeParseInt(Database.GetSetting(con, "MiniViewFontSize"), 8)));
+            miniViews.mvFontSize = tbFontSize.Value;
+
+            miniViews.mvNormForeColor = SafeParseInt(Database.GetSetting(con, "MiniViewNormFore"), Color.Black.ToArgb());
+            lblNormPickFore.BackColor = Color.FromArgb(miniViews.mvNormForeColor);
+            miniViews.mvNormBackColor = SafeParseInt(Database.GetSetting(con, "MiniViewNormBack"), Color.White.ToArgb());
+            lblNormPickBack.BackColor = Color.FromArgb(miniViews.mvNormBackColor);
+
+            miniViews.mvWarnForeColor = SafeParseInt(Database.GetSetting(con, "MiniViewWarnFore"), Color.White.ToArgb());
+            lblWarnPickFore.BackColor = Color.FromArgb(miniViews.mvWarnForeColor);
+            miniViews.mvWarnBackColor = SafeParseInt(Database.GetSetting(con, "MiniViewWarnBack"), Color.Red.ToArgb());
+            lblWarnPickBack.BackColor = Color.FromArgb(miniViews.mvWarnBackColor);
+            miniViews.mvWarnTime = Database.GetSetting(con, "MiniViewWarnTime");
+            txtWarningTime.Text = miniViews.mvWarnTime;
+
+            miniViews.mvShowPing = SafeParseInt(Database.GetSetting(con, "MiniViewShowPing"), 1);
+            chkShowPing.Checked = miniViews.ShowPing();
+            miniViews.mvPingForeColor = SafeParseInt(Database.GetSetting(con, "MiniViewPingFore"), Color.LightGreen.ToArgb());
+            lblPingPickFore.BackColor = Color.FromArgb(miniViews.mvPingForeColor);
+            miniViews.mvPingBackColor = SafeParseInt(Database.GetSetting(con, "MiniViewPingBack"), Color.Black.ToArgb());
+            lblPingPickBack.BackColor = Color.FromArgb(miniViews.mvPingBackColor);
+            miniViews.mvPingTime = Database.GetSetting(con, "MiniViewPingTime");
+            txtPingTime.Text = miniViews.mvPingTime;
+
+            miniViews.mvBuffForeColor = SafeParseInt(Database.GetSetting(con, "MiniViewBuffFore"), Color.Orange.ToArgb());
+            lblBuffPickFore.BackColor = Color.FromArgb(miniViews.mvBuffForeColor);
+            miniViews.mvBuffBackColor = SafeParseInt(Database.GetSetting(con, "MiniViewBuffBack"), Color.Black.ToArgb());
+            lblBuffPickBack.BackColor = Color.FromArgb(miniViews.mvBuffBackColor);
+
+            UpdateMiniAppearance();
+
+            activeVoice = Database.GetSetting(con, "ActiveVoice");
+            voiceVolume = SafeParseInt(Database.GetSetting(con, "VoiceVolume"), 100);
+            voiceRate = SafeParseInt(Database.GetSetting(con, "VoiceRate"), -2);
+            voiceEnabled = SafeParseInt(Database.GetSetting(con, "VoiceEnabled"), 1);
+            chkVoiceEnabled.Checked = (voiceEnabled == 1);
+
+            activeCharacterID = Database.GetSetting(con, "ActiveCharacterID");
+
+            // Unhook event handlers before tearing down grids to prevent
+            // validation firing against columns that no longer exist.
+            grdTimers.RowValidating -= ValidateRowTimers;
+            grdCharacters.RowValidating -= ValidateRowCharacters;
+            grdCharacters.CellClick -= grdCharacters_CellClick;
+            grdCategories.RowValidating -= ValidateRowCategories;
+
+            // Reload grids
+            SetupActiveCharacters();
+            grdTimers.DataSource = null;
+            grdTimers.Columns.Clear();
+            SetupTimerGrid();
+            grdCharacters.DataSource = null;
+            grdCharacters.Columns.Clear();
+            SetupCharacterGrid();
+            grdCategories.DataSource = null;
+            grdCategories.Columns.Clear();
+            SetupCategoriesGrid();
+
+            UpdateMiniView();
+        }
+
+        private void openDatabaseToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            string currentDir = Path.GetDirectoryName(
+                Properties.Settings.Default.DatabasePath ?? Database.GetDefaultDatabasePath());
+
+            OpenFileDialog dlg = new OpenFileDialog
+            {
+                Title = "Open Timer Database",
+                Filter = "Database files (*.db)|*.db|All files (*.*)|*.*",
+                InitialDirectory = currentDir,
+                DereferenceLinks = false,
+                AutoUpgradeEnabled = true
+            };
+
+            if (dlg.ShowDialog() == DialogResult.OK)
+            {
+                OpenDatabase(dlg.FileName);
+            }
         }
 
         private void FormMain_FormClosing(Object sender, FormClosingEventArgs e)

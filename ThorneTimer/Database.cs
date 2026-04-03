@@ -10,12 +10,25 @@ namespace ThorneTimer
 {
     class Database
     {
-     static public SQLiteConnection Connection()
+        /// <summary>
+        /// Returns the default database path next to the running executable.
+        /// </summary>
+        static public string GetDefaultDatabasePath()
         {
-        string exePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
-        string basePath = Path.GetDirectoryName(exePath);
-        string newDbName = Path.Combine(basePath, "ThorneTimer.db");
-        string oldDbName = Path.Combine(basePath, "EQTimer.db");
+            string exePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
+            string basePath = Path.GetDirectoryName(exePath);
+            return Path.Combine(basePath, "ThorneTimer.db");
+        }
+
+        /// <summary>
+        /// Opens a connection to the database at the specified path.
+        /// If the file doesn't exist, a new database is created with default schema.
+        /// </summary>
+        static public SQLiteConnection Connection(string dbPath)
+        {
+            string newDbName = dbPath;
+            string basePath = Path.GetDirectoryName(newDbName);
+            string oldDbName = Path.Combine(basePath, "EQTimer.db");
 
        bool newDatabase = false;
         // Migration: If ThorneTimer.db does not exist but EQTimer.db does, copy it
@@ -299,6 +312,14 @@ namespace ThorneTimer
             }
 
             return con;
+        }
+
+        /// <summary>
+        /// Opens a connection using the default database path (next to the executable).
+        /// </summary>
+        static public SQLiteConnection Connection()
+        {
+            return Connection(GetDefaultDatabasePath());
         }
 
         /// <summary>

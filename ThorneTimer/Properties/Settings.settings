@@ -23,5 +23,11 @@
     <Setting Name="SortColumn" Type="System.String" Scope="User">
       <Value Profile="(Default)">"Name"</Value>
     </Setting>
+    <Setting Name="DatabasePath" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="RecentDatabases" Type="System.Collections.Specialized.StringCollection" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
   </Settings>
 </SettingsFile>
