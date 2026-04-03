@@ -5,7 +5,7 @@
 <h1 align="center">Thorne Timer</h1>
 
 <p align="center">
-  <strong>A tactical overlay timer and log event notification system for Project Quarm</strong>
+  <strong>A tactical overlay timer and log event notification system for TAKP / Project Quarm</strong>
 </p>
 
 <p align="center">
@@ -22,9 +22,9 @@
 
 ## About
 
-**Thorne Timer** is a companion desktop application designed to enhance your gameplay experience on [Project Quarm](https://www.projectquarm.com/) — a PoP-era EverQuest server built on [The Al'Kabor Project (TAKP)](https://www.takproject.net/) foundation.
+**Thorne Timer** is a companion desktop application designed to enhance your gameplay experience on [Project Quarm](https://www.projectquarm.com/), [The Al'Kabor Project (TAKP)](https://www.takproject.net/), and any EverQuest server that produces log files.
 
-It watches your EverQuest log files in real-time and gives you always-on-top timer overlays, voice alerts, and event-driven notifications — the tactical information edge that UI files alone simply cannot provide.
+It watches your EverQuest log files in real-time and gives you always-on-top timer overlays, voice alerts, and event-driven notifications — the tactical information edge that UI files alone simply cannot provide. While it's built and tested with the Project Quarm community in mind, the log parsing engine works with any text-based log output, so it can be adapted to other servers or use cases.
 
 ### Why Thorne Timer?
 
@@ -53,6 +53,8 @@ Compact, always-on-top windows that float over your game client. Four distinct v
 - **Ping** — Instant visual notifications for log events (tells, auction alerts, custom triggers)
 
 Each view remembers its position independently — arrange them once and they stay put.
+
+> 📌 **Note:** The four views above are currently fixed defaults. An upcoming update will let you create your own custom views and link them to specific styles, categories, or individual timers — giving you full control over how your overlays are organized.
 
 ### ⏱️ Real-Time Log Parsing
 Point Thorne Timer at your EQ log file and it starts working immediately:
@@ -163,7 +165,7 @@ Thorne Timer is evolving into a **tactical HUD** for serious multi-boxing and ra
 | Phase | Description |
 |-------|-------------|
 | **Current** | Timer styles, mini view overlays, per-timer settings, column persistence, UI polish |
-| **Next** | Per-character timer collections, style-to-view linking, configuration dialogs |
+| **Next** | Custom user-defined views, style-to-view linking, per-character timer collections, configuration dialogs |
 | **Planned** | Class-specific timer profiles, zone-aware timers, global (cross-character) timers |
 | **Future** | Full spell/ability management per class with smart timer automation |
 
