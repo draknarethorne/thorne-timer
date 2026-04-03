@@ -1829,9 +1829,12 @@ namespace ThorneTimer
 
         private void HideMiniView()
         {
-            if (miniViews.DestroyMiniViews())
+            if (miniViews.MiniViewsActive())
             {
+                // Save positions while the views still exist
                 SaveDataCharacters();
+
+                miniViews.DestroyMiniViews();
 
                 btnMiniView.BackColor = btnAddTimer.BackColor;
                 btnMiniView.UseVisualStyleBackColor = true;
