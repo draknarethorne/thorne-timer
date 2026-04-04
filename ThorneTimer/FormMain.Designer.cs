@@ -504,6 +504,8 @@
             this.btnDeleteView.TabIndex = 8;
             this.btnDeleteView.Text = "Delete";
             this.btnDeleteView.UseVisualStyleBackColor = true;
+            this.btnDeleteView.Enabled = false;
+            this.btnDeleteView.Visible = false;
             this.btnDeleteView.Click += new System.EventHandler(this.btnDeleteView_Click);
             // 
             // btnAddView
@@ -515,6 +517,8 @@
             this.btnAddView.TabIndex = 7;
             this.btnAddView.Text = "Add";
             this.btnAddView.UseVisualStyleBackColor = true;
+            this.btnAddView.Enabled = false;
+            this.btnAddView.Visible = false;
             this.btnAddView.Click += new System.EventHandler(this.btnAddView_Click);
             // 
             // grdViews

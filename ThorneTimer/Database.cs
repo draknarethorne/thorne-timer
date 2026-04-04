@@ -113,7 +113,7 @@ namespace ThorneTimer
                 cmd.ExecuteNonQuery();
 
                 // Create miniviews table used by the UI
-                cmd.CommandText = "CREATE TABLE miniviews(ID INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT, PositionX INTEGER DEFAULT 100, PositionY INTEGER DEFAULT 100, ViewType TEXT DEFAULT 'Normal', SortOrder INTEGER DEFAULT 0)";
+                cmd.CommandText = "CREATE TABLE miniviews(ID INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT, PositionX INTEGER DEFAULT 100, PositionY INTEGER DEFAULT 100, ViewType TEXT DEFAULT 'Normal', SortOrder INTEGER DEFAULT 0, ActiveYn INTEGER DEFAULT 1, StyleFilter TEXT DEFAULT 'Normal')";
                 cmd.ExecuteNonQuery();
 
                 // Create grid_columns table for persisting column widths across sessions
@@ -349,6 +349,23 @@ namespace ThorneTimer
                     cmd.ExecuteNonQuery();
                 }
 
+                // Add ActiveYn and StyleFilter columns to miniviews table
+                if (!isFieldExist(con, "miniviews", "ActiveYn"))
+                {
+                    SQLiteCommand cmd = new SQLiteCommand(con)
+                    {
+                        CommandText = "ALTER TABLE miniviews ADD ActiveYn INTEGER DEFAULT 1"
+                    };
+                    cmd.ExecuteNonQuery();
+
+                    cmd.CommandText = "ALTER TABLE miniviews ADD StyleFilter TEXT DEFAULT 'Normal'";
+                    cmd.ExecuteNonQuery();
+
+                    // Set StyleFilter to match ViewType for existing rows
+                    cmd.CommandText = "UPDATE miniviews SET ActiveYn = 1, StyleFilter = ViewType";
+                    cmd.ExecuteNonQuery();
+                }
+
                 // Add Style column to timers table and migrate legacy prefix conventions
                 if (!isFieldExist(con, "timers", "Style"))
                 {
@@ -474,7 +491,7 @@ namespace ThorneTimer
 
                 // Insert the 4 default views with positions matching current hardcoded offsets
                 cmd.Parameters.Clear();
-                cmd.CommandText = "INSERT INTO miniviews (Name, ViewType, PositionX, PositionY, SortOrder) VALUES (@name, @type, @x, @y, @order)";
+                cmd.CommandText = "INSERT INTO miniviews (Name, ViewType, PositionX, PositionY, SortOrder, ActiveYn, StyleFilter) VALUES (@name, @type, @x, @y, @order, @active, @style)";
 
                 // Normal view
                 cmd.Parameters.AddWithValue("@name", "Normal Timers");
@@ -482,6 +499,8 @@ namespace ThorneTimer
                 cmd.Parameters.AddWithValue("@x", baseX);
                 cmd.Parameters.AddWithValue("@y", baseY);
                 cmd.Parameters.AddWithValue("@order", 1);
+                cmd.Parameters.AddWithValue("@active", 1);
+                cmd.Parameters.AddWithValue("@style", "Normal");
                 cmd.ExecuteNonQuery();
 
                 // Pet view (offset +200)
@@ -491,6 +510,8 @@ namespace ThorneTimer
                 cmd.Parameters.AddWithValue("@x", baseX + 200);
                 cmd.Parameters.AddWithValue("@y", baseY);
                 cmd.Parameters.AddWithValue("@order", 2);
+                cmd.Parameters.AddWithValue("@active", 1);
+                cmd.Parameters.AddWithValue("@style", "Pet");
                 cmd.ExecuteNonQuery();
 
                 // Buff view (offset +400)
@@ -500,6 +521,8 @@ namespace ThorneTimer
                 cmd.Parameters.AddWithValue("@x", baseX + 400);
                 cmd.Parameters.AddWithValue("@y", baseY);
                 cmd.Parameters.AddWithValue("@order", 3);
+                cmd.Parameters.AddWithValue("@active", 1);
+                cmd.Parameters.AddWithValue("@style", "Buff");
                 cmd.ExecuteNonQuery();
 
                 // Ping view (offset +1000)
@@ -509,6 +532,8 @@ namespace ThorneTimer
                 cmd.Parameters.AddWithValue("@x", baseX + 1000);
                 cmd.Parameters.AddWithValue("@y", baseY);
                 cmd.Parameters.AddWithValue("@order", 4);
+                cmd.Parameters.AddWithValue("@active", 1);
+                cmd.Parameters.AddWithValue("@style", "Ping");
                 cmd.ExecuteNonQuery();
             }
         }
@@ -1000,7 +1025,7 @@ namespace ThorneTimer
 
             SQLiteCommand cmd = new SQLiteCommand(con)
             {
-                CommandText = "SELECT * from miniviews ORDER BY Name"
+                CommandText = "SELECT * from miniviews ORDER BY SortOrder, Name"
             };
             SQLiteDataReader rdr = cmd.ExecuteReader();
 
@@ -1009,7 +1034,13 @@ namespace ThorneTimer
                 MiniViews.GridData data = new MiniViews.GridData
                 {
                     ID = rdr.GetInt32(rdr.GetOrdinal("ID")),
-                    Name = rdr.GetString(rdr.GetOrdinal("Name"))
+                    Name = rdr.IsDBNull(rdr.GetOrdinal("Name")) ? "" : rdr.GetString(rdr.GetOrdinal("Name")),
+                    ViewType = rdr.IsDBNull(rdr.GetOrdinal("ViewType")) ? "Normal" : rdr.GetString(rdr.GetOrdinal("ViewType")),
+                    ActiveYn = rdr.IsDBNull(rdr.GetOrdinal("ActiveYn")) ? 1 : rdr.GetInt32(rdr.GetOrdinal("ActiveYn")),
+                    StyleFilter = rdr.IsDBNull(rdr.GetOrdinal("StyleFilter")) ? "Normal" : rdr.GetString(rdr.GetOrdinal("StyleFilter")),
+                    PositionX = rdr.IsDBNull(rdr.GetOrdinal("PositionX")) ? 100 : rdr.GetInt32(rdr.GetOrdinal("PositionX")),
+                    PositionY = rdr.IsDBNull(rdr.GetOrdinal("PositionY")) ? 100 : rdr.GetInt32(rdr.GetOrdinal("PositionY")),
+                    SortOrder = rdr.IsDBNull(rdr.GetOrdinal("SortOrder")) ? 0 : rdr.GetInt32(rdr.GetOrdinal("SortOrder"))
                 };
 
                 gridData.Add(data);
@@ -1035,20 +1066,26 @@ namespace ThorneTimer
         {
             DataGridViewCell ID = row.Cells[dataGridView.Columns["ID"].Index];
             DataGridViewCell Name = row.Cells[dataGridView.Columns["Name"].Index];
+            DataGridViewCell ActiveYn = row.Cells[dataGridView.Columns["ActiveYn"].Index];
+            DataGridViewCell StyleFilter = row.Cells[dataGridView.Columns["StyleFilter"].Index];
 
             SQLiteCommand cmd = new SQLiteCommand(con);
 
             if (Convert.ToString(ID.Value) == "-1")
             {
-                cmd.CommandText = "INSERT INTO miniviews (Name) VALUES (@name)";
+                cmd.CommandText = "INSERT INTO miniviews (Name, ActiveYn, StyleFilter) VALUES (@name, @active, @style)";
                 cmd.Parameters.AddWithValue("@name", Convert.ToString(Name.Value));
+                cmd.Parameters.AddWithValue("@active", Convert.ToInt32(ActiveYn.Value));
+                cmd.Parameters.AddWithValue("@style", Convert.ToString(StyleFilter.Value));
                 cmd.ExecuteNonQuery();
                 cmd.Parameters.Clear();
             }
             else
             {
-                cmd.CommandText = "UPDATE miniviews SET Name = @name WHERE ID = @id";
+                cmd.CommandText = "UPDATE miniviews SET Name = @name, ActiveYn = @active, StyleFilter = @style WHERE ID = @id";
                 cmd.Parameters.AddWithValue("@name", Convert.ToString(Name.Value));
+                cmd.Parameters.AddWithValue("@active", Convert.ToInt32(ActiveYn.Value));
+                cmd.Parameters.AddWithValue("@style", Convert.ToString(StyleFilter.Value));
                 cmd.Parameters.AddWithValue("@id", Convert.ToInt32(ID.Value));
                 cmd.ExecuteNonQuery();
                 cmd.Parameters.Clear();
@@ -1073,6 +1110,8 @@ namespace ThorneTimer
             public int PositionX { get; set; }
             public int PositionY { get; set; }
             public int SortOrder { get; set; }
+            public int ActiveYn { get; set; }
+            public string StyleFilter { get; set; }
         }
 
         /// <summary>
@@ -1085,7 +1124,7 @@ namespace ThorneTimer
 
             SQLiteCommand cmd = new SQLiteCommand(con)
             {
-                CommandText = "SELECT ID, Name, ViewType, PositionX, PositionY, SortOrder FROM miniviews ORDER BY SortOrder"
+                CommandText = "SELECT ID, Name, ViewType, PositionX, PositionY, SortOrder, ActiveYn, StyleFilter FROM miniviews ORDER BY SortOrder"
             };
 
             using (SQLiteDataReader rdr = cmd.ExecuteReader())
@@ -1099,7 +1138,9 @@ namespace ThorneTimer
                         ViewType = rdr.IsDBNull(rdr.GetOrdinal("ViewType")) ? "Normal" : rdr.GetString(rdr.GetOrdinal("ViewType")),
                         PositionX = rdr.IsDBNull(rdr.GetOrdinal("PositionX")) ? 100 : rdr.GetInt32(rdr.GetOrdinal("PositionX")),
                         PositionY = rdr.IsDBNull(rdr.GetOrdinal("PositionY")) ? 100 : rdr.GetInt32(rdr.GetOrdinal("PositionY")),
-                        SortOrder = rdr.IsDBNull(rdr.GetOrdinal("SortOrder")) ? 0 : rdr.GetInt32(rdr.GetOrdinal("SortOrder"))
+                        SortOrder = rdr.IsDBNull(rdr.GetOrdinal("SortOrder")) ? 0 : rdr.GetInt32(rdr.GetOrdinal("SortOrder")),
+                        ActiveYn = rdr.IsDBNull(rdr.GetOrdinal("ActiveYn")) ? 1 : rdr.GetInt32(rdr.GetOrdinal("ActiveYn")),
+                        StyleFilter = rdr.IsDBNull(rdr.GetOrdinal("StyleFilter")) ? "Normal" : rdr.GetString(rdr.GetOrdinal("StyleFilter"))
                     };
 
                     // Use ViewType as key for easy lookup

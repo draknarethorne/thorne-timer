@@ -191,6 +191,7 @@ namespace ThorneTimer
             SetupTimerGrid();
             SetupCharacterGrid();
             SetupCategoriesGrid();
+            SetupViewsGrid();
 
             // Restore persisted column widths
             LoadColumnWidths("Timers", grdTimers);
@@ -279,6 +280,7 @@ namespace ThorneTimer
             SaveDataTimers();
             SaveDataCharacters();
             SaveDataCategories();
+            SaveDataViews();
 
             // Snapshot what was running so we can restore after reload
             bool wasParsingLog = (tsbStartStopWatching.Text == stopWatchingText);
@@ -409,6 +411,7 @@ namespace ThorneTimer
             grdCharacters.RowValidating -= ValidateRowCharacters;
             grdCharacters.CellClick -= grdCharacters_CellClick;
             grdCategories.RowValidating -= ValidateRowCategories;
+            grdViews.RowValidating -= ValidateRowViews;
 
             // Reload grids
             SetupActiveCharacters();
@@ -421,6 +424,9 @@ namespace ThorneTimer
             grdCategories.DataSource = null;
             grdCategories.Columns.Clear();
             SetupCategoriesGrid();
+            grdViews.DataSource = null;
+            grdViews.Columns.Clear();
+            SetupViewsGrid();
 
             UpdateMiniView();
         }
@@ -588,6 +594,7 @@ namespace ThorneTimer
             SaveDataTimers();
             SaveDataCharacters();
             SaveDataCategories();
+            SaveDataViews();
 
             // Copy the current database to the new location
             File.Copy(currentDbPath, dlg.FileName, true);
@@ -608,6 +615,7 @@ namespace ThorneTimer
             SaveDataTimers();
             SaveDataCharacters();
             SaveDataCategories();
+            SaveDataViews();
 
             if (tParseLog != null)
                 tParseLog.Abort();
@@ -1083,6 +1091,80 @@ namespace ThorneTimer
             grdCategories.DataSource = Database.GetCategories(con);
 
             grdCategories.RowValidating += ValidateRowCategories;
+        }
+
+        private void SetupViewsGrid()
+        {
+            grdViews.AllowUserToAddRows = false;
+            grdViews.AllowUserToDeleteRows = false;
+
+            grdViews.Columns.Add("ID", "ID");
+            grdViews.Columns["ID"].DataPropertyName = "ID";
+            grdViews.Columns["ID"].Visible = false;
+
+            grdViews.Columns.Add("Name", "Name");
+            grdViews.Columns["Name"].DataPropertyName = "Name";
+            grdViews.Columns["Name"].Width = 200;
+            grdViews.Columns["Name"].FillWeight = 200;
+
+            grdViews.Columns.Add("ViewType", "Type");
+            grdViews.Columns["ViewType"].DataPropertyName = "ViewType";
+            grdViews.Columns["ViewType"].ReadOnly = true;
+            grdViews.Columns["ViewType"].Width = 80;
+            grdViews.Columns["ViewType"].MinimumWidth = 60;
+
+            DataGridViewComboBoxColumn cboStyle = new DataGridViewComboBoxColumn
+            {
+                HeaderText = "Style",
+                Name = "StyleFilter",
+                DataPropertyName = "StyleFilter",
+                FlatStyle = FlatStyle.Flat
+            };
+            cboStyle.Items.AddRange("Normal", "Buff", "Pet", "Ping");
+            grdViews.Columns.Add(cboStyle);
+            grdViews.Columns["StyleFilter"].Width = 85;
+            grdViews.Columns["StyleFilter"].MinimumWidth = 60;
+
+            DataGridViewCheckBoxColumn chkActive = new DataGridViewCheckBoxColumn
+            {
+                HeaderText = "Active",
+                Name = "ActiveYn",
+                DataPropertyName = "ActiveYn",
+                TrueValue = (long)1,
+                FalseValue = (long)0
+            };
+            grdViews.Columns.Add(chkActive);
+            grdViews.Columns["ActiveYn"].Width = 50;
+            grdViews.Columns["ActiveYn"].MinimumWidth = 50;
+
+            // Hide position/sort columns — managed internally
+            grdViews.Columns.Add("PositionX", "PositionX");
+            grdViews.Columns["PositionX"].DataPropertyName = "PositionX";
+            grdViews.Columns["PositionX"].Visible = false;
+            grdViews.Columns.Add("PositionY", "PositionY");
+            grdViews.Columns["PositionY"].DataPropertyName = "PositionY";
+            grdViews.Columns["PositionY"].Visible = false;
+            grdViews.Columns.Add("SortOrder", "SortOrder");
+            grdViews.Columns["SortOrder"].DataPropertyName = "SortOrder";
+            grdViews.Columns["SortOrder"].Visible = false;
+
+            grdViews.DataSource = Database.GetViews(con);
+
+            grdViews.RowValidating += ValidateRowViews;
+        }
+
+        void ValidateRowViews(object sender, DataGridViewCellCancelEventArgs data)
+        {
+            SaveDataViews();
+        }
+
+        void SaveDataViews()
+        {
+            for (int r = 0; r < grdViews.Rows.Count; r++)
+            {
+                DataGridViewRow row = grdViews.Rows[r];
+                Database.SaveView(con, grdViews, row);
+            }
         }
 
         void grdTimers_CurrentCellDirtyStateChanged(object sender, EventArgs e)
