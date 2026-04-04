@@ -1107,12 +1107,6 @@ namespace ThorneTimer
             grdViews.Columns["Name"].Width = 200;
             grdViews.Columns["Name"].FillWeight = 200;
 
-            grdViews.Columns.Add("ViewType", "Type");
-            grdViews.Columns["ViewType"].DataPropertyName = "ViewType";
-            grdViews.Columns["ViewType"].ReadOnly = true;
-            grdViews.Columns["ViewType"].Width = 80;
-            grdViews.Columns["ViewType"].MinimumWidth = 60;
-
             DataGridViewComboBoxColumn cboStyle = new DataGridViewComboBoxColumn
             {
                 HeaderText = "Style",
@@ -1242,7 +1236,7 @@ namespace ThorneTimer
             // Save all view positions to the miniviews table
             if (miniViews.MiniViewsActive())
             {
-                Dictionary<string, Point> positions = miniViews.GetCurrentViewPositions();
+                Dictionary<int, Point> positions = miniViews.GetCurrentViewPositions();
                 Database.SaveViewPositions(con, positions);
             }
 

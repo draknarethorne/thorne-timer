@@ -1035,7 +1035,6 @@ namespace ThorneTimer
                 {
                     ID = rdr.GetInt32(rdr.GetOrdinal("ID")),
                     Name = rdr.IsDBNull(rdr.GetOrdinal("Name")) ? "" : rdr.GetString(rdr.GetOrdinal("Name")),
-                    ViewType = rdr.IsDBNull(rdr.GetOrdinal("ViewType")) ? "Normal" : rdr.GetString(rdr.GetOrdinal("ViewType")),
                     ActiveYn = rdr.IsDBNull(rdr.GetOrdinal("ActiveYn")) ? 1 : rdr.GetInt32(rdr.GetOrdinal("ActiveYn")),
                     StyleFilter = rdr.IsDBNull(rdr.GetOrdinal("StyleFilter")) ? "Normal" : rdr.GetString(rdr.GetOrdinal("StyleFilter")),
                     PositionX = rdr.IsDBNull(rdr.GetOrdinal("PositionX")) ? 100 : rdr.GetInt32(rdr.GetOrdinal("PositionX")),
@@ -1106,7 +1105,6 @@ namespace ThorneTimer
         {
             public int ID { get; set; }
             public string Name { get; set; }
-            public string ViewType { get; set; }
             public int PositionX { get; set; }
             public int PositionY { get; set; }
             public int SortOrder { get; set; }
@@ -1115,16 +1113,15 @@ namespace ThorneTimer
         }
 
         /// <summary>
-        /// Gets all view positions from the database, ordered by SortOrder.
-        /// Returns a dictionary keyed by ViewType (Normal, Pet, Buff, Ping).
+        /// Gets all view definitions from the database, ordered by SortOrder.
         /// </summary>
-        static public Dictionary<string, ViewPositionData> GetViewPositions(SQLiteConnection con)
+        static public List<ViewPositionData> GetViewPositions(SQLiteConnection con)
         {
-            Dictionary<string, ViewPositionData> positions = new Dictionary<string, ViewPositionData>();
+            List<ViewPositionData> views = new List<ViewPositionData>();
 
             SQLiteCommand cmd = new SQLiteCommand(con)
             {
-                CommandText = "SELECT ID, Name, ViewType, PositionX, PositionY, SortOrder, ActiveYn, StyleFilter FROM miniviews ORDER BY SortOrder"
+                CommandText = "SELECT ID, Name, PositionX, PositionY, SortOrder, ActiveYn, StyleFilter FROM miniviews ORDER BY SortOrder"
             };
 
             using (SQLiteDataReader rdr = cmd.ExecuteReader())
@@ -1135,7 +1132,6 @@ namespace ThorneTimer
                     {
                         ID = rdr.GetInt32(rdr.GetOrdinal("ID")),
                         Name = rdr.IsDBNull(rdr.GetOrdinal("Name")) ? "" : rdr.GetString(rdr.GetOrdinal("Name")),
-                        ViewType = rdr.IsDBNull(rdr.GetOrdinal("ViewType")) ? "Normal" : rdr.GetString(rdr.GetOrdinal("ViewType")),
                         PositionX = rdr.IsDBNull(rdr.GetOrdinal("PositionX")) ? 100 : rdr.GetInt32(rdr.GetOrdinal("PositionX")),
                         PositionY = rdr.IsDBNull(rdr.GetOrdinal("PositionY")) ? 100 : rdr.GetInt32(rdr.GetOrdinal("PositionY")),
                         SortOrder = rdr.IsDBNull(rdr.GetOrdinal("SortOrder")) ? 0 : rdr.GetInt32(rdr.GetOrdinal("SortOrder")),
@@ -1143,31 +1139,27 @@ namespace ThorneTimer
                         StyleFilter = rdr.IsDBNull(rdr.GetOrdinal("StyleFilter")) ? "Normal" : rdr.GetString(rdr.GetOrdinal("StyleFilter"))
                     };
 
-                    // Use ViewType as key for easy lookup
-                    if (!positions.ContainsKey(data.ViewType))
-                    {
-                        positions[data.ViewType] = data;
-                    }
+                    views.Add(data);
                 }
             }
 
-            return positions;
+            return views;
         }
 
         /// <summary>
-        /// Saves view positions to the database.
+        /// Saves view positions to the database by ID.
         /// </summary>
-        static public void SaveViewPositions(SQLiteConnection con, Dictionary<string, Point> positions)
+        static public void SaveViewPositions(SQLiteConnection con, Dictionary<int, Point> positions)
         {
             SQLiteCommand cmd = new SQLiteCommand(con);
 
             foreach (var kvp in positions)
             {
-                cmd.CommandText = "UPDATE miniviews SET PositionX = @x, PositionY = @y WHERE ViewType = @type";
+                cmd.CommandText = "UPDATE miniviews SET PositionX = @x, PositionY = @y WHERE ID = @id";
                 cmd.Parameters.Clear();
                 cmd.Parameters.AddWithValue("@x", kvp.Value.X);
                 cmd.Parameters.AddWithValue("@y", kvp.Value.Y);
-                cmd.Parameters.AddWithValue("@type", kvp.Key);
+                cmd.Parameters.AddWithValue("@id", kvp.Key);
                 cmd.ExecuteNonQuery();
             }
         }

@@ -47,7 +47,6 @@ namespace ThorneTimer
         {
             public long ID { get; set; }
             public string Name { get; set; }
-            public string ViewType { get; set; }
             public long ActiveYn { get; set; }
             public string StyleFilter { get; set; }
             public int PositionX { get; set; }
@@ -72,16 +71,16 @@ namespace ThorneTimer
 
         /// <summary>
         /// Gets the current positions of all views.
-        /// Returns a dictionary keyed by ViewType.
+        /// Returns a dictionary keyed by database ID.
         /// </summary>
-        public Dictionary<string, Point> GetCurrentViewPositions()
+        public Dictionary<int, Point> GetCurrentViewPositions()
         {
-            Dictionary<string, Point> positions = new Dictionary<string, Point>();
+            Dictionary<int, Point> positions = new Dictionary<int, Point>();
 
             foreach (var entry in activeViews)
             {
                 if (entry.Form != null)
-                    positions[entry.Data.ViewType] = entry.Form.Location;
+                    positions[entry.Data.ID] = entry.Form.Location;
             }
 
             return positions;
@@ -160,12 +159,10 @@ namespace ThorneTimer
             if (activeViews.Count == 0)
             {
                 // Load view definitions from database
-                Dictionary<string, Database.ViewPositionData> positions = Database.GetViewPositions(con);
+                List<Database.ViewPositionData> views = Database.GetViewPositions(con);
 
-                foreach (var kvp in positions)
+                foreach (var viewData in views)
                 {
-                    var viewData = kvp.Value;
-
                     // Skip inactive views
                     if (viewData.ActiveYn != 1)
                         continue;
@@ -174,8 +171,8 @@ namespace ThorneTimer
                     if (viewData.StyleFilter == "Ping")
                         showView = ShowPing();
 
-                    MiniView form = CreateMiniView(viewData.PositionX, viewData.PositionY, showView,
-                        string.IsNullOrEmpty(viewData.Name) ? viewData.ViewType + " Timers" : viewData.Name);
+                    string title = string.IsNullOrEmpty(viewData.Name) ? viewData.StyleFilter + " Timers" : viewData.Name;
+                    MiniView form = CreateMiniView(viewData.PositionX, viewData.PositionY, showView, title);
 
                     activeViews.Add(new ViewEntry { Data = viewData, Form = form });
                 }
