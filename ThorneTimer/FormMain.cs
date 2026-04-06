@@ -72,7 +72,11 @@ namespace ThorneTimer
         const string startWatchingText = "Start Watching";
         const string stopWatchingText = "Stop Watching";
 
-        const int FullViewWidth = 1400;
+        const int DefaultFullViewWidth = 1400;
+        const int DefaultCompactViewWidth = 800;
+
+        int fullViewWidth = DefaultFullViewWidth;
+        int compactViewWidth = DefaultCompactViewWidth;
 
         readonly MiniViews miniViews = new MiniViews();
         readonly TimerRuntime timerRuntime = new TimerRuntime();
@@ -294,6 +298,8 @@ namespace ThorneTimer
             RefreshTimerGridDataSource();
 
             // Restore compact view setting
+            compactViewWidth = SafeParseInt(Database.GetSetting(con, "CompactWidth"), this.Width < DefaultFullViewWidth ? this.Width : DefaultCompactViewWidth);
+            fullViewWidth = SafeParseInt(Database.GetSetting(con, "FullWidth"), Math.Max(this.Width, DefaultFullViewWidth));
             bool compactView = Database.GetSetting(con, "CompactView") == "1";
             tsbCompactView.Checked = compactView;
             compactViewToolStripMenuItem.Checked = compactView;
@@ -808,7 +814,7 @@ namespace ThorneTimer
                     // Always nudge height; only nudge width for full-view users
                     // so compact-view users keep their narrower window.
                     sz = new Size(
-                        isCompact ? sz.Width : Math.Max(sz.Width, FullViewWidth),
+                        isCompact ? sz.Width : Math.Max(sz.Width, DefaultFullViewWidth),
                         Math.Max(sz.Height, 700));
                 }
 
@@ -845,6 +851,18 @@ namespace ThorneTimer
 
             Properties.Settings.Default.HasSetDefaults = true;
             Properties.Settings.Default.Save();
+
+            // Persist compact/full view widths
+            bool isCompact = tsbCompactView.Checked;
+            if (this.WindowState == FormWindowState.Normal)
+            {
+                if (isCompact)
+                    compactViewWidth = this.Width;
+                else
+                    fullViewWidth = this.Width;
+            }
+            Database.SetSetting(con, "CompactWidth", compactViewWidth);
+            Database.SetSetting(con, "FullWidth", fullViewWidth);
         }
 
         /// <summary>
@@ -1032,6 +1050,7 @@ namespace ThorneTimer
             grdTimers.Columns[2].DataPropertyName = grdTimers.Columns[2].Name;
             grdTimers.Columns[2].Width = 140;
             grdTimers.Columns[2].MinimumWidth = 80;
+            grdTimers.Columns[2].FillWeight = 60;
 
             DataGridViewComboBoxColumn cboCategory = new DataGridViewComboBoxColumn
             {
@@ -1787,13 +1806,21 @@ namespace ThorneTimer
                 }
             }
 
-            // When switching to full view, widen the window if it's too
-            // narrow to show all columns comfortably.
-            if (!compact && this.WindowState == FormWindowState.Normal
-                && this.Width < FullViewWidth)
+            if (this.WindowState != FormWindowState.Normal) return;
+
+            if (compact)
             {
+                // Save current (full) width, restore compact width
+                fullViewWidth = this.Width;
+                this.Width = compactViewWidth;
+            }
+            else
+            {
+                // Save current (compact) width, restore full width
+                compactViewWidth = this.Width;
+                int targetWidth = Math.Max(fullViewWidth, DefaultFullViewWidth);
                 Screen screen = Screen.FromControl(this);
-                this.Width = Math.Min(FullViewWidth, screen.WorkingArea.Width);
+                this.Width = Math.Min(targetWidth, screen.WorkingArea.Width);
 
                 // Nudge left if the wider window extends past the screen edge
                 if (this.Right > screen.WorkingArea.Right)

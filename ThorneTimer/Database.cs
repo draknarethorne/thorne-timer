@@ -625,6 +625,24 @@ namespace ThorneTimer
                     cmd.ExecuteNonQuery();
                 }
 
+                if (!isFieldExist(con, "settings", "CompactWidth"))
+                {
+                    SQLiteCommand cmd = new SQLiteCommand(con)
+                    {
+                        CommandText = "ALTER TABLE settings ADD CompactWidth INTEGER"
+                    };
+                    cmd.ExecuteNonQuery();
+                }
+
+                if (!isFieldExist(con, "settings", "FullWidth"))
+                {
+                    SQLiteCommand cmd = new SQLiteCommand(con)
+                    {
+                        CommandText = "ALTER TABLE settings ADD FullWidth INTEGER"
+                    };
+                    cmd.ExecuteNonQuery();
+                }
+
                 // One-time migration: set Scope='Character' and ClassID on timers whose
                 // category name matches an EQ class name.  Older tomes used categories as
                 // class proxies (e.g. "Necro", "Enchanter") before Scope/ClassID existed.
@@ -922,7 +940,8 @@ namespace ThorneTimer
             "MiniViewShowPing", "MiniViewPingFore", "MiniViewPingBack", "MiniViewPingTime",
             "MiniViewBuffFore", "MiniViewBuffBack",
             "VoiceVolume", "VoiceRate", "VoiceEnabled",
-            "ShowAllClasses", "CompactView", "AutoSwitchEnabled"
+            "ShowAllClasses", "CompactView", "AutoSwitchEnabled",
+            "CompactWidth", "FullWidth"
         };
 
         static public void SetSetting(SQLiteConnection con, string column, string value)
