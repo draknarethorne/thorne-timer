@@ -709,11 +709,14 @@ namespace ThorneTimer
                 }
             }
 
-            // Update timers in matched categories
+            // Update timers in matched categories.
+            // Deactivate them (ActiveYn=0) so upgrading users start clean —
+            // they opt-in to class-specific timers per character rather than
+            // inheriting whatever was active in the old database for every character.
             foreach (var cat in categoriesToMigrate)
             {
                 cmd.Parameters.Clear();
-                cmd.CommandText = "UPDATE timers SET Scope = 'Character', ClassID = @classId WHERE CategoryID = @catId";
+                cmd.CommandText = "UPDATE timers SET Scope = 'Character', ClassID = @classId, ActiveYn = 0 WHERE CategoryID = @catId";
                 cmd.Parameters.AddWithValue("@classId", cat.Item2);
                 cmd.Parameters.AddWithValue("@catId", cat.Item1);
                 cmd.ExecuteNonQuery();

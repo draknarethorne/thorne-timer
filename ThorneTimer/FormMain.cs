@@ -938,9 +938,15 @@ namespace ThorneTimer
             {
                 activeTimers = 0;
                 runningTimers = 0;
+                int visibleTimers = 0;
+                int totalTimers = grdTimers.RowCount;
 
                 foreach (DataGridViewRow row in grdTimers.Rows)
                 {
+                    if (!row.Visible) continue;
+
+                    visibleTimers++;
+
                     if (Convert.ToInt32(row.Cells[grdTimers.Columns["ActiveYn"].Index].Value) == 1)
                     {
                         activeTimers++;
@@ -953,7 +959,8 @@ namespace ThorneTimer
                     }
                 }
 
-                String timerText = "Timers: " + grdTimers.RowCount + "   Active: " + activeTimers + "   Running: " + runningTimers;
+                string timerText = "Timers: " + visibleTimers + "/" + totalTimers + "   Active: " + activeTimers + "   Running: " + runningTimers;
+
                 statusTimerStats.GetCurrentParent()?.Invoke(new Action(() => statusTimerStats.Text = timerText));
             }
             catch
@@ -1723,6 +1730,7 @@ namespace ThorneTimer
             timerRuntime.ShowAllClasses = showAll;
             Database.SetSetting(con, "ShowAllClasses", showAll ? "1" : "0");
             RefreshTimerGridDataSource();
+            RepaintTimerGrid();
         }
 
         private void showAllClassesToolStripMenuItem_Click(object sender, EventArgs e)
@@ -1732,6 +1740,7 @@ namespace ThorneTimer
             timerRuntime.ShowAllClasses = showAll;
             Database.SetSetting(con, "ShowAllClasses", showAll ? "1" : "0");
             RefreshTimerGridDataSource();
+            RepaintTimerGrid();
         }
 
         private void tsbCompactView_Click(object sender, EventArgs e)

@@ -37,6 +37,7 @@
             this.tsbMiniViews = new System.Windows.Forms.ToolStripButton();
             this.toolStripSeparator5 = new System.Windows.Forms.ToolStripSeparator();
             this.tsbAutoSwitch = new System.Windows.Forms.ToolStripButton();
+            this.toolStripSeparator7 = new System.Windows.Forms.ToolStripSeparator();
             this.tsbShowAllClasses = new System.Windows.Forms.ToolStripButton();
             this.toolStripSeparator6 = new System.Windows.Forms.ToolStripSeparator();
             this.tsbCompactView = new System.Windows.Forms.ToolStripButton();
@@ -1036,7 +1037,7 @@
             this.statusTimerStats.BorderSides = System.Windows.Forms.ToolStripStatusLabelBorderSides.Left;
             this.statusTimerStats.Name = "statusTimerStats";
             this.statusTimerStats.Size = new System.Drawing.Size(162, 17);
-            this.statusTimerStats.Text = "Timers: 0   Active: 0   Running: 0";
+            this.statusTimerStats.Text = "Timers: 0/0   Active: 0   Running: 0";
             // 
             // FormMain
             // 
