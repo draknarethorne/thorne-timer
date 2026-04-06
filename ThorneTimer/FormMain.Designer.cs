@@ -145,6 +145,7 @@
             this.tsbMiniViews,
             this.toolStripSeparator5,
             this.tsbAutoSwitch,
+            this.toolStripSeparator7,
             this.tsbShowAllClasses,
             this.toolStripSeparator6,
             this.tsbCompactView});
@@ -204,6 +205,11 @@
             this.tsbAutoSwitch.Text = "Auto-Switch";
             this.tsbAutoSwitch.ToolTipText = "Automatically switch to the character whose log file is actively being written";
             this.tsbAutoSwitch.Click += new System.EventHandler(this.tsbAutoSwitch_Click);
+            // 
+            // toolStripSeparator7
+            // 
+            this.toolStripSeparator7.Name = "toolStripSeparator7";
+            this.toolStripSeparator7.Size = new System.Drawing.Size(6, 25);
             // 
             // tsbShowAllClasses
             // 
@@ -1084,6 +1090,7 @@
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator5;
         private System.Windows.Forms.ToolStripButton tsbAutoSwitch;
         private System.Windows.Forms.ToolStripButton tsbShowAllClasses;
+        private System.Windows.Forms.ToolStripSeparator toolStripSeparator7;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator6;
         private System.Windows.Forms.ToolStripButton tsbCompactView;
         private System.Windows.Forms.MenuStrip menuStrip1;
