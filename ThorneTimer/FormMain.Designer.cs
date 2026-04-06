@@ -35,6 +35,11 @@
             this.tsbStartStopWatching = new System.Windows.Forms.ToolStripButton();
             this.toolStripSeparator4 = new System.Windows.Forms.ToolStripSeparator();
             this.tsbMiniViews = new System.Windows.Forms.ToolStripButton();
+            this.toolStripSeparator5 = new System.Windows.Forms.ToolStripSeparator();
+            this.tsbAutoSwitch = new System.Windows.Forms.ToolStripButton();
+            this.tsbShowAllClasses = new System.Windows.Forms.ToolStripButton();
+            this.toolStripSeparator6 = new System.Windows.Forms.ToolStripSeparator();
+            this.tsbCompactView = new System.Windows.Forms.ToolStripButton();
             this.menuStrip1 = new System.Windows.Forms.MenuStrip();
             this.fileToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.newDatabaseToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -104,6 +109,8 @@
             this.watchToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.startStopWatchingToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.autoSwitchToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.showAllClassesToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.compactViewToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.colorDialog1 = new System.Windows.Forms.ColorDialog();
             this.statusStrip = new System.Windows.Forms.StatusStrip();
             this.statusTomePath = new System.Windows.Forms.ToolStripStatusLabel();
