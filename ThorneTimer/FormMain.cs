@@ -1616,12 +1616,6 @@ namespace ThorneTimer
             UpdateMiniView();
         }
 
-        private void KillAllTimers()
-        {
-            timerRuntime.StopAllTimers();
-            SyncRuntimeToGrid();
-        }
-
         private void StopAllTimers()
         {
             timerRuntime.StopAllTimers();
