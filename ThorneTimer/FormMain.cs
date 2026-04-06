@@ -70,16 +70,20 @@ namespace ThorneTimer
         const string stopWatchingText = "Stop Watching";
 
         readonly MiniViews miniViews = new MiniViews();
-        readonly List<TimerPlus> timers = new List<TimerPlus>();
+        readonly TimerRuntime timerRuntime = new TimerRuntime();
+        readonly LogMonitor logMonitor = new LogMonitor();
         SQLiteConnection con;
 
         Bitmap iconPlay;
         Bitmap iconStop;
         Bitmap iconMiniViews;
+        Bitmap iconAutoSwitch;
+        Bitmap iconAllClasses;
+        Bitmap iconCompactView;
 
         private void CreateToolbarIcons()
         {
-            // Green play triangle (?) — Start Watching
+            // Green play triangle — Start Watching
             iconPlay = new Bitmap(16, 16);
             using (var g = Graphics.FromImage(iconPlay))
             {
@@ -89,7 +93,7 @@ namespace ThorneTimer
                     g.FillPolygon(brush, new[] { new Point(4, 2), new Point(14, 8), new Point(4, 14) });
             }
 
-            // Red stop square (?) — Stop Watching
+            // Red stop square — Stop Watching
             iconStop = new Bitmap(16, 16);
             using (var g = Graphics.FromImage(iconStop))
             {
@@ -112,11 +116,76 @@ namespace ThorneTimer
                 }
             }
 
+            // Auto-Switch icon — two curved arrows forming a cycle
+            iconAutoSwitch = new Bitmap(16, 16);
+            using (var g = Graphics.FromImage(iconAutoSwitch))
+            {
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (var pen = new Pen(Color.FromArgb(0, 120, 180), 1.6f))
+                {
+                    // Top arc: left-to-right
+                    g.DrawArc(pen, 3, 2, 10, 8, 180, 180);
+                    // Bottom arc: right-to-left
+                    g.DrawArc(pen, 3, 6, 10, 8, 0, 180);
+                }
+                // Arrowhead on top arc (right side, pointing right)
+                using (var brush = new SolidBrush(Color.FromArgb(0, 120, 180)))
+                    g.FillPolygon(brush, new[] { new Point(13, 3), new Point(13, 9), new Point(15, 6) });
+                // Arrowhead on bottom arc (left side, pointing left)
+                using (var brush = new SolidBrush(Color.FromArgb(0, 120, 180)))
+                    g.FillPolygon(brush, new[] { new Point(3, 7), new Point(3, 13), new Point(1, 10) });
+            }
+
+            // All Classes icon — three person silhouettes
+            iconAllClasses = new Bitmap(16, 16);
+            using (var g = Graphics.FromImage(iconAllClasses))
+            {
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                var purple = Color.FromArgb(100, 60, 160);
+                using (var brush = new SolidBrush(purple))
+                {
+                    // Center person (head + body)
+                    g.FillEllipse(brush, 6, 1, 4, 4);   // head
+                    g.FillPie(brush, 4, 6, 8, 10, 180, 180); // shoulders
+
+                    // Left person (slightly behind)
+                    g.FillEllipse(brush, 1, 3, 3, 3);   // head
+                    g.FillPie(brush, 0, 7, 6, 8, 180, 180); // shoulders
+
+                    // Right person (slightly behind)
+                    g.FillEllipse(brush, 12, 3, 3, 3);  // head
+                    g.FillPie(brush, 10, 7, 6, 8, 180, 180); // shoulders
+                }
+            }
+
+            // Compact View icon — three descending horizontal lines (collapsed columns)
+            iconCompactView = new Bitmap(16, 16);
+            using (var g = Graphics.FromImage(iconCompactView))
+            {
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                var orange = Color.FromArgb(200, 120, 0);
+                using (var pen = new Pen(orange, 2f))
+                {
+                    g.DrawLine(pen, 2, 4, 14, 4);
+                    g.DrawLine(pen, 2, 8, 10, 8);
+                    g.DrawLine(pen, 2, 12, 6, 12);
+                }
+            }
+
             // Set initial images
             tsbStartStopWatching.Image = iconPlay;
             startStopWatchingToolStripMenuItem.Image = iconPlay;
             tsbMiniViews.Image = iconMiniViews;
             miniViewsToolStripMenuItem.Image = iconMiniViews;
+            tsbAutoSwitch.Image = iconAutoSwitch;
+            autoSwitchToolStripMenuItem.Image = iconAutoSwitch;
+            tsbShowAllClasses.Image = iconAllClasses;
+            showAllClassesToolStripMenuItem.Image = iconAllClasses;
+            tsbCompactView.Image = iconCompactView;
+            compactViewToolStripMenuItem.Image = iconCompactView;
         }
 
         private void FormMain_Load(object sender, EventArgs e)
@@ -187,11 +256,43 @@ namespace ThorneTimer
                 ShowMiniView();
             }
 
+            // Wire TimerRuntime events
+            timerRuntime.TimerStateChanged += OnTimerStateChanged;
+            timerRuntime.TimerSoundRequested += OnTimerSoundRequested;
+            timerRuntime.CategoryTimersActivated += OnCategoryTimersActivated;
+
+            // Wire LogMonitor character switch detection
+            logMonitor.CharacterSwitched += OnCharacterSwitched;
+
+            // Restore auto-switch setting
+            bool autoSwitch = Database.GetSetting(con, "AutoSwitchEnabled") != "0";
+            autoSwitchToolStripMenuItem.Checked = autoSwitch;
+            tsbAutoSwitch.Checked = autoSwitch;
+            logMonitor.AutoSwitchEnabled = autoSwitch;
+
+            // Restore show-all-classes setting
+            bool showAllClasses = Database.GetSetting(con, "ShowAllClasses") != "0";
+            tsbShowAllClasses.Checked = showAllClasses;
+            showAllClassesToolStripMenuItem.Checked = showAllClasses;
+            timerRuntime.ShowAllClasses = showAllClasses;
+
             SetupActiveCharacters();
             SetupTimerGrid();
             SetupCharacterGrid();
             SetupCategoriesGrid();
             SetupViewsGrid();
+
+            // Load timer and category data into TimerRuntime
+            LoadTimerRuntime();
+
+            // Apply class filter based on active character
+            RefreshTimerGridDataSource();
+
+            // Restore compact view setting
+            bool compactView = Database.GetSetting(con, "CompactView") == "1";
+            tsbCompactView.Checked = compactView;
+            compactViewToolStripMenuItem.Checked = compactView;
+            ApplyCompactView(compactView);
 
             // Restore persisted column widths
             LoadColumnWidths("Timers", grdTimers);
@@ -405,6 +506,21 @@ namespace ThorneTimer
 
             activeCharacterID = Database.GetSetting(con, "ActiveCharacterID");
 
+            // Restore toolbar toggle states from the new database
+            bool autoSwitch = Database.GetSetting(con, "AutoSwitchEnabled") != "0";
+            autoSwitchToolStripMenuItem.Checked = autoSwitch;
+            tsbAutoSwitch.Checked = autoSwitch;
+            logMonitor.AutoSwitchEnabled = autoSwitch;
+
+            bool showAllClasses = Database.GetSetting(con, "ShowAllClasses") != "0";
+            tsbShowAllClasses.Checked = showAllClasses;
+            showAllClassesToolStripMenuItem.Checked = showAllClasses;
+            timerRuntime.ShowAllClasses = showAllClasses;
+
+            bool compactView = Database.GetSetting(con, "CompactView") == "1";
+            tsbCompactView.Checked = compactView;
+            compactViewToolStripMenuItem.Checked = compactView;
+
             // Unhook event handlers before tearing down grids to prevent
             // validation firing against columns that no longer exist.
             grdTimers.RowValidating -= ValidateRowTimers;
@@ -427,6 +543,15 @@ namespace ThorneTimer
             grdViews.DataSource = null;
             grdViews.Columns.Clear();
             SetupViewsGrid();
+
+            // Reload TimerRuntime with new database data
+            LoadTimerRuntime();
+
+            // Apply class filter based on active character
+            RefreshTimerGridDataSource();
+
+            // Re-apply compact view after grid rebuild
+            ApplyCompactView(tsbCompactView.Checked);
 
             UpdateMiniView();
         }
@@ -617,8 +742,13 @@ namespace ThorneTimer
             SaveDataCategories();
             SaveDataViews();
 
-            if (tParseLog != null)
-                tParseLog.Abort();
+            // Save timer runtime state (counts + running timer info) for persistence
+            var closingStates = timerRuntime.SaveCharacterState();
+            Database.SaveTimerStates(con, closingStates, activeCharacterID);
+
+            // Stop remaining timers (World-scope) and log monitor gracefully
+            timerRuntime.StopAllTimers();
+            logMonitor.Stop();
         }
 
         /// <summary>
@@ -747,6 +877,8 @@ namespace ThorneTimer
             grdTimers.Columns["Count"].DisplayIndex = i++;
             grdTimers.Columns["CategoryID"].DisplayIndex = i++;
             grdTimers.Columns["Style"].DisplayIndex = i++;
+            grdTimers.Columns["ClassID"].DisplayIndex = i++;
+            grdTimers.Columns["Scope"].DisplayIndex = i++;
             grdTimers.Columns["StartKeyword"].DisplayIndex = i++;
             grdTimers.Columns["EndKeyword"].DisplayIndex = i++;
             grdTimers.Columns["WAV"].DisplayIndex = i++;
@@ -756,12 +888,17 @@ namespace ThorneTimer
             grdTimers.Columns["Remaining"].DisplayIndex = i++;
             grdTimers.Columns["CaseYn"].DisplayIndex = i++;
             grdTimers.Columns["EndlessYn"].DisplayIndex = i++;
+            grdTimers.Columns["DependsOnTimer"].DisplayIndex = i++;
+            grdTimers.Columns["DependsOnDelay"].DisplayIndex = i++;
             grdTimers.Columns["StartStop"].DisplayIndex = i++;
 
             grdTimers.Columns["ActiveYn"].SortMode = DataGridViewColumnSortMode.Automatic;
             grdTimers.Columns["Name"].SortMode = DataGridViewColumnSortMode.Automatic;
             grdTimers.Columns["Count"].SortMode = DataGridViewColumnSortMode.NotSortable;
             grdTimers.Columns["CategoryID"].SortMode = DataGridViewColumnSortMode.Automatic;
+            grdTimers.Columns["Style"].SortMode = DataGridViewColumnSortMode.Automatic;
+            grdTimers.Columns["ClassID"].SortMode = DataGridViewColumnSortMode.Automatic;
+            grdTimers.Columns["Scope"].SortMode = DataGridViewColumnSortMode.Automatic;
             grdTimers.Columns["StartKeyword"].SortMode = DataGridViewColumnSortMode.Automatic;
             grdTimers.Columns["EndKeyword"].SortMode = DataGridViewColumnSortMode.Automatic;
             grdTimers.Columns["WAV"].SortMode = DataGridViewColumnSortMode.NotSortable;
@@ -771,7 +908,8 @@ namespace ThorneTimer
             grdTimers.Columns["Remaining"].SortMode = DataGridViewColumnSortMode.NotSortable;
             grdTimers.Columns["CaseYn"].SortMode = DataGridViewColumnSortMode.NotSortable;
             grdTimers.Columns["EndlessYn"].SortMode = DataGridViewColumnSortMode.NotSortable;
-            grdTimers.Columns["Style"].SortMode = DataGridViewColumnSortMode.Automatic;
+            grdTimers.Columns["DependsOnTimer"].SortMode = DataGridViewColumnSortMode.Automatic;
+            grdTimers.Columns["DependsOnDelay"].SortMode = DataGridViewColumnSortMode.NotSortable;
             grdTimers.Columns["StartStop"].SortMode = DataGridViewColumnSortMode.NotSortable;
 
             RepaintTimerGrid(true);
@@ -973,6 +1111,44 @@ namespace ThorneTimer
             grdTimers.Columns["Style"].Width = 85;
             grdTimers.Columns["Style"].MinimumWidth = 60;
 
+            DataGridViewComboBoxColumn cboClass = new DataGridViewComboBoxColumn
+            {
+                HeaderText = "Class",
+                Name = "ClassID",
+                DataPropertyName = "ClassID",
+                ValueType = typeof(ComboBoxItem),
+                DisplayMember = "Text",
+                ValueMember = "Value",
+                DataSource = Database.GetGridClasses(con),
+                FlatStyle = FlatStyle.Flat
+            };
+            grdTimers.Columns.Add(cboClass);
+            grdTimers.Columns["ClassID"].Width = 100;
+            grdTimers.Columns["ClassID"].MinimumWidth = 60;
+
+            DataGridViewComboBoxColumn cboScope = new DataGridViewComboBoxColumn
+            {
+                HeaderText = "Scope",
+                Name = "Scope",
+                DataPropertyName = "Scope",
+                FlatStyle = FlatStyle.Flat
+            };
+            cboScope.Items.AddRange("Character", "World");
+            grdTimers.Columns.Add(cboScope);
+            grdTimers.Columns["Scope"].Width = 85;
+            grdTimers.Columns["Scope"].MinimumWidth = 60;
+
+            grdTimers.Columns.Add("DependsOnTimer", "Depends On");
+            grdTimers.Columns["DependsOnTimer"].DataPropertyName = "DependsOnTimer";
+            grdTimers.Columns["DependsOnTimer"].Width = 100;
+            grdTimers.Columns["DependsOnTimer"].MinimumWidth = 60;
+
+            grdTimers.Columns.Add("DependsOnDelay", "Delay (s)");
+            grdTimers.Columns["DependsOnDelay"].DataPropertyName = "DependsOnDelay";
+            grdTimers.Columns["DependsOnDelay"].Width = 60;
+            grdTimers.Columns["DependsOnDelay"].MinimumWidth = 40;
+            grdTimers.Columns["DependsOnDelay"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+
             DataGridViewButtonColumn buttonWAV = new DataGridViewButtonColumn
             {
                 HeaderText = "Play",
@@ -1038,6 +1214,21 @@ namespace ThorneTimer
             grdCharacters.Columns[4].DataPropertyName = grdCharacters.Columns[4].Name;
             grdCharacters.Columns[4].Visible = false;
 
+            DataGridViewComboBoxColumn cboCharClass = new DataGridViewComboBoxColumn
+            {
+                HeaderText = "Class",
+                Name = "ClassID",
+                DataPropertyName = "ClassID",
+                ValueType = typeof(ComboBoxItem),
+                DisplayMember = "Text",
+                ValueMember = "Value",
+                DataSource = Database.GetGridClasses(con),
+                FlatStyle = FlatStyle.Flat
+            };
+            grdCharacters.Columns.Add(cboCharClass);
+            grdCharacters.Columns["ClassID"].Width = 120;
+            grdCharacters.Columns["ClassID"].MinimumWidth = 80;
+
             grdCharacters.RowValidating += ValidateRowCharacters;
 
             DataGridViewButtonColumn buttonLogFile = new DataGridViewButtonColumn
@@ -1051,7 +1242,10 @@ namespace ThorneTimer
 
             grdCharacters.Columns["LOG"].Width = 30;
             grdCharacters.Columns["LOG"].MinimumWidth = 30;
-            grdCharacters.Columns["LOG"].DisplayIndex = 3;
+            grdCharacters.Columns["LOG"].DisplayIndex = grdCharacters.Columns["LogFile"].Index + 1;
+
+            // Position Class column after Name
+            grdCharacters.Columns["ClassID"].DisplayIndex = 2;
 
             grdCharacters.DataSource = Database.GetCharacters(con);
 
@@ -1368,20 +1562,24 @@ namespace ThorneTimer
             }
             else if (e.ColumnIndex == grdTimers.Columns["ActiveYn"].Index)
             {
-                // TODO: Need to figure out what the hook is for after the cell changes
-                //RepaintTimers(true);
+                long timerID = Convert.ToInt64(grdTimers.Rows[e.RowIndex].Cells[grdTimers.Columns["ID"].Index].Value);
+                // CellClick fires before the checkbox value flips, so the current value is the OLD state
+                object cellValue = grdTimers.Rows[e.RowIndex].Cells[e.ColumnIndex].Value;
+                bool wasActive = cellValue != null && Convert.ToInt32(cellValue) == 1;
+                timerRuntime.SetTimerActive(timerID, !wasActive);
+                RepaintTimerGrid(true);
             }
             else if (e.ColumnIndex == grdTimers.Columns["StartStop"].Index)
             {
-                DataGridViewButtonCell btnCell = (DataGridViewButtonCell)grdTimers.Rows[e.RowIndex].Cells[e.ColumnIndex];
+                long timerID = Convert.ToInt64(grdTimers.Rows[e.RowIndex].Cells[grdTimers.Columns["ID"].Index].Value);
+                var ts = timerRuntime.GetState(timerID);
+                if (ts == null) return;
 
-                if (Timers.TimerStopped((string)btnCell.Value))
+                if (ts.IsStopped)
                 {
-                    DataGridViewCell ActiveYn = (DataGridViewCell)grdTimers.Rows[e.RowIndex].Cells[grdTimers.Columns["ActiveYn"].Index];
-
-                    if (Convert.ToInt32(ActiveYn.Value) == 1)
+                    if (ts.IsActive)
                     {
-                        TriggerRowTimer(btnCell, e.RowIndex);
+                        timerRuntime.StartTimer(timerID);
                     }
                     else
                     {
@@ -1390,7 +1588,7 @@ namespace ThorneTimer
                 }
                 else
                 {
-                    StopRowTimer(btnCell, e.RowIndex);
+                    timerRuntime.StopTimer(timerID);
                 }
             }
         }
@@ -1407,99 +1605,9 @@ namespace ThorneTimer
             }
         }
 
-        private string GetDependentName(string endKeyword)
-        {
-            // Check timer that has a dependency identified
-            string dependentName = endKeyword.Substring(1, endKeyword.Length - 1);
-
-            int delayIndex = endKeyword.IndexOf("|");
-            if (delayIndex > 0)
-            {
-                dependentName = endKeyword.Substring(1, delayIndex - 1);
-            }
-
-            return dependentName;
-        }
-
-        private double GetDependentDelay(string endKeyword)
-        {
-            // Check timer that has a dependency identified
-            double delayMS = 15000;
-
-            int delayIndex = endKeyword.IndexOf("|");
-            if (delayIndex > 0)
-            {
-                string delayStr = endKeyword.Substring(delayIndex + 1, endKeyword.Length - delayIndex - 1);
-                delayMS = Convert.ToDouble(delayStr) * 1000;
-            }
-
-            return delayMS;
-        }
-
-        private bool DependentTimer(string endKeyword)
-        {
-            // Check for dependency tag
-            bool bOk = true;
-
-            if (endKeyword.Length > 0)
-            {
-                string endChar = endKeyword.Substring(0, 1);
-                if (endChar == "*")
-                {
-                    string dependentName = GetDependentName(endKeyword);
-                    double delayMS = GetDependentDelay(endKeyword);
-
-                    // Make sure enough time has elapsed
-                    bOk = CheckDependentTimer(dependentName, delayMS);
-                }
-            }
-
-            return bOk;
-        }
-
-        private bool CheckDependentTimer(string dependentName, double delayMS)
-        {
-            for (int r = 0; r < grdTimers.Rows.Count; r++)
-            {
-                DataGridViewRow row = grdTimers.Rows[r];
-                DataGridViewCell cellStartStop = row.Cells[grdTimers.Columns["StartStop"].Index];
-
-                if (Timers.TimerRunning((string)cellStartStop.Value))
-                {
-                    DataGridViewCell cellName = row.Cells[grdTimers.Columns["Name"].Index];
-                    if ((string)cellName.Value == dependentName)
-                    {
-                        DataGridViewCell cellRemaining = row.Cells[grdTimers.Columns["Remaining"].Index];
-                        DataGridViewCell cellDuration = row.Cells[grdTimers.Columns["Duration"].Index];
-                        if (ValidDuration(cellDuration))
-                        {
-                            double remainingMS = TimerPlus.GetMilliseconds((string)cellRemaining.Value);
-                            double durationMS = TimerPlus.GetMilliseconds((string)cellDuration.Value);
-                            double elapsedMS = (durationMS - remainingMS);
-
-                            if (elapsedMS > delayMS)
-                            {
-                                DataGridViewCell cellEndkeyword = row.Cells[grdTimers.Columns["EndKeyword"].Index];
-                                string endKeyword = (string)cellEndkeyword.Value + "";
-                                if (endKeyword.Length <= 0)
-                                {
-                                    return true;
-                                }
-                                else
-                                {
-                                    return DependentTimer(endKeyword);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            return false;
-        }
-
         private void ResetTimerCounts()
         {
+            timerRuntime.ResetCounts();
             for (int r = 0; r < grdTimers.Rows.Count; r++)
             {
                 DataGridViewCell countCell = grdTimers.Rows[r].Cells[grdTimers.Columns["Count"].Index];
@@ -1508,303 +1616,17 @@ namespace ThorneTimer
             UpdateMiniView();
         }
 
-        private bool BasicTimer(string endKeyword)
-        {
-            return (endKeyword.Length <= 0);
-        }
-
-        void TriggerRowTimer(DataGridViewButtonCell btnCell, int rowIndex)
-        {
-            DataGridViewCell cellEndkeyword = grdTimers.Rows[rowIndex].Cells[grdTimers.Columns["EndKeyword"].Index];
-
-            // Check for any possible tags
-            string endKeyword = (string)cellEndkeyword.Value + "";
-            if (BasicTimer(endKeyword))
-            {
-                // No keyword, so just start the timer
-                StartRowTimer(btnCell, rowIndex);
-            }
-            else
-            {
-                // Complex timer, check for dependency 
-                if (DependentTimer(endKeyword))
-                {
-                    StartRowTimer(btnCell, rowIndex);
-                }
-            }
-        }
-
-        private delegate void StartRowTimerDelegate(DataGridViewButtonCell btnCell, int rowIndex);
-
-        void StartRowTimer(DataGridViewButtonCell btnCell, int rowIndex)
-        {
-            if (InvokeRequired)
-            {
-                object[] parameters = new object[] { btnCell, rowIndex };
-                var d = new StartRowTimerDelegate(StartRowTimer);
-                this.Invoke(d, parameters);
-                return;
-            }
-
-            DataGridViewCell durationCell = grdTimers.Rows[rowIndex].Cells[grdTimers.Columns["Duration"].Index];
-            string durationText = (string)durationCell.Value + "";
-
-            if (ValidDuration(durationCell))
-            {
-                DataGridViewCell countCell = grdTimers.Rows[rowIndex].Cells[grdTimers.Columns["Count"].Index];
-                int counter = Convert.ToInt32(countCell.Value) + 1;
-                countCell.Value = counter.ToString();
-
-                btnCell.UseColumnTextForButtonValue = false;
-                DataGridViewCell styleCell = grdTimers.Rows[rowIndex].Cells[grdTimers.Columns["Style"].Index];
-                string style = Convert.ToString(styleCell.Value);
-
-                if (style == "Ping")
-                {
-                    // Ping timers use their own Duration (per-timer ping countdown)
-                    string pingText = durationText;
-                    if (TimerPlus.GetMilliseconds(pingText) == 0)
-                    {
-                        // Fallback to global ping time if Duration is still zero
-                        pingText = pingHour + miniViews.mvPingTime;
-                    }
-                    if (TimerPlus.GetMilliseconds(pingText) != 0)
-                    {
-                        btnCell.Value = Timers.btnPing;
-                        StartTimer(rowIndex, grdTimers.Columns["Remaining"].Index, pingText, TimerPlus.TimerType.Ping);
-                    }
-
-                    PlayTimerSounds(rowIndex);
-                }
-                else if (TimerPlus.GetMilliseconds(durationText) != 0)
-                {
-                    if (style == "Buff")
-                    {
-                        btnCell.Value = Timers.btnBuff;
-                        StartTimer(rowIndex, grdTimers.Columns["Remaining"].Index, durationText, TimerPlus.TimerType.Buff);
-                    }
-                    else if (style == "Pet")
-                    {
-                        btnCell.Value = Timers.btnPet;
-                        StartTimer(rowIndex, grdTimers.Columns["Remaining"].Index, durationText, TimerPlus.TimerType.Pet);
-                    }
-                    else
-                    {
-                        btnCell.Value = Timers.btnStop;
-                        StartTimer(rowIndex, grdTimers.Columns["Remaining"].Index, durationText, TimerPlus.TimerType.Normal);
-                    }
-                }
-            }
-        }
-
         private void KillAllTimers()
         {
-            for (int r = 0; r < grdTimers.Rows.Count; r++)
-            {
-                DataGridViewButtonCell btnCell = (DataGridViewButtonCell)grdTimers.Rows[r].Cells[grdTimers.Columns["StartStop"].Index];
-                StopRowTimer(btnCell, r);
-            }
+            timerRuntime.StopAllTimers();
+            SyncRuntimeToGrid();
         }
 
         private void StopAllTimers()
         {
-            for (int r = 0; r < grdTimers.Rows.Count; r++)
-            {
-                DataGridViewButtonCell btnCell = (DataGridViewButtonCell)grdTimers.Rows[r].Cells[grdTimers.Columns["StartStop"].Index];
-                if ((string)btnCell.Value != Timers.btnStart)
-                {
-                    StopRowTimer(btnCell, r);
-                }
-            }
-            UpdateMiniView();
+            timerRuntime.StopAllTimers();
+            SyncRuntimeToGrid();
         }
-
-        void StopRowTimer(DataGridViewButtonCell btnCell, int rowIndex)
-        {
-            // Only Called if EndKeyword or Manually Stopped with Button
-            btnCell.Value = Timers.btnStart;
-
-            StopTimer(rowIndex, false);
-        }
-
-        private delegate void StartTimerDelegate(int row, int col, string duration, TimerPlus.TimerType theType);
-
-        void StartTimer(int row, int col, string duration, TimerPlus.TimerType theType)
-        {
-            if (InvokeRequired)
-            {
-                object[] parameters = new object[] { row, col, duration, theType };
-                var d = new StartTimerDelegate(StartTimer);
-                this.Invoke(d, parameters);
-                return;
-            }
-
-            DataGridViewCell cell = grdTimers.Rows[row].Cells[col];
-
-            TimerPlus t1 = new TimerPlus
-            {
-                RowIndex = row,
-                Interval = 1000, // 1 sec = 1000 ms
-                ElapsedTime = 0,
-                DurationTime = TimerPlus.GetMilliseconds(duration)
-            };
-            t1.TimerElapsed += TimerElapsed;
-            t1.TimerExpired += TimerExpired;
-            t1.TheType = theType;
-            timers.Add(t1);
-
-            cell.Value = t1.GetTimeRemaining();
-            if (theType == TimerPlus.TimerType.Ping)
-            {
-                grdTimers.Rows[row].DefaultCellStyle.BackColor = Color.LightGreen;
-                cell.Style.BackColor = Color.LightGreen;
-            }
-            else if (theType == TimerPlus.TimerType.Buff)
-            {
-                cell.Style.BackColor = Color.Orange;
-            }
-            else if (theType == TimerPlus.TimerType.Pet)
-            {
-                cell.Style.BackColor = Color.Orange;
-            }
-            else
-            {
-                cell.Style.BackColor = Color.Yellow;
-            }
-
-            t1.Start();
-
-            RepaintTimerGrid(false);
-            UpdateMiniView();
-        }
-
-        void StopTimer(int row, bool resetYn)
-        {
-            foreach (TimerPlus timer in timers)
-            {
-                if (timer.RowIndex == row)
-                {
-                    if (resetYn)
-                    {
-                        timer.Stop();
-                        timer.ElapsedTime = 0;
-                        timer.Start();
-                    }
-                    else
-                    {
-                        timer.Stop();
-                        timers.Remove(timer);
-                        timer.Dispose();
-                    }
-                    break;
-                }
-            }
-
-            DataGridViewCell remainingCell = grdTimers.Rows[row].Cells[grdTimers.Columns["Remaining"].Index];
-            remainingCell.Value = blankTime;
-
-            grdTimers.Rows[row].DefaultCellStyle.BackColor = Color.White;
-            remainingCell.Style.BackColor = Color.White;
-
-            RepaintTimerGrid(false);
-            UpdateMiniView();
-        }
-
-        void TimerExpired(object sender, TimerPlus e)
-        {
-            DataGridViewButtonCell btnCell = (DataGridViewButtonCell)grdTimers.Rows[e.RowIndex].Cells[grdTimers.Columns["StartStop"].Index];
-            DataGridViewCell EndlessYn = grdTimers.Rows[e.RowIndex].Cells[grdTimers.Columns["EndlessYn"].Index];
-
-            if (Convert.ToInt32(EndlessYn.Value) == 0)
-            {
-                btnCell.Value = Timers.btnStart;
-                StopTimer(e.RowIndex, false);
-            }
-            else
-            {
-                StopTimer(e.RowIndex, true);
-            }
-
-            if (e.TheType != TimerPlus.TimerType.Ping)
-            {
-                PlayTimerSounds(e.RowIndex);
-            }
-
-            RepaintTimerGrid(false);
-            UpdateMiniView();
-        }
-
-        void PlayTimerSounds(int row)
-        {
-            DataGridViewCell wavCell = (DataGridViewCell)grdTimers.Rows[row].Cells[grdTimers.Columns["WAVFile"].Index];
-            string wavText = wavCell.Value + "";
-            if (wavText.Length > 0)
-            {
-                SoundPlayer sp = new SoundPlayer(Application.StartupPath + "\\Sounds\\" + wavText);
-                sp.Play();
-            }
-
-            DataGridViewCell speechCell = (DataGridViewCell)grdTimers.Rows[row].Cells[grdTimers.Columns["Speech"].Index];
-            string speechText = speechCell.Value + "";
-
-            if ((speechText.Length > 0) && (voiceEnabled == 1))
-            {
-                SpeechSynthesizer synth = new SpeechSynthesizer();
-
-                if (activeVoice.Length > 0)
-                {
-                    synth.SelectVoice(activeVoice);
-                }
-
-                // Configure the audio output.   
-                synth.SetOutputToDefaultAudioDevice();
-
-                synth.Rate = voiceRate;
-                synth.Volume = voiceVolume;
-
-                // Speak a string.  
-                synth.SpeakAsync(speechText);
-            }
-        }
-
-        void TimerElapsed(object sender, TimerPlus e)
-        {
-            try
-            {
-                DataGridViewCell cell = grdTimers.Rows[e.RowIndex].Cells[grdTimers.Columns["Remaining"].Index];
-
-                Color color = Color.White;
-                if (e.ElapsedTime < e.DurationTime)
-                {
-                    if (e.TheType == TimerPlus.TimerType.Ping)
-                    {
-                        color = Color.LightGreen;
-                    }
-                    else if (e.TheType == TimerPlus.TimerType.Buff)
-                    {
-                        color = Color.Orange;
-                    }
-                    else if (e.TheType == TimerPlus.TimerType.Pet)
-                    {
-                        color = Color.Orange;
-                    }
-                    else
-                    {
-                        color = Color.Yellow;
-                    }
-                }
-
-                cell.Style.BackColor = color;
-                cell.Value = e.GetTimeRemaining();
-
-                UpdateMiniView(false);
-            }
-            catch
-            {
-            }
-        }
-
-        System.Threading.Thread tParseLog;
 
         private void ToggleLog()
         {
@@ -1818,32 +1640,44 @@ namespace ThorneTimer
             }
         }
 
-        private void RestartLog()
-        {
-            if (tsbStartStopWatching.Text == stopWatchingText)
-            {
-                StopLog();
-                StartLog();
-            }
-        }
-
         private void StartLog()
         {
-            Characters.GridData character = Database.GetCharacter(con, activeCharacterID);
+            // Build file state list from all registered characters
+            var allCharacters = Database.GetCharacters(con);
+            var fileStates = new List<CharacterFileState>();
+            long activeID = 0;
+            long.TryParse(activeCharacterID, out activeID);
+            string activeFilePath = null;
 
-            string filePath = character.LogFile;
+            foreach (var c in allCharacters)
+            {
+                if (!string.IsNullOrEmpty(c.LogFile))
+                {
+                    fileStates.Add(new CharacterFileState
+                    {
+                        CharacterID = c.ID,
+                        CharacterName = c.Name,
+                        FilePath = c.LogFile
+                    });
 
-            if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
+                    if (c.ID == activeID)
+                    {
+                        activeFilePath = c.LogFile;
+                    }
+                }
+            }
+
+            if (fileStates.Count > 0)
             {
                 tsbStartStopWatching.Text = stopWatchingText;
                 tsbStartStopWatching.Image = iconStop;
                 startStopWatchingToolStripMenuItem.Text = "&Stop Watching";
                 startStopWatchingToolStripMenuItem.Image = iconStop;
-                statusParsing.Text = "Watching: " + Path.GetFileName(filePath);
+                statusParsing.Text = "Watching: " + (activeFilePath != null ? Path.GetFileName(activeFilePath) : "all characters");
 
-                // Process Events on Another Thread
-                tParseLog = new Thread(new ThreadStart(ParseLog));
-                tParseLog.Start();
+                logMonitor.LogChunkReceived -= OnLogChunkReceived;
+                logMonitor.LogChunkReceived += OnLogChunkReceived;
+                logMonitor.Start(fileStates, activeID);
             }
         }
 
@@ -1855,7 +1689,180 @@ namespace ThorneTimer
             startStopWatchingToolStripMenuItem.Image = iconPlay;
             statusParsing.Text = "Idle";
 
-            tParseLog.Abort();
+            logMonitor.Stop();
+        }
+
+        private void OnLogChunkReceived(object sender, LogChunkReceivedEventArgs e)
+        {
+            timerRuntime.ProcessLogText(e.Text);
+        }
+
+        private void autoSwitchToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            bool enabled = autoSwitchToolStripMenuItem.Checked;
+            tsbAutoSwitch.Checked = enabled;
+            logMonitor.AutoSwitchEnabled = enabled;
+            Database.SetSetting(con, "AutoSwitchEnabled", enabled ? "1" : "0");
+        }
+
+        private void tsbAutoSwitch_Click(object sender, EventArgs e)
+        {
+            bool enabled = tsbAutoSwitch.Checked;
+            autoSwitchToolStripMenuItem.Checked = enabled;
+            logMonitor.AutoSwitchEnabled = enabled;
+            Database.SetSetting(con, "AutoSwitchEnabled", enabled ? "1" : "0");
+        }
+
+        private void tsbShowAllClasses_Click(object sender, EventArgs e)
+        {
+            bool showAll = tsbShowAllClasses.Checked;
+            showAllClassesToolStripMenuItem.Checked = showAll;
+            timerRuntime.ShowAllClasses = showAll;
+            Database.SetSetting(con, "ShowAllClasses", showAll ? "1" : "0");
+            RefreshTimerGridDataSource();
+        }
+
+        private void showAllClassesToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            bool showAll = showAllClassesToolStripMenuItem.Checked;
+            tsbShowAllClasses.Checked = showAll;
+            timerRuntime.ShowAllClasses = showAll;
+            Database.SetSetting(con, "ShowAllClasses", showAll ? "1" : "0");
+            RefreshTimerGridDataSource();
+        }
+
+        private void tsbCompactView_Click(object sender, EventArgs e)
+        {
+            bool compact = tsbCompactView.Checked;
+            compactViewToolStripMenuItem.Checked = compact;
+            Database.SetSetting(con, "CompactView", compact ? "1" : "0");
+            ApplyCompactView(compact);
+        }
+
+        private void compactViewToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            bool compact = compactViewToolStripMenuItem.Checked;
+            tsbCompactView.Checked = compact;
+            Database.SetSetting(con, "CompactView", compact ? "1" : "0");
+            ApplyCompactView(compact);
+        }
+
+        /// <summary>
+        /// Columns hidden in compact mode — configuration-only columns
+        /// that aren't needed during active play.
+        /// </summary>
+        private static readonly string[] CompactHiddenColumns = new[]
+        {
+            "StartKeyword", "EndKeyword", "WAVFile", "Speech",
+            "CaseYn", "EndlessYn", "Style", "ClassID",
+            "Scope", "DependsOnTimer", "DependsOnDelay", "WAV"
+        };
+
+        /// <summary>
+        /// Toggles visibility of configuration columns on the timer grid.
+        /// Compact mode shows only: Active, Name, Category, Duration,
+        /// Remaining, Start/Stop, Count.
+        /// </summary>
+        private void ApplyCompactView(bool compact)
+        {
+            foreach (string colName in CompactHiddenColumns)
+            {
+                if (grdTimers.Columns.Contains(colName))
+                {
+                    grdTimers.Columns[colName].Visible = !compact;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets the ClassID of the currently active character from the database.
+        /// Returns 0 if no character is active or character has no class set.
+        /// </summary>
+        private long GetActiveCharacterClassID()
+        {
+            if (string.IsNullOrEmpty(activeCharacterID)) return 0;
+            var character = Database.GetCharacter(con, activeCharacterID);
+            return character.ClassID;
+        }
+
+        /// <summary>
+        /// Refreshes the timer grid row visibility based on class filter.
+        /// Called when ShowAllClasses toggle changes or after character switch.
+        /// </summary>
+        private void RefreshTimerGridDataSource()
+        {
+            if (InvokeRequired)
+            {
+                this.Invoke(new Action(RefreshTimerGridDataSource));
+                return;
+            }
+
+            long classID = GetActiveCharacterClassID();
+            bool showAll = timerRuntime.ShowAllClasses || classID <= 0;
+
+            foreach (DataGridViewRow row in grdTimers.Rows)
+            {
+                if (row.IsNewRow) continue;
+
+                if (showAll)
+                {
+                    row.Visible = true;
+                }
+                else
+                {
+                    long timerClassID = Convert.ToInt64(row.Cells[grdTimers.Columns["ClassID"].Index].Value);
+                    row.Visible = (timerClassID == 0 || timerClassID == classID);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Handles auto-detected character switch from LogMonitor.
+        /// Saves outgoing character state, switches active character,
+        /// reloads timers, restores incoming character state.
+        /// </summary>
+        private void OnCharacterSwitched(object sender, CharacterSwitchedEventArgs e)
+        {
+            if (this.InvokeRequired)
+            {
+                this.BeginInvoke(new Action(() => OnCharacterSwitched(sender, e)));
+                return;
+            }
+
+            // Save outgoing character's timer state
+            var outgoingStates = timerRuntime.SaveCharacterState();
+            Database.SaveTimerStates(con, outgoingStates, activeCharacterID);
+
+            // Update active character
+            activeCharacterID = e.NewCharacterID.ToString();
+            Database.SetSetting(con, "ActiveCharacterID", activeCharacterID);
+
+            // Update the character dropdown without triggering SelectedIndexChanged again
+            tscActiveCharacter.SelectedIndexChanged -= tscActiveCharacter_SelectedIndexChanged;
+            foreach (ComboBoxItem item in (List<ComboBoxItem>)tscActiveCharacter.ComboBox.DataSource)
+            {
+                if (Convert.ToInt64(item.Value) == e.NewCharacterID)
+                {
+                    tscActiveCharacter.SelectedItem = item;
+                    break;
+                }
+            }
+            tscActiveCharacter.SelectedIndexChanged += tscActiveCharacter_SelectedIndexChanged;
+
+            // Tell LogMonitor which character is now active
+            logMonitor.SetActiveCharacter(e.NewCharacterID);
+
+            // Reload timers and restore incoming character's state
+            LoadTimerRuntime();
+
+            // Apply class filter for new character
+            RefreshTimerGridDataSource();
+
+            // Update status bar
+            statusParsing.Text = "Watching: " + Path.GetFileName(logMonitor.FilePath) + " (auto)";
+
+            // Refresh mini views
+            UpdateMiniView();
         }
 
         private void tsbStartStopWatching_Click(object sender, EventArgs e)
@@ -1863,175 +1870,223 @@ namespace ThorneTimer
             ToggleLog();
         }
 
-        public class ThreadSharedData
+        /// <summary>
+        /// Loads timer and category data from the database into TimerRuntime.
+        /// Restores persisted state (counts + Character-scope running timers)
+        /// from timer_runtime_state.
+        /// </summary>
+        private void LoadTimerRuntime()
         {
-            public List<TimerPlus> timers = new List<TimerPlus>();
+            var timerData = Database.GetTimers(con);
+            timerRuntime.LoadTimers(timerData);
+
+            var catData = Database.GetCategories(con);
+            timerRuntime.LoadCategories(catData);
+
+            // Restore persisted Character-scope timer state
+            var savedStates = Database.LoadTimerStates(con, activeCharacterID);
+            timerRuntime.RestoreCharacterState(savedStates);
+
+            // Sync to grid
+            SyncRuntimeToGrid();
         }
 
-        private void ActivateCategoryTimers(Int32 ID, string ActiveYn)
+        /// <summary>
+        /// Updates grid cells to reflect current TimerRuntime state (counts, remaining, buttons, ActiveYn).
+        /// </summary>
+        private void SyncRuntimeToGrid()
         {
-            for (int r = 0; r < grdTimers.Rows.Count; r++)
+            if (InvokeRequired)
             {
-                DataGridViewCell CategoryIDCell = (DataGridViewCell)grdTimers.Rows[r].Cells[grdTimers.Columns["CategoryID"].Index];
+                this.Invoke(new Action(SyncRuntimeToGrid));
+                return;
+            }
 
-                if (Convert.ToInt32(CategoryIDCell.Value) == ID)
+            var states = timerRuntime.GetAllStates();
+            foreach (DataGridViewRow row in grdTimers.Rows)
+            {
+                long rowID = Convert.ToInt64(row.Cells[grdTimers.Columns["ID"].Index].Value);
+                var ts = states.FirstOrDefault(s => s.TimerID == rowID);
+                if (ts == null) continue;
+
+                // Sync per-character ActiveYn preference
+                DataGridViewCheckBoxCell activeCell = row.Cells[grdTimers.Columns["ActiveYn"].Index] as DataGridViewCheckBoxCell;
+                if (activeCell != null)
                 {
-                    DataGridViewCheckBoxCell ActiveYnCell = (DataGridViewCheckBoxCell)grdTimers.Rows[r].Cells[grdTimers.Columns["ActiveYn"].Index];
-                    ActiveYnCell.Value = ActiveYn;
+                    activeCell.Value = ts.ActiveYn;
+                }
 
-                    // Shut Off Any Running Timers about to go Inactive
-                    if (ActiveYn == "0")
+                // Sync count
+                DataGridViewCell countCell = row.Cells[grdTimers.Columns["Count"].Index];
+                countCell.Value = ts.Count > 0 ? ts.Count.ToString() : null;
+
+                // Sync button state
+                DataGridViewButtonCell btnCell = (DataGridViewButtonCell)row.Cells[grdTimers.Columns["StartStop"].Index];
+                btnCell.Value = ts.ButtonState;
+                if (ts.ButtonState != Timers.btnStart)
+                {
+                    btnCell.UseColumnTextForButtonValue = false;
+                }
+
+                // Sync remaining
+                DataGridViewCell remainingCell = row.Cells[grdTimers.Columns["Remaining"].Index];
+                remainingCell.Value = ts.Remaining;
+
+                // Sync color
+                ApplyTimerRowColor(row, ts);
+            }
+
+            RepaintTimerGrid(false);
+            UpdateMiniView();
+        }
+
+        /// <summary>
+        /// Applies the correct row/cell colors based on timer state.
+        /// </summary>
+        private void ApplyTimerRowColor(DataGridViewRow row, TimerState ts)
+        {
+            DataGridViewCell remainingCell = row.Cells[grdTimers.Columns["Remaining"].Index];
+
+            if (ts.IsRunning)
+            {
+                Color color;
+                switch (ts.Style)
+                {
+                    case "Ping":
+                        color = Color.LightGreen;
+                        row.DefaultCellStyle.BackColor = color;
+                        break;
+                    case "Buff":
+                    case "Pet":
+                        color = Color.Orange;
+                        row.DefaultCellStyle.BackColor = Color.White;
+                        break;
+                    default:
+                        color = Color.Yellow;
+                        row.DefaultCellStyle.BackColor = Color.White;
+                        break;
+                }
+                remainingCell.Style.BackColor = color;
+            }
+            else
+            {
+                row.DefaultCellStyle.BackColor = ts.IsActive ? Color.White : Color.LightPink;
+                remainingCell.Style.BackColor = Color.White;
+            }
+        }
+
+        /// <summary>
+        /// Handles TimerStateChanged events from TimerRuntime — updates the grid row for the affected timer.
+        /// </summary>
+        private void OnTimerStateChanged(object sender, TimerStateChangedEventArgs e)
+        {
+            if (InvokeRequired)
+            {
+                this.BeginInvoke(new Action<object, TimerStateChangedEventArgs>(OnTimerStateChanged), sender, e);
+                return;
+            }
+
+            try
+            {
+                // Find the grid row for this timer
+                foreach (DataGridViewRow row in grdTimers.Rows)
+                {
+                    long rowID = Convert.ToInt64(row.Cells[grdTimers.Columns["ID"].Index].Value);
+                    if (rowID == e.TimerID)
                     {
-                        DataGridViewButtonCell btnCell = (DataGridViewButtonCell)grdTimers.Rows[r].Cells[grdTimers.Columns["StartStop"].Index];
+                        // Update button
+                        DataGridViewButtonCell btnCell = (DataGridViewButtonCell)row.Cells[grdTimers.Columns["StartStop"].Index];
+                        btnCell.Value = e.ButtonState;
+                        if (e.ButtonState != Timers.btnStart)
+                        {
+                            btnCell.UseColumnTextForButtonValue = false;
+                        }
 
-                        StopRowTimer(btnCell, r);
+                        // Update remaining
+                        DataGridViewCell remainingCell = row.Cells[grdTimers.Columns["Remaining"].Index];
+                        remainingCell.Value = e.Remaining;
+
+                        // Update count
+                        DataGridViewCell countCell = row.Cells[grdTimers.Columns["Count"].Index];
+                        countCell.Value = e.Count > 0 ? e.Count.ToString() : null;
+
+                        // Update colors
+                        var ts = timerRuntime.GetState(e.TimerID);
+                        if (ts != null)
+                        {
+                            ApplyTimerRowColor(row, ts);
+                        }
+
+                        break;
                     }
+                }
+
+                RepaintTimerGrid(false);
+                UpdateMiniView(false);
+            }
+            catch
+            {
+            }
+        }
+
+        /// <summary>
+        /// Handles sound/speech requests from TimerRuntime.
+        /// </summary>
+        private void OnTimerSoundRequested(object sender, TimerSoundRequestedEventArgs e)
+        {
+            if (InvokeRequired)
+            {
+                this.BeginInvoke(new Action<object, TimerSoundRequestedEventArgs>(OnTimerSoundRequested), sender, e);
+                return;
+            }
+
+            if (e.WAVFile.Length > 0)
+            {
+                SoundPlayer sp = new SoundPlayer(Application.StartupPath + "\\Sounds\\" + e.WAVFile);
+                sp.Play();
+            }
+
+            if ((e.Speech.Length > 0) && (voiceEnabled == 1))
+            {
+                SpeechSynthesizer synth = new SpeechSynthesizer();
+
+                if (activeVoice.Length > 0)
+                {
+                    synth.SelectVoice(activeVoice);
+                }
+
+                synth.SetOutputToDefaultAudioDevice();
+                synth.Rate = voiceRate;
+                synth.Volume = voiceVolume;
+                synth.SpeakAsync(e.Speech);
+            }
+        }
+
+        /// <summary>
+        /// Handles category activation events — syncs grid checkboxes and saves.
+        /// </summary>
+        private void OnCategoryTimersActivated(object sender, EventArgs e)
+        {
+            if (InvokeRequired)
+            {
+                this.BeginInvoke(new Action<object, EventArgs>(OnCategoryTimersActivated), sender, e);
+                return;
+            }
+
+            // Sync ActiveYn checkboxes from TimerRuntime state
+            var states = timerRuntime.GetAllStates();
+            foreach (DataGridViewRow row in grdTimers.Rows)
+            {
+                long rowID = Convert.ToInt64(row.Cells[grdTimers.Columns["ID"].Index].Value);
+                var ts = states.FirstOrDefault(s => s.TimerID == rowID);
+                if (ts != null)
+                {
+                    DataGridViewCheckBoxCell activeCell = (DataGridViewCheckBoxCell)row.Cells[grdTimers.Columns["ActiveYn"].Index];
+                    activeCell.Value = ts.ActiveYn;
                 }
             }
 
             SaveDataTimers();
-        }
-
-        public void ProcessLogText(string chunk)
-        {
-            if (InvokeRequired)
-            {
-                this.Invoke(new Action<string>(ProcessLogText), new object[] { chunk });
-                return;
-            }
-
-            // Process Categories
-            for (int r = 0; r < grdCategories.Rows.Count; r++)
-            {
-                Int32 ID = Convert.ToInt32(grdCategories.Rows[r].Cells[grdCategories.Columns["ID"].Index].Value);
-
-                string startKeyword = (string)grdCategories.Rows[r].Cells[grdCategories.Columns["StartKeyword"].Index].Value + "";
-                if (chunk.Contains(startKeyword) && startKeyword.Length > 0)
-                {
-                    // Activate Timers of this Category
-                    ActivateCategoryTimers(ID, "1");
-                }
-                else
-                {
-                    string endKeyword = (string)grdCategories.Rows[r].Cells[grdCategories.Columns["EndKeyword"].Index].Value + "";
-                    DataGridViewCell AutoStopYn = (DataGridViewCell)grdCategories.Rows[r].Cells[grdCategories.Columns["AutoStop"].Index];
-
-                    if (chunk.Contains(endKeyword) && endKeyword.Length > 0)
-                    {
-                        if (Convert.ToInt32(AutoStopYn.Value) == 1)
-                        {
-                            // De-Activate Timers of this Category
-                            ActivateCategoryTimers(ID, "0");
-                        }
-                    }
-                }
-            }
-
-            // Process Active Timers
-            for (int r = 0; r < grdTimers.Rows.Count; r++)
-            {
-                DataGridViewCell ActiveYn = (DataGridViewCell)grdTimers.Rows[r].Cells[grdTimers.Columns["ActiveYn"].Index];
-                DataGridViewCell CaseYn = (DataGridViewCell)grdTimers.Rows[r].Cells[grdTimers.Columns["CaseYn"].Index];
-                DataGridViewButtonCell btnCell = (DataGridViewButtonCell)grdTimers.Rows[r].Cells[grdTimers.Columns["StartStop"].Index];
-
-                if (Convert.ToInt32(ActiveYn.Value) == 1)
-                {
-                    // Force a refresh
-                    //Application.DoEvents();
-
-                    string startKeyword = (string)grdTimers.Rows[r].Cells[grdTimers.Columns["StartKeyword"].Index].Value + "";
-                    string endKeyword = (string)grdTimers.Rows[r].Cells[grdTimers.Columns["EndKeyword"].Index].Value + "";
-
-                    // TODO:  Redo this to check that endKeyword doesn't include "@#$*"
-                    // TODO:  Redo this so that we don't check case sensitive and then sensitive
-
-                    bool containsStart = chunk.IndexOf(startKeyword, StringComparison.OrdinalIgnoreCase) >= 0;
-                    bool containsEnd = chunk.IndexOf(endKeyword, StringComparison.OrdinalIgnoreCase) >= 0;
-
-                    // Check if Case-Sensitive
-                    if (Convert.ToInt32(CaseYn.Value) != 0)
-                    {
-                        containsStart = chunk.IndexOf(startKeyword, StringComparison.Ordinal) >= 0;
-                        containsEnd = chunk.IndexOf(endKeyword, StringComparison.Ordinal) >= 0;
-                    }
-
-                    if (containsStart && startKeyword.Length > 0)
-                    {
-                        // Check to start a timer
-                        if (Timers.TimerStopped((string)btnCell.Value))
-                        {
-                            TriggerRowTimer(btnCell, r);
-                        }
-                        else if (Timers.TimerRunning((string)btnCell.Value))
-                        {
-                            // Buff and Pet timers reset when their start keyword fires again
-                            string style = Convert.ToString(grdTimers.Rows[r].Cells[grdTimers.Columns["Style"].Index].Value);
-                            if (style == "Buff" || style == "Pet")
-                            {
-                                StopRowTimer(btnCell, r);
-                                StartRowTimer(btnCell, r);
-                            }
-                        }
-                    }
-
-                    if (containsEnd && endKeyword.Length > 0)
-                    {
-                        // Check to stop a running timer
-                        if (Timers.TimerRunning((string)btnCell.Value))
-                        {
-                            StopRowTimer(btnCell, r);
-                        }
-                    }
-                }
-            }
-        }
-
-        private void ParseLog()
-        {
-            Characters.GridData character = Database.GetCharacter(con, activeCharacterID);
-
-            string filePath = character.LogFile;
-
-            if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
-            {
-                var initialFileSize = new FileInfo(filePath).Length;
-                var lastReadLength = initialFileSize;
-                if (lastReadLength < 0) lastReadLength = 0;
-
-                while (true)
-                {
-                    try
-                    {
-                        var fileSize = new FileInfo(filePath).Length;
-                        if (fileSize > lastReadLength)
-                        {
-                            using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                            {
-                                fs.Seek(lastReadLength, SeekOrigin.Begin);
-                                var buffer = new byte[1024];
-
-                                while (true)
-                                {
-                                    var bytesRead = fs.Read(buffer, 0, buffer.Length);
-                                    lastReadLength += bytesRead;
-
-                                    if (bytesRead == 0)
-                                        break;
-
-                                    var text = ASCIIEncoding.ASCII.GetString(buffer, 0, bytesRead);
-
-                                    ProcessLogText(text);
-                                }
-                            }
-                        }
-                    }
-                    catch
-                    {
-                    }
-
-                    Thread.Sleep(100);
-                }
-            }
         }
 
         private void ExitToolStripMenuItem_Click(object sender, EventArgs e)
@@ -2043,22 +2098,19 @@ namespace ThorneTimer
         {
             if (grdTimers.CurrentCell != null)
             {
-                string deleteWarning = "Are you sure you want to delete this timer?";
-                if (runningTimers > 0)
+                if (MessageBox.Show("Are you sure you want to delete this timer?", "Delete Timer", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1) == System.Windows.Forms.DialogResult.Yes)
                 {
-                    deleteWarning = "Deleting this timer will also stop all running timers, are you sure?";
-                }
+                    // Stop this specific timer if running, via TimerRuntime
+                    long timerID = Convert.ToInt64(grdTimers.Rows[grdTimers.CurrentCell.RowIndex].Cells[grdTimers.Columns["ID"].Index].Value);
+                    timerRuntime.StopTimer(timerID);
 
-                if (MessageBox.Show(deleteWarning, "Delete Timer", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1) == System.Windows.Forms.DialogResult.Yes)
-                {
-                    StopAllTimers();
-
-                    DataGridViewCell idCell = grdTimers.Rows[grdTimers.CurrentCell.RowIndex].Cells[grdTimers.Columns["ID"].Index];
-                    Database.DeleteTimer(con, Convert.ToString(idCell.Value));
+                    Database.DeleteTimer(con, Convert.ToString(timerID));
 
                     grdTimers.DataSource = Database.GetTimers(con);
+                    timerRuntime.LoadTimers((SortableBindingList<Timers.GridData>)grdTimers.DataSource);
 
                     ResetTimersGridColumns();
+                    SyncRuntimeToGrid();
                 }
             }
         }
@@ -2069,27 +2121,30 @@ namespace ThorneTimer
 
             if (row == null || ValidDataTimers(row))
             {
-                if (MessageBox.Show("Adding a timer will stop all running timers, are you sure?", "Add Timer", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1) == System.Windows.Forms.DialogResult.Yes)
+                SortableBindingList<Timers.GridData> data = Database.GetTimers(con);
+
+                Timers.GridData gd = new Timers.GridData
                 {
-                    StopAllTimers();
+                    ID = -1,
+                    ActiveYn = 1,
+                    Style = "Normal",
+                    Scope = "World",
+                    DependsOnTimer = "",
+                    DependsOnDelay = 0,
+                    ClassID = 0
+                };
+                data.Add(gd);
 
-                    SortableBindingList<Timers.GridData> data = Database.GetTimers(con);
+                grdTimers.DataSource = data;
+                timerRuntime.LoadTimers(data);
 
-                    Timers.GridData gd = new Timers.GridData
-                    {
-                        ID = -1
-                    };
-                    data.Add(gd);
+                ResetTimersGridColumns();
+                SyncRuntimeToGrid();
 
-                    grdTimers.DataSource = data;
+                grdTimers.Rows[grdTimers.Rows.Count - 1].Cells[grdTimers.Columns["Duration"].Index].Value = noTime;
+                grdTimers.CurrentCell = grdTimers.Rows[grdTimers.Rows.Count - 1].Cells[grdTimers.Columns["Name"].Index];
 
-                    ResetTimersGridColumns();
-
-                    grdTimers.Rows[grdTimers.Rows.Count - 1].Cells[grdTimers.Columns["Duration"].Index].Value = noTime;
-                    grdTimers.CurrentCell = grdTimers.Rows[grdTimers.Rows.Count - 1].Cells[grdTimers.Columns["Name"].Index];
-
-                    grdTimers.BeginEdit(true);
-                }
+                grdTimers.BeginEdit(true);
             }
         }
 
@@ -2133,11 +2188,31 @@ namespace ThorneTimer
 
         private void tscActiveCharacter_SelectedIndexChanged(object sender, EventArgs e)
         {
-            activeCharacterID = (tscActiveCharacter.SelectedItem as ComboBoxItem).Value.ToString();
+            // Save outgoing character's timer state before switching
+            var outgoingStates = timerRuntime.SaveCharacterState();
+            Database.SaveTimerStates(con, outgoingStates, activeCharacterID);
 
+            activeCharacterID = (tscActiveCharacter.SelectedItem as ComboBoxItem).Value.ToString();
             Database.SetSetting(con, "ActiveCharacterID", activeCharacterID);
 
-            RestartLog();
+            // Tell LogMonitor which character is now active
+            long newCharID = 0;
+            long.TryParse(activeCharacterID, out newCharID);
+            logMonitor.SetActiveCharacter(newCharID);
+
+            // Reload timers and restore incoming character's state
+            LoadTimerRuntime();
+
+            // Apply class filter for new character
+            RefreshTimerGridDataSource();
+
+            // Update status bar if watching
+            if (tsbStartStopWatching.Text == stopWatchingText && logMonitor.FilePath != null)
+            {
+                statusParsing.Text = "Watching: " + Path.GetFileName(logMonitor.FilePath);
+            }
+
+            UpdateMiniView();
         }
 
         private void btnAddCategory_Click(object sender, EventArgs e)
@@ -2212,7 +2287,8 @@ namespace ThorneTimer
 
         private void UpdateMiniView(bool bForce=true)
         {
-            miniViews.UpdateMiniTimers(grdTimers, bForce);
+            var data = timerRuntime.GetMiniViewData();
+            miniViews.UpdateMiniTimers(data, bForce);
         }
 
         private void UpdateMiniAppearance()
@@ -2440,11 +2516,9 @@ namespace ThorneTimer
 
         private void grdTimers_ColumnHeaderMouseClick(object sender, DataGridViewCellMouseEventArgs e)
         {
-            if (runningTimers > 0)
-            {
-                KillAllTimers();
-            }
+            // TimerRuntime tracks timers by ID, not row index — sorting is safe now
             RepaintTimerGrid(true);
+            SyncRuntimeToGrid();
         }
 
         private void lblBuffPickFore_Click(object sender, EventArgs e)

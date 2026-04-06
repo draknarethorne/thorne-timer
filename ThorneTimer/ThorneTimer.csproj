@@ -122,6 +122,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Categories.cs" />
+    <Compile Include="LogMonitor.cs" />
+    <Compile Include="TimerRuntime.cs" />
     <Compile Include="Timers.cs" />
     <Compile Include="MiniViews.cs" />
     <Compile Include="ComboBoxItem.cs" />
@@ -176,11 +178,12 @@
     <Content Include="Data\ThorneTimer_Draknare.tdb">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <None Include="Docs\architecture-redesign.md" />
     <None Include="Docs\active-views\active-views-design.md" />
     <None Include="Docs\active-views\codebase-analysis.md" />
     <None Include="Docs\active-views\schema-migration.md" />
     <None Include="Docs\active-views\technical-debt.md" />
+    <None Include="Docs\architecture-redesign.md" />
+    <None Include="Docs\auto-character-switching.md" />
     <None Include="ThorneTimer.pfx" />
     <None Include="packages.config" />
     <None Include="Properties\app.manifest" />

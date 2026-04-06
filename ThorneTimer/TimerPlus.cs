@@ -17,14 +17,14 @@ namespace ThorneTimer
             Normal
         }
 
-        public int RowIndex = 0;
+        public long TimerID = 0;
         public double ElapsedTime = 0;
         public double DurationTime = 0;
         public TimerType TheType = TimerType.Normal;
 
         public class TimerPlusEventArgs : EventArgs
         {
-            public int RowIndex = 0;
+            public long TimerID = 0;
             public double ElapsedTime = 0;
             public double Duration = 0;
         }
@@ -45,7 +45,7 @@ namespace ThorneTimer
 
                 TimerPlus ea = new TimerPlus
                 {
-                    RowIndex = this.RowIndex,
+                    TimerID = this.TimerID,
                     ElapsedTime = this.ElapsedTime,
                     DurationTime = this.DurationTime,
                     TheType = this.TheType

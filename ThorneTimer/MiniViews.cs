@@ -297,6 +297,62 @@ namespace ThorneTimer
             return (mvShowPing == 1);
         }
 
+        public void UpdateMiniTimers(List<MiniTimerData> timerData, bool bForce=true)
+        {
+            // Check current time vs. last time to prevent excessive updates
+            DateTime currTime = DateTime.Now;
+            if ((((currTime.Subtract(lastTime).TotalMilliseconds) > 999) || bForce) && (activeViews.Count > 0))
+            {
+                lastTime = currTime;
+
+                // Build a data list for each active view keyed by StyleFilter
+                Dictionary<string, List<MiniView.MiniData>> viewData = new Dictionary<string, List<MiniView.MiniData>>();
+                foreach (var entry in activeViews)
+                {
+                    if (!viewData.ContainsKey(entry.Data.StyleFilter))
+                        viewData[entry.Data.StyleFilter] = new List<MiniView.MiniData>();
+                }
+
+                foreach (var td in timerData)
+                {
+                    if (!ShowMiniTimer(td.ButtonState)) continue;
+
+                    string timerStyle = string.IsNullOrEmpty(td.Style) ? "Normal" : td.Style;
+
+                    MiniView.MiniData.ColorType colorType;
+                    switch (timerStyle)
+                    {
+                        case "Pet": colorType = MiniView.MiniData.ColorType.Pet; break;
+                        case "Buff": colorType = MiniView.MiniData.ColorType.Buff; break;
+                        case "Ping": colorType = MiniView.MiniData.ColorType.Ping; break;
+                        default: colorType = MiniView.MiniData.ColorType.Normal; break;
+                    }
+
+                    MiniView.MiniData md = new MiniView.MiniData
+                    {
+                        Name = td.Name,
+                        Remaining = td.Remaining,
+                        TheColor = colorType
+                    };
+
+                    // Route to view(s) whose StyleFilter matches this timer's Style
+                    if (viewData.ContainsKey(timerStyle))
+                    {
+                        viewData[timerStyle].Add(md);
+                    }
+                }
+
+                // Push data to each view
+                foreach (var entry in activeViews)
+                {
+                    if (viewData.ContainsKey(entry.Data.StyleFilter))
+                        entry.Form.LoadData(viewData[entry.Data.StyleFilter]);
+                    else
+                        entry.Form.LoadData(new List<MiniView.MiniData>());
+                }
+            }
+        }
+
         public void UpdateMiniTimers(DataGridView grdTimers, bool bForce=true)
         {
             // Check current time vs. last time to prevent excessive updates to the mini view since it scans all rows in the grid every time

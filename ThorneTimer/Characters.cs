@@ -15,6 +15,7 @@ namespace ThorneTimer
             public string LogFile { get; set; }
             public int MiniViewX { get; set; }
             public int MiniViewY { get; set; }
+            public long ClassID { get; set; }
         }
 
         public Characters()

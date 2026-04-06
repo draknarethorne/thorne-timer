@@ -103,6 +103,7 @@
             this.miniViewsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.watchToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.startStopWatchingToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.autoSwitchToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.colorDialog1 = new System.Windows.Forms.ColorDialog();
             this.statusStrip = new System.Windows.Forms.StatusStrip();
             this.statusTomePath = new System.Windows.Forms.ToolStripStatusLabel();
@@ -134,7 +135,12 @@
             this.toolStripSeparator3,
             this.tsbStartStopWatching,
             this.toolStripSeparator4,
-            this.tsbMiniViews});
+            this.tsbMiniViews,
+            this.toolStripSeparator5,
+            this.tsbAutoSwitch,
+            this.tsbShowAllClasses,
+            this.toolStripSeparator6,
+            this.tsbCompactView});
             this.toolStrip.Location = new System.Drawing.Point(0, 24);
             this.toolStrip.Name = "toolStrip";
             this.toolStrip.Size = new System.Drawing.Size(1152, 25);
@@ -174,6 +180,50 @@
             this.tsbMiniViews.Text = "Mini Views";
             this.tsbMiniViews.ToolTipText = "Toggle Mini Views";
             this.tsbMiniViews.Click += new System.EventHandler(this.tsbMiniViews_Click);
+            // 
+            // toolStripSeparator5
+            // 
+            this.toolStripSeparator5.Name = "toolStripSeparator5";
+            this.toolStripSeparator5.Size = new System.Drawing.Size(6, 25);
+            // 
+            // tsbAutoSwitch
+            // 
+            this.tsbAutoSwitch.CheckOnClick = true;
+            this.tsbAutoSwitch.Checked = true;
+            this.tsbAutoSwitch.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.tsbAutoSwitch.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.ImageAndText;
+            this.tsbAutoSwitch.Name = "tsbAutoSwitch";
+            this.tsbAutoSwitch.Size = new System.Drawing.Size(84, 22);
+            this.tsbAutoSwitch.Text = "Auto-Switch";
+            this.tsbAutoSwitch.ToolTipText = "Automatically switch to the character whose log file is actively being written";
+            this.tsbAutoSwitch.Click += new System.EventHandler(this.tsbAutoSwitch_Click);
+            // 
+            // tsbShowAllClasses
+            // 
+            this.tsbShowAllClasses.CheckOnClick = true;
+            this.tsbShowAllClasses.Checked = true;
+            this.tsbShowAllClasses.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.tsbShowAllClasses.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.ImageAndText;
+            this.tsbShowAllClasses.Name = "tsbShowAllClasses";
+            this.tsbShowAllClasses.Size = new System.Drawing.Size(92, 22);
+            this.tsbShowAllClasses.Text = "All Classes";
+            this.tsbShowAllClasses.ToolTipText = "Show timers for all classes. When unchecked, only timers matching the active character\u0027s class are shown.";
+            this.tsbShowAllClasses.Click += new System.EventHandler(this.tsbShowAllClasses_Click);
+            // 
+            // toolStripSeparator6
+            // 
+            this.toolStripSeparator6.Name = "toolStripSeparator6";
+            this.toolStripSeparator6.Size = new System.Drawing.Size(6, 25);
+            // 
+            // tsbCompactView
+            // 
+            this.tsbCompactView.CheckOnClick = true;
+            this.tsbCompactView.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.ImageAndText;
+            this.tsbCompactView.Name = "tsbCompactView";
+            this.tsbCompactView.Size = new System.Drawing.Size(92, 22);
+            this.tsbCompactView.Text = "Compact";
+            this.tsbCompactView.ToolTipText = "Toggle compact view. Hides configuration columns and shows only runtime columns.";
+            this.tsbCompactView.Click += new System.EventHandler(this.tsbCompactView_Click);
             // 
             // menuStrip1
             // 
@@ -265,7 +315,8 @@
             // viewToolStripMenuItem
             // 
             this.viewToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.miniViewsToolStripMenuItem});
+            this.miniViewsToolStripMenuItem,
+            this.compactViewToolStripMenuItem});
             this.viewToolStripMenuItem.Name = "viewToolStripMenuItem";
             this.viewToolStripMenuItem.Size = new System.Drawing.Size(44, 20);
             this.viewToolStripMenuItem.Text = "&View";
@@ -277,10 +328,21 @@
             this.miniViewsToolStripMenuItem.Text = "&Mini Views";
             this.miniViewsToolStripMenuItem.Click += new System.EventHandler(this.tsbMiniViews_Click);
             // 
+            // compactViewToolStripMenuItem
+            // 
+            this.compactViewToolStripMenuItem.CheckOnClick = true;
+            this.compactViewToolStripMenuItem.Name = "compactViewToolStripMenuItem";
+            this.compactViewToolStripMenuItem.Size = new System.Drawing.Size(160, 22);
+            this.compactViewToolStripMenuItem.Text = "&Compact View";
+            this.compactViewToolStripMenuItem.ToolTipText = "Toggle compact view. Hides configuration columns and shows only runtime columns.";
+            this.compactViewToolStripMenuItem.Click += new System.EventHandler(this.compactViewToolStripMenuItem_Click);
+            // 
             // watchToolStripMenuItem
             // 
             this.watchToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.startStopWatchingToolStripMenuItem});
+            this.startStopWatchingToolStripMenuItem,
+            this.autoSwitchToolStripMenuItem,
+            this.showAllClassesToolStripMenuItem});
             this.watchToolStripMenuItem.Name = "watchToolStripMenuItem";
             this.watchToolStripMenuItem.Size = new System.Drawing.Size(54, 20);
             this.watchToolStripMenuItem.Text = "&Watch";
@@ -291,6 +353,28 @@
             this.startStopWatchingToolStripMenuItem.Size = new System.Drawing.Size(160, 22);
             this.startStopWatchingToolStripMenuItem.Text = "&Start Watching";
             this.startStopWatchingToolStripMenuItem.Click += new System.EventHandler(this.tsbStartStopWatching_Click);
+            // 
+            // autoSwitchToolStripMenuItem
+            // 
+            this.autoSwitchToolStripMenuItem.CheckOnClick = true;
+            this.autoSwitchToolStripMenuItem.Checked = true;
+            this.autoSwitchToolStripMenuItem.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.autoSwitchToolStripMenuItem.Name = "autoSwitchToolStripMenuItem";
+            this.autoSwitchToolStripMenuItem.Size = new System.Drawing.Size(160, 22);
+            this.autoSwitchToolStripMenuItem.Text = "&Auto-Switch Character";
+            this.autoSwitchToolStripMenuItem.ToolTipText = "Automatically switch to the character whose log file is actively being written";
+            this.autoSwitchToolStripMenuItem.Click += new System.EventHandler(this.autoSwitchToolStripMenuItem_Click);
+            // 
+            // showAllClassesToolStripMenuItem
+            // 
+            this.showAllClassesToolStripMenuItem.CheckOnClick = true;
+            this.showAllClassesToolStripMenuItem.Checked = true;
+            this.showAllClassesToolStripMenuItem.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.showAllClassesToolStripMenuItem.Name = "showAllClassesToolStripMenuItem";
+            this.showAllClassesToolStripMenuItem.Size = new System.Drawing.Size(160, 22);
+            this.showAllClassesToolStripMenuItem.Text = "Show &All Classes";
+            this.showAllClassesToolStripMenuItem.ToolTipText = "Show timers for all classes. When unchecked, only timers matching the active character's class are shown.";
+            this.showAllClassesToolStripMenuItem.Click += new System.EventHandler(this.showAllClassesToolStripMenuItem_Click);
             // 
             // tabCtrlMain
             // 
@@ -989,6 +1073,11 @@
         private System.Windows.Forms.ToolStripButton tsbStartStopWatching;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator4;
         private System.Windows.Forms.ToolStripButton tsbMiniViews;
+        private System.Windows.Forms.ToolStripSeparator toolStripSeparator5;
+        private System.Windows.Forms.ToolStripButton tsbAutoSwitch;
+        private System.Windows.Forms.ToolStripButton tsbShowAllClasses;
+        private System.Windows.Forms.ToolStripSeparator toolStripSeparator6;
+        private System.Windows.Forms.ToolStripButton tsbCompactView;
         private System.Windows.Forms.MenuStrip menuStrip1;
         private System.Windows.Forms.ToolStripMenuItem fileToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem exitToolStripMenuItem;
@@ -1003,8 +1092,11 @@
         private System.Windows.Forms.Button btnDeleteCharacter;
         private System.Windows.Forms.ToolStripMenuItem viewToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem miniViewsToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem compactViewToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem watchToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem startStopWatchingToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem autoSwitchToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem showAllClassesToolStripMenuItem;
         private System.Windows.Forms.TabPage tabCategories;
         private System.Windows.Forms.Button btnAddCategory;
         private System.Windows.Forms.Button btnDeleteCategory;
