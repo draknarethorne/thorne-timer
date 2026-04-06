@@ -150,7 +150,7 @@
             this.tsbCompactView});
             this.toolStrip.Location = new System.Drawing.Point(0, 24);
             this.toolStrip.Name = "toolStrip";
-            this.toolStrip.Size = new System.Drawing.Size(1152, 25);
+            this.toolStrip.Size = new System.Drawing.Size(1400, 25);
             this.toolStrip.TabIndex = 21;
             // 
             // tscActiveCharacter
@@ -242,7 +242,7 @@
             this.helpToolStripMenuItem});
             this.menuStrip1.Location = new System.Drawing.Point(0, 0);
             this.menuStrip1.Name = "menuStrip1";
-            this.menuStrip1.Size = new System.Drawing.Size(1152, 24);
+            this.menuStrip1.Size = new System.Drawing.Size(1400, 24);
             this.menuStrip1.TabIndex = 8;
             this.menuStrip1.Text = "menuStrip1";
             // 
@@ -396,7 +396,7 @@
             this.tabCtrlMain.Location = new System.Drawing.Point(12, 52);
             this.tabCtrlMain.Name = "tabCtrlMain";
             this.tabCtrlMain.SelectedIndex = 0;
-            this.tabCtrlMain.Size = new System.Drawing.Size(1128, 433);
+            this.tabCtrlMain.Size = new System.Drawing.Size(1376, 609);
             this.tabCtrlMain.TabIndex = 9;
             // 
             // tabTimers
@@ -410,7 +410,7 @@
             this.tabTimers.Location = new System.Drawing.Point(4, 22);
             this.tabTimers.Name = "tabTimers";
             this.tabTimers.Padding = new System.Windows.Forms.Padding(3);
-            this.tabTimers.Size = new System.Drawing.Size(1120, 407);
+            this.tabTimers.Size = new System.Drawing.Size(1368, 583);
             this.tabTimers.TabIndex = 0;
             this.tabTimers.Text = "Timers";
             // 
@@ -418,7 +418,7 @@
             // 
             this.btnResetCounts.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
             this.btnResetCounts.BackColor = System.Drawing.SystemColors.Control;
-            this.btnResetCounts.Location = new System.Drawing.Point(87, 378);
+            this.btnResetCounts.Location = new System.Drawing.Point(87, 554);
             this.btnResetCounts.Name = "btnResetCounts";
             this.btnResetCounts.Size = new System.Drawing.Size(75, 23);
             this.btnResetCounts.TabIndex = 18;
@@ -430,7 +430,7 @@
             // 
             this.buttonStopAll.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.buttonStopAll.BackColor = System.Drawing.SystemColors.Control;
-            this.buttonStopAll.Location = new System.Drawing.Point(958, 378);
+            this.buttonStopAll.Location = new System.Drawing.Point(1206, 554);
             this.buttonStopAll.Name = "buttonStopAll";
             this.buttonStopAll.Size = new System.Drawing.Size(75, 23);
             this.buttonStopAll.TabIndex = 17;
@@ -442,7 +442,7 @@
             // 
             this.btnAddTimer.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.btnAddTimer.BackColor = System.Drawing.SystemColors.Control;
-            this.btnAddTimer.Location = new System.Drawing.Point(1039, 378);
+            this.btnAddTimer.Location = new System.Drawing.Point(1287, 554);
             this.btnAddTimer.Name = "btnAddTimer";
             this.btnAddTimer.Size = new System.Drawing.Size(75, 23);
             this.btnAddTimer.TabIndex = 4;
@@ -454,7 +454,7 @@
             // 
             this.btnDeleteTimer.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
             this.btnDeleteTimer.BackColor = System.Drawing.SystemColors.Control;
-            this.btnDeleteTimer.Location = new System.Drawing.Point(6, 378);
+            this.btnDeleteTimer.Location = new System.Drawing.Point(6, 554);
             this.btnDeleteTimer.Name = "btnDeleteTimer";
             this.btnDeleteTimer.Size = new System.Drawing.Size(75, 23);
             this.btnDeleteTimer.TabIndex = 3;
@@ -474,7 +474,7 @@
             this.grdTimers.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             this.grdTimers.Location = new System.Drawing.Point(6, 6);
             this.grdTimers.Name = "grdTimers";
-            this.grdTimers.Size = new System.Drawing.Size(1108, 366);
+            this.grdTimers.Size = new System.Drawing.Size(1356, 542);
             this.grdTimers.TabIndex = 1;
             this.grdTimers.CellClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.grdTimers_CellClick);
             this.grdTimers.ColumnHeaderMouseClick += new System.Windows.Forms.DataGridViewCellMouseEventHandler(this.grdTimers_ColumnHeaderMouseClick);
@@ -488,14 +488,14 @@
             this.tabCharacters.Location = new System.Drawing.Point(4, 22);
             this.tabCharacters.Name = "tabCharacters";
             this.tabCharacters.Padding = new System.Windows.Forms.Padding(3);
-            this.tabCharacters.Size = new System.Drawing.Size(1120, 407);
+            this.tabCharacters.Size = new System.Drawing.Size(1368, 583);
             this.tabCharacters.TabIndex = 1;
             this.tabCharacters.Text = "Characters";
             // 
             // btnAddCharacter
             // 
             this.btnAddCharacter.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnAddCharacter.Location = new System.Drawing.Point(997, 368);
+            this.btnAddCharacter.Location = new System.Drawing.Point(1245, 544);
             this.btnAddCharacter.Name = "btnAddCharacter";
             this.btnAddCharacter.Size = new System.Drawing.Size(75, 23);
             this.btnAddCharacter.TabIndex = 5;
@@ -506,7 +506,7 @@
             // btnDeleteCharacter
             // 
             this.btnDeleteCharacter.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.btnDeleteCharacter.Location = new System.Drawing.Point(6, 368);
+            this.btnDeleteCharacter.Location = new System.Drawing.Point(6, 544);
             this.btnDeleteCharacter.Name = "btnDeleteCharacter";
             this.btnDeleteCharacter.Size = new System.Drawing.Size(75, 23);
             this.btnDeleteCharacter.TabIndex = 4;
@@ -523,7 +523,7 @@
             this.grdCharacters.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             this.grdCharacters.Location = new System.Drawing.Point(6, 6);
             this.grdCharacters.Name = "grdCharacters";
-            this.grdCharacters.Size = new System.Drawing.Size(1066, 356);
+            this.grdCharacters.Size = new System.Drawing.Size(1314, 532);
             this.grdCharacters.TabIndex = 0;
             // 
             // tabCategories
@@ -535,14 +535,14 @@
             this.tabCategories.Location = new System.Drawing.Point(4, 22);
             this.tabCategories.Name = "tabCategories";
             this.tabCategories.Padding = new System.Windows.Forms.Padding(3);
-            this.tabCategories.Size = new System.Drawing.Size(1120, 407);
+            this.tabCategories.Size = new System.Drawing.Size(1368, 583);
             this.tabCategories.TabIndex = 2;
             this.tabCategories.Text = "Categories";
             // 
             // btnAddCategory
             // 
             this.btnAddCategory.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnAddCategory.Location = new System.Drawing.Point(997, 368);
+            this.btnAddCategory.Location = new System.Drawing.Point(1245, 544);
             this.btnAddCategory.Name = "btnAddCategory";
             this.btnAddCategory.Size = new System.Drawing.Size(75, 23);
             this.btnAddCategory.TabIndex = 6;
@@ -553,7 +553,7 @@
             // btnDeleteCategory
             // 
             this.btnDeleteCategory.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.btnDeleteCategory.Location = new System.Drawing.Point(6, 368);
+            this.btnDeleteCategory.Location = new System.Drawing.Point(6, 544);
             this.btnDeleteCategory.Name = "btnDeleteCategory";
             this.btnDeleteCategory.Size = new System.Drawing.Size(75, 23);
             this.btnDeleteCategory.TabIndex = 5;
@@ -570,7 +570,7 @@
             this.grdCategories.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             this.grdCategories.Location = new System.Drawing.Point(6, 6);
             this.grdCategories.Name = "grdCategories";
-            this.grdCategories.Size = new System.Drawing.Size(1066, 356);
+            this.grdCategories.Size = new System.Drawing.Size(1314, 532);
             this.grdCategories.TabIndex = 1;
             // 
             // tabViews
@@ -582,14 +582,14 @@
             this.tabViews.Location = new System.Drawing.Point(4, 22);
             this.tabViews.Name = "tabViews";
             this.tabViews.Padding = new System.Windows.Forms.Padding(3);
-            this.tabViews.Size = new System.Drawing.Size(1120, 407);
+            this.tabViews.Size = new System.Drawing.Size(1368, 583);
             this.tabViews.TabIndex = 3;
             this.tabViews.Text = "Views";
             // 
             // btnDeleteView
             // 
             this.btnDeleteView.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.btnDeleteView.Location = new System.Drawing.Point(6, 368);
+            this.btnDeleteView.Location = new System.Drawing.Point(6, 544);
             this.btnDeleteView.Name = "btnDeleteView";
             this.btnDeleteView.Size = new System.Drawing.Size(75, 23);
             this.btnDeleteView.TabIndex = 8;
@@ -602,7 +602,7 @@
             // btnAddView
             // 
             this.btnAddView.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnAddView.Location = new System.Drawing.Point(997, 368);
+            this.btnAddView.Location = new System.Drawing.Point(1245, 544);
             this.btnAddView.Name = "btnAddView";
             this.btnAddView.Size = new System.Drawing.Size(75, 23);
             this.btnAddView.TabIndex = 7;
@@ -621,7 +621,7 @@
             this.grdViews.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             this.grdViews.Location = new System.Drawing.Point(6, 6);
             this.grdViews.Name = "grdViews";
-            this.grdViews.Size = new System.Drawing.Size(1066, 356);
+            this.grdViews.Size = new System.Drawing.Size(1314, 532);
             this.grdViews.TabIndex = 2;
             // 
             // tabSettings
@@ -632,7 +632,7 @@
             this.tabSettings.Location = new System.Drawing.Point(4, 22);
             this.tabSettings.Name = "tabSettings";
             this.tabSettings.Padding = new System.Windows.Forms.Padding(3);
-            this.tabSettings.Size = new System.Drawing.Size(1120, 407);
+            this.tabSettings.Size = new System.Drawing.Size(1368, 583);
             this.tabSettings.TabIndex = 4;
             this.tabSettings.Text = "Settings";
             // 
@@ -1006,9 +1006,9 @@
             this.statusTomePath,
             this.statusParsing,
             this.statusTimerStats});
-            this.statusStrip.Location = new System.Drawing.Point(0, 502);
+            this.statusStrip.Location = new System.Drawing.Point(0, 678);
             this.statusStrip.Name = "statusStrip";
-            this.statusStrip.Size = new System.Drawing.Size(1152, 22);
+            this.statusStrip.Size = new System.Drawing.Size(1400, 22);
             this.statusStrip.TabIndex = 20;
             // 
             // statusTomePath
@@ -1037,7 +1037,8 @@
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.SystemColors.Window;
-            this.ClientSize = new System.Drawing.Size(1152, 524);
+            this.ClientSize = new System.Drawing.Size(1400, 700);
+            this.MinimumSize = new System.Drawing.Size(800, 550);
             this.Controls.Add(this.statusStrip);
             this.Controls.Add(this.tabCtrlMain);
             this.Controls.Add(this.toolStrip);

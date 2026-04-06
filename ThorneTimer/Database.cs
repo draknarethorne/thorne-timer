@@ -109,7 +109,7 @@ namespace ThorneTimer
                 cmd.CommandText = "CREATE TABLE categories(ID INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT, StartKeyword TEXT, EndKeyword TEXT, AutoStop INTEGER)";
                 cmd.ExecuteNonQuery();
 
-                cmd.CommandText = "CREATE TABLE settings(ID INTEGER PRIMARY KEY, ActiveCharacterID TEXT, ActiveVoice TEXT, MiniViewFontSize INTEGER, MiniViewWarnFore INTEGER, MiniViewWarnBack INTEGER, MiniViewWarnTime TEXT, MiniViewOpacity INTEGER, VoiceVolume INTEGER, VoiceRate INTEGER, VoiceEnabled INTEGER, MiniViewNormFore INTEGER, MiniViewNormBack INTEGER, MiniViewShowPing INTEGER, MiniViewPingFore INTEGER, MiniViewPingBack INTEGER, MiniViewPingTime TEXT, MiniViewBuffFore INTEGER, MiniViewBuffBack INTEGER)";
+                cmd.CommandText = "CREATE TABLE settings(ID INTEGER PRIMARY KEY, ActiveCharacterID TEXT, ActiveVoice TEXT, MiniViewFontSize INTEGER, MiniViewWarnFore INTEGER, MiniViewWarnBack INTEGER, MiniViewWarnTime TEXT, MiniViewOpacity INTEGER, VoiceVolume INTEGER, VoiceRate INTEGER, VoiceEnabled INTEGER, MiniViewNormFore INTEGER, MiniViewNormBack INTEGER, MiniViewShowPing INTEGER, MiniViewPingFore INTEGER, MiniViewPingBack INTEGER, MiniViewPingTime TEXT, MiniViewBuffFore INTEGER, MiniViewBuffBack INTEGER, ShowAllClasses INTEGER DEFAULT 1, CompactView INTEGER DEFAULT 0, AutoSwitchEnabled INTEGER DEFAULT 1)";
                 cmd.ExecuteNonQuery();
 
                 // Create miniviews table used by the UI
@@ -597,6 +597,61 @@ namespace ThorneTimer
                     cmd.ExecuteNonQuery();
                 }
 
+                // Add toggle-state columns to settings for persistence across sessions
+                if (!isFieldExist(con, "settings", "ShowAllClasses"))
+                {
+                    SQLiteCommand cmd = new SQLiteCommand(con)
+                    {
+                        CommandText = "ALTER TABLE settings ADD ShowAllClasses INTEGER DEFAULT 1"
+                    };
+                    cmd.ExecuteNonQuery();
+                }
+
+                if (!isFieldExist(con, "settings", "CompactView"))
+                {
+                    SQLiteCommand cmd = new SQLiteCommand(con)
+                    {
+                        CommandText = "ALTER TABLE settings ADD CompactView INTEGER DEFAULT 0"
+                    };
+                    cmd.ExecuteNonQuery();
+                }
+
+                if (!isFieldExist(con, "settings", "AutoSwitchEnabled"))
+                {
+                    SQLiteCommand cmd = new SQLiteCommand(con)
+                    {
+                        CommandText = "ALTER TABLE settings ADD AutoSwitchEnabled INTEGER DEFAULT 1"
+                    };
+                    cmd.ExecuteNonQuery();
+                }
+
+                // One-time migration: set Scope='Character' and ClassID on timers whose
+                // category name matches an EQ class name.  Older tomes used categories as
+                // class proxies (e.g. "Necro", "Enchanter") before Scope/ClassID existed.
+                // Categories that don't match a class name are left as World scope.
+                if (!isFieldExist(con, "settings", "CategoryScopeMigrated"))
+                {
+                    SQLiteCommand cmd = new SQLiteCommand(con)
+                    {
+                        CommandText = "ALTER TABLE settings ADD CategoryScopeMigrated INTEGER DEFAULT 0"
+                    };
+                    cmd.ExecuteNonQuery();
+                }
+
+                {
+                    string migrated = GetSetting(con, "CategoryScopeMigrated");
+                    if (migrated == "0" || migrated == "")
+                    {
+                        MigrateCategoryScopesToCharacter(con);
+
+                        SQLiteCommand cmd = new SQLiteCommand(con)
+                        {
+                            CommandText = "UPDATE settings SET CategoryScopeMigrated = 1"
+                        };
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+
                 // Seed default views if miniviews table is empty
                 SeedDefaultViews(con);
             }
@@ -610,6 +665,92 @@ namespace ThorneTimer
         static public SQLiteConnection Connection()
         {
             return Connection(GetDefaultDatabasePath());
+        }
+
+        /// <summary>
+        /// One-time migration: examines each category name and, if it matches (or is
+        /// a recognizable abbreviation of) an EQ class name, sets all timers in that
+        /// category to Scope='Character' and assigns the matching ClassID.
+        /// Non-matching categories (e.g. "Spawn", "Misc") are left as World scope.
+        /// </summary>
+        static private void MigrateCategoryScopesToCharacter(SQLiteConnection con)
+        {
+            // Build a lookup of class names from the classes table
+            // Key = lowercase class name, Value = class ID
+            var classLookup = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+            SQLiteCommand cmd = new SQLiteCommand(con)
+            {
+                CommandText = "SELECT ID, Name FROM classes"
+            };
+            using (SQLiteDataReader rdr = cmd.ExecuteReader())
+            {
+                while (rdr.Read())
+                {
+                    classLookup[rdr.GetString(1)] = rdr.GetInt64(0);
+                }
+            }
+
+            // Read all categories
+            var categoriesToMigrate = new List<Tuple<long, long>>(); // CategoryID, ClassID
+            cmd.CommandText = "SELECT ID, Name FROM categories";
+            using (SQLiteDataReader rdr = cmd.ExecuteReader())
+            {
+                while (rdr.Read())
+                {
+                    long catId = rdr.GetInt64(0);
+                    string catName = rdr.GetString(1).Trim();
+
+                    long matchedClassId = MatchCategoryToClass(catName, classLookup);
+
+                    if (matchedClassId >= 0)
+                    {
+                        categoriesToMigrate.Add(Tuple.Create(catId, matchedClassId));
+                    }
+                }
+            }
+
+            // Update timers in matched categories
+            foreach (var cat in categoriesToMigrate)
+            {
+                cmd.Parameters.Clear();
+                cmd.CommandText = "UPDATE timers SET Scope = 'Character', ClassID = @classId WHERE CategoryID = @catId";
+                cmd.Parameters.AddWithValue("@classId", cat.Item2);
+                cmd.Parameters.AddWithValue("@catId", cat.Item1);
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        /// <summary>
+        /// Tries to match a category name to an EQ class. Handles exact matches,
+        /// abbreviation prefixes ("Necro" → "Necromancer"), and parenthetical
+        /// suffixes ("Enchanter (Pet)" → "Enchanter").
+        /// Returns the matched ClassID, or -1 if no match.
+        /// </summary>
+        static private long MatchCategoryToClass(string catName, Dictionary<string, long> classLookup)
+        {
+            // Exact match
+            if (classLookup.TryGetValue(catName, out long exactId))
+                return exactId;
+
+            // Partial match: category name is a prefix of a class name
+            // e.g. "Necro" → "Necromancer", "Shadow" → "Shadow Knight"
+            foreach (var kvp in classLookup)
+            {
+                if (kvp.Key.StartsWith(catName, StringComparison.OrdinalIgnoreCase))
+                    return kvp.Value;
+            }
+
+            // Strip parenthetical suffix and retry
+            // e.g. "Enchanter (Pet)" → "Enchanter", "Necro (Pet)" → "Necro"
+            int parenIndex = catName.IndexOf('(');
+            if (parenIndex > 0)
+            {
+                string baseName = catName.Substring(0, parenIndex).Trim();
+                if (baseName.Length > 0)
+                    return MatchCategoryToClass(baseName, classLookup);
+            }
+
+            return -1;
         }
 
         /// <summary>
@@ -777,7 +918,8 @@ namespace ThorneTimer
             "MiniViewNormFore", "MiniViewNormBack",
             "MiniViewShowPing", "MiniViewPingFore", "MiniViewPingBack", "MiniViewPingTime",
             "MiniViewBuffFore", "MiniViewBuffBack",
-            "VoiceVolume", "VoiceRate", "VoiceEnabled"
+            "VoiceVolume", "VoiceRate", "VoiceEnabled",
+            "ShowAllClasses", "CompactView", "AutoSwitchEnabled"
         };
 
         static public void SetSetting(SQLiteConnection con, string column, string value)
@@ -1110,7 +1252,7 @@ namespace ThorneTimer
             ComboBoxItem globalData = new ComboBoxItem
             {
                 Value = 0,
-                Text = "Global"
+                Text = "All"
             };
             cboData.Add(globalData);
 

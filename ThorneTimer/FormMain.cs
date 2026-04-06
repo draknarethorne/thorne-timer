@@ -37,6 +37,7 @@ namespace ThorneTimer
                 Properties.Settings.Default.Upgrade();
                 Properties.Settings.Default.NeedsUpgrade = false;
                 Properties.Settings.Default.Save();
+                needsSizeNudge = true;
             }
 
             // Resolve initial database: saved path > default (next to exe)
@@ -51,6 +52,8 @@ namespace ThorneTimer
             AddToRecentDatabases(dbPath);
             UpdateTitleBar(dbPath);
         }
+
+        bool needsSizeNudge = false;
 
         int activeTimers = 0;
         int runningTimers = 0;
@@ -68,6 +71,8 @@ namespace ThorneTimer
 
         const string startWatchingText = "Start Watching";
         const string stopWatchingText = "Stop Watching";
+
+        const int FullViewWidth = 1400;
 
         readonly MiniViews miniViews = new MiniViews();
         readonly TimerRuntime timerRuntime = new TimerRuntime();
@@ -793,6 +798,20 @@ namespace ThorneTimer
                 this.WindowState = Properties.Settings.Default.WindowState;
                 Point loc = Properties.Settings.Default.Location;
                 Size sz = Properties.Settings.Default.Size;
+
+                // One-time nudge on version upgrade: bump saved size up to
+                // the new default so existing users see the improved layout.
+                // Only fires once — after that their chosen size is respected.
+                if (needsSizeNudge)
+                {
+                    bool isCompact = Database.GetSetting(con, "CompactView") == "1";
+                    // Always nudge height; only nudge width for full-view users
+                    // so compact-view users keep their narrower window.
+                    sz = new Size(
+                        isCompact ? sz.Width : Math.Max(sz.Width, FullViewWidth),
+                        Math.Max(sz.Height, 700));
+                }
+
                 this.Location = EnsureVisibleOnScreen(loc, sz);
                 this.Size = sz;
             }
@@ -911,51 +930,25 @@ namespace ThorneTimer
             grdTimers.Columns["DependsOnTimer"].SortMode = DataGridViewColumnSortMode.Automatic;
             grdTimers.Columns["DependsOnDelay"].SortMode = DataGridViewColumnSortMode.NotSortable;
             grdTimers.Columns["StartStop"].SortMode = DataGridViewColumnSortMode.NotSortable;
-
-            RepaintTimerGrid(true);
         }
 
-        private void RepaintTimerGrid(bool changeColor)
+        private void RepaintTimerGrid()
         {
             try
             {
-                // Reset the timer counters
                 activeTimers = 0;
                 runningTimers = 0;
 
                 foreach (DataGridViewRow row in grdTimers.Rows)
                 {
-                    DataGridViewCell ActiveYn = (DataGridViewCell)row.Cells[grdTimers.Columns["ActiveYn"].Index];
-
-                    if (Convert.ToInt32(ActiveYn.Value) == 1)
+                    if (Convert.ToInt32(row.Cells[grdTimers.Columns["ActiveYn"].Index].Value) == 1)
                     {
-                        if (changeColor)
-                        {
-                            DataGridViewButtonCell btnCell = (DataGridViewButtonCell)row.Cells[grdTimers.Columns["StartStop"].Index];
-                            if (Timers.PingTimer((string)btnCell.Value))
-                            {
-                                row.DefaultCellStyle.BackColor = Color.LightGreen;
-                            }
-                            else
-                            {
-                                row.DefaultCellStyle.BackColor = Color.White;
-                            }
-                        }
-
                         activeTimers++;
 
-                        DataGridViewCell cellRemaining = (DataGridViewCell)row.Cells[grdTimers.Columns["Remaining"].Index];
-                        String remainingText = (string)cellRemaining.Value + "";
+                        string remainingText = (string)row.Cells[grdTimers.Columns["Remaining"].Index].Value + "";
                         if (remainingText.Length > 0)
                         {
                             runningTimers++;
-                        }
-                    }
-                    else
-                    {
-                        if (changeColor)
-                        {
-                            row.DefaultCellStyle.BackColor = Color.LightPink;
                         }
                     }
                 }
@@ -1030,6 +1023,8 @@ namespace ThorneTimer
 
             grdTimers.Columns.Add("Name", "Name");
             grdTimers.Columns[2].DataPropertyName = grdTimers.Columns[2].Name;
+            grdTimers.Columns[2].Width = 140;
+            grdTimers.Columns[2].MinimumWidth = 80;
 
             DataGridViewComboBoxColumn cboCategory = new DataGridViewComboBoxColumn
             {
@@ -1043,19 +1038,28 @@ namespace ThorneTimer
                 FlatStyle = FlatStyle.Flat
             };
             grdTimers.Columns.Add(cboCategory);
+            grdTimers.Columns["CategoryID"].Width = 100;
+            grdTimers.Columns["CategoryID"].MinimumWidth = 60;
 
             grdTimers.Columns.Add("StartKeyword", "Start Keyword");
             grdTimers.Columns[4].DataPropertyName = grdTimers.Columns[4].Name;
+            grdTimers.Columns[4].Width = 180;
+            grdTimers.Columns[4].MinimumWidth = 60;
 
             grdTimers.Columns.Add("EndKeyword", "End Keyword");
             grdTimers.Columns[5].DataPropertyName = grdTimers.Columns[5].Name;
+            grdTimers.Columns[5].Width = 120;
+            grdTimers.Columns[5].MinimumWidth = 60;
 
             grdTimers.Columns.Add("WAVFile", "Sound");
             grdTimers.Columns[6].DataPropertyName = grdTimers.Columns[6].Name;
-            grdTimers.Columns[6].Width = 70;
+            grdTimers.Columns[6].Width = 100;
+            grdTimers.Columns[6].MinimumWidth = 60;
 
             grdTimers.Columns.Add("Speech", "Speech");
             grdTimers.Columns[7].DataPropertyName = grdTimers.Columns[7].Name;
+            grdTimers.Columns[7].Width = 100;
+            grdTimers.Columns[7].MinimumWidth = 60;
 
             grdTimers.Columns.Add("Duration", "Duration");
             grdTimers.Columns[8].DataPropertyName = grdTimers.Columns[8].Name;
@@ -1108,7 +1112,7 @@ namespace ThorneTimer
             };
             cboRole.Items.AddRange("Normal", "Buff", "Pet", "Ping");
             grdTimers.Columns.Add(cboRole);
-            grdTimers.Columns["Style"].Width = 85;
+            grdTimers.Columns["Style"].Width = 80;
             grdTimers.Columns["Style"].MinimumWidth = 60;
 
             DataGridViewComboBoxColumn cboClass = new DataGridViewComboBoxColumn
@@ -1123,7 +1127,7 @@ namespace ThorneTimer
                 FlatStyle = FlatStyle.Flat
             };
             grdTimers.Columns.Add(cboClass);
-            grdTimers.Columns["ClassID"].Width = 100;
+            grdTimers.Columns["ClassID"].Width = 90;
             grdTimers.Columns["ClassID"].MinimumWidth = 60;
 
             DataGridViewComboBoxColumn cboScope = new DataGridViewComboBoxColumn
@@ -1135,7 +1139,7 @@ namespace ThorneTimer
             };
             cboScope.Items.AddRange("Character", "World");
             grdTimers.Columns.Add(cboScope);
-            grdTimers.Columns["Scope"].Width = 85;
+            grdTimers.Columns["Scope"].Width = 80;
             grdTimers.Columns["Scope"].MinimumWidth = 60;
 
             grdTimers.Columns.Add("DependsOnTimer", "Depends On");
@@ -1145,7 +1149,7 @@ namespace ThorneTimer
 
             grdTimers.Columns.Add("DependsOnDelay", "Delay (s)");
             grdTimers.Columns["DependsOnDelay"].DataPropertyName = "DependsOnDelay";
-            grdTimers.Columns["DependsOnDelay"].Width = 60;
+            grdTimers.Columns["DependsOnDelay"].Width = 55;
             grdTimers.Columns["DependsOnDelay"].MinimumWidth = 40;
             grdTimers.Columns["DependsOnDelay"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
 
@@ -1446,7 +1450,7 @@ namespace ThorneTimer
                 Database.SaveTimer(con, grdTimers, row);
             }
 
-            RepaintTimerGrid(true);
+            RepaintTimerGrid();
         }
 
         void ValidateRowTimers(object sender, DataGridViewCellCancelEventArgs data)
@@ -1567,7 +1571,12 @@ namespace ThorneTimer
                 object cellValue = grdTimers.Rows[e.RowIndex].Cells[e.ColumnIndex].Value;
                 bool wasActive = cellValue != null && Convert.ToInt32(cellValue) == 1;
                 timerRuntime.SetTimerActive(timerID, !wasActive);
-                RepaintTimerGrid(true);
+                var ts = timerRuntime.GetState(timerID);
+                if (ts != null)
+                {
+                    ApplyTimerRowColor(grdTimers.Rows[e.RowIndex], ts);
+                }
+                RepaintTimerGrid();
             }
             else if (e.ColumnIndex == grdTimers.Columns["StartStop"].Index)
             {
@@ -1748,14 +1757,16 @@ namespace ThorneTimer
         private static readonly string[] CompactHiddenColumns = new[]
         {
             "StartKeyword", "EndKeyword", "WAVFile", "Speech",
-            "CaseYn", "EndlessYn", "Style", "ClassID",
-            "Scope", "DependsOnTimer", "DependsOnDelay", "WAV"
+            "CaseYn", "EndlessYn",
+            "DependsOnTimer", "DependsOnDelay", "WAV"
         };
 
         /// <summary>
         /// Toggles visibility of configuration columns on the timer grid.
         /// Compact mode shows only: Active, Name, Category, Duration,
         /// Remaining, Start/Stop, Count.
+        /// When switching to full view, auto-widens the window if it is
+        /// too narrow for all columns, clamped to the current screen.
         /// </summary>
         private void ApplyCompactView(bool compact)
         {
@@ -1764,6 +1775,22 @@ namespace ThorneTimer
                 if (grdTimers.Columns.Contains(colName))
                 {
                     grdTimers.Columns[colName].Visible = !compact;
+                }
+            }
+
+            // When switching to full view, widen the window if it's too
+            // narrow to show all columns comfortably.
+            if (!compact && this.WindowState == FormWindowState.Normal
+                && this.Width < FullViewWidth)
+            {
+                Screen screen = Screen.FromControl(this);
+                this.Width = Math.Min(FullViewWidth, screen.WorkingArea.Width);
+
+                // Nudge left if the wider window extends past the screen edge
+                if (this.Right > screen.WorkingArea.Right)
+                {
+                    this.Left = Math.Max(screen.WorkingArea.Left,
+                        screen.WorkingArea.Right - this.Width);
                 }
             }
         }
@@ -1792,7 +1819,12 @@ namespace ThorneTimer
             }
 
             long classID = GetActiveCharacterClassID();
-            bool showAll = timerRuntime.ShowAllClasses || classID <= 0;
+            bool showAll = timerRuntime.ShowAllClasses;
+
+            // Detach the current cell before changing row visibility —
+            // WinForms throws InvalidOperationException if you try to
+            // hide the row the CurrencyManager is currently pointing to.
+            grdTimers.CurrentCell = null;
 
             foreach (DataGridViewRow row in grdTimers.Rows)
             {
@@ -1805,7 +1837,20 @@ namespace ThorneTimer
                 else
                 {
                     long timerClassID = Convert.ToInt64(row.Cells[grdTimers.Columns["ClassID"].Index].Value);
-                    row.Visible = (timerClassID == 0 || timerClassID == classID);
+                    // Global timers (ClassID=0) always visible.
+                    // Class-specific timers visible only if they match the active character's class.
+                    // If the character has no class set (classID=0), only global timers are shown.
+                    row.Visible = (timerClassID == 0 || (classID > 0 && timerClassID == classID));
+                }
+            }
+
+            // Restore selection to the first visible row
+            foreach (DataGridViewRow row in grdTimers.Rows)
+            {
+                if (row.Visible && !row.IsNewRow)
+                {
+                    grdTimers.CurrentCell = row.Cells[grdTimers.Columns["Name"].Index];
+                    break;
                 }
             }
         }
@@ -1930,42 +1975,67 @@ namespace ThorneTimer
                 ApplyTimerRowColor(row, ts);
             }
 
-            RepaintTimerGrid(false);
+            RepaintTimerGrid();
             UpdateMiniView();
         }
 
         /// <summary>
-        /// Applies the correct row/cell colors based on timer state.
+        /// Blends a color toward white to produce a soft pastel suitable
+        /// for a grid row background. A blend of 0.0 returns the original
+        /// color; 1.0 returns pure white.
+        /// </summary>
+        private static Color LightenColor(Color source, float blend)
+        {
+            int r = (int)(source.R + (255 - source.R) * blend);
+            int g = (int)(source.G + (255 - source.G) * blend);
+            int b = (int)(source.B + (255 - source.B) * blend);
+            return Color.FromArgb(r, g, b);
+        }
+
+        /// <summary>
+        /// Returns the mini view fore color for the given timer style.
+        /// This ties the main grid's running-row tint to the same colors
+        /// configured in Settings ? Mini View, so changing a style color
+        /// in one place updates both.
+        /// </summary>
+        private Color GetStyleColor(string style)
+        {
+            switch (style)
+            {
+                case "Ping":
+                    return Color.FromArgb(miniViews.mvPingForeColor);
+                case "Buff":
+                case "Pet":
+                    return Color.FromArgb(miniViews.mvBuffForeColor);
+                default:
+                    return Color.FromArgb(miniViews.mvNormForeColor);
+            }
+        }
+
+        /// <summary>
+        /// Applies row colors based on timer state and style.
+        /// Running timers paint the entire row with a lightened version
+        /// of their style color (derived from mini view fore colors),
+        /// with a deeper accent on the Remaining cell.
+        /// Inactive timers get a pink entire row.
         /// </summary>
         private void ApplyTimerRowColor(DataGridViewRow row, TimerState ts)
         {
             DataGridViewCell remainingCell = row.Cells[grdTimers.Columns["Remaining"].Index];
 
-            if (ts.IsRunning)
+            if (Timers.PingTimer(ts.ButtonState) || ts.IsRunning)
             {
-                Color color;
-                switch (ts.Style)
-                {
-                    case "Ping":
-                        color = Color.LightGreen;
-                        row.DefaultCellStyle.BackColor = color;
-                        break;
-                    case "Buff":
-                    case "Pet":
-                        color = Color.Orange;
-                        row.DefaultCellStyle.BackColor = Color.White;
-                        break;
-                    default:
-                        color = Color.Yellow;
-                        row.DefaultCellStyle.BackColor = Color.White;
-                        break;
-                }
-                remainingCell.Style.BackColor = color;
+                Color styleColor = GetStyleColor(ts.Style);
+                Color rowColor = LightenColor(styleColor, 0.75f);
+                Color accentColor = LightenColor(styleColor, 0.50f);
+                row.DefaultCellStyle.BackColor = rowColor;
+                remainingCell.Style.BackColor = accentColor;
             }
             else
             {
-                row.DefaultCellStyle.BackColor = ts.IsActive ? Color.White : Color.LightPink;
-                remainingCell.Style.BackColor = Color.White;
+                Color bgColor = ts.IsActive ? Color.White : Color.LightPink;
+                row.DefaultCellStyle.BackColor = bgColor;
+                remainingCell.Style.BackColor = bgColor;
             }
         }
 
@@ -2015,7 +2085,7 @@ namespace ThorneTimer
                     }
                 }
 
-                RepaintTimerGrid(false);
+                RepaintTimerGrid();
                 UpdateMiniView(false);
             }
             catch
@@ -2067,19 +2137,7 @@ namespace ThorneTimer
                 return;
             }
 
-            // Sync ActiveYn checkboxes from TimerRuntime state
-            var states = timerRuntime.GetAllStates();
-            foreach (DataGridViewRow row in grdTimers.Rows)
-            {
-                long rowID = Convert.ToInt64(row.Cells[grdTimers.Columns["ID"].Index].Value);
-                var ts = states.FirstOrDefault(s => s.TimerID == rowID);
-                if (ts != null)
-                {
-                    DataGridViewCheckBoxCell activeCell = (DataGridViewCheckBoxCell)row.Cells[grdTimers.Columns["ActiveYn"].Index];
-                    activeCell.Value = ts.ActiveYn;
-                }
-            }
-
+            SyncRuntimeToGrid();
             SaveDataTimers();
         }
 
@@ -2510,9 +2568,11 @@ namespace ThorneTimer
 
         private void grdTimers_ColumnHeaderMouseClick(object sender, DataGridViewCellMouseEventArgs e)
         {
-            // TimerRuntime tracks timers by ID, not row index — sorting is safe now
-            RepaintTimerGrid(true);
+            // SyncRuntimeToGrid already repaints colors and updates the status bar
             SyncRuntimeToGrid();
+
+            // Sorting resets row visibility — reapply class filter
+            RefreshTimerGridDataSource();
         }
 
         private void lblBuffPickFore_Click(object sender, EventArgs e)
