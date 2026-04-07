@@ -209,7 +209,8 @@ namespace ThorneTimer
                             break;
                     }
 
-                    if (TimerPlus.GetMilliseconds(md.Remaining) <= TimerPlus.GetMilliseconds(WarnTime))
+                    if (md.TheColor != MiniData.ColorType.Ping
+                        && TimerPlus.GetMilliseconds(md.Remaining) <= TimerPlus.GetMilliseconds(WarnTime))
                     {
                         lblRemaining.BackColor = WarnBackColor;
                         lblRemaining.ForeColor = WarnForeColor;
