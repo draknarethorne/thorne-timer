@@ -10,8 +10,9 @@
 | Priority | Count | Estimated Effort |
 |----------|-------|------------------|
 | 🔴 High | 3 | ~20 hrs |
-| 🟡 Medium | 4 | ~15 hrs |
+| 🟡 Medium | 5 | ~19 hrs |
 | 🟢 Low | 3 | ~5 hrs |
+| ✅ Resolved | 1 | — |
 
 ---
 
@@ -21,7 +22,7 @@
 
 **Location:** `Database.cs`  
 **Risk:** Security — malicious input could corrupt or extract database  
-**Status:** Open
+**Status:** ✅ Resolved (Phase D — all SQL parameterized)
 
 **Examples:**
 ```csharp
@@ -184,6 +185,38 @@ if (!int.TryParse(ID, out int idValue)) return;  // Silent failure
 **Risk:** Readability — hard to understand intent  
 **Status:** Open
 
+---
+
+### TD-011: Ping Execution Model — Hardcoded Special Cases
+
+**Location:** `TimerRuntime.cs`, `MiniViews.cs`, `MiniView.cs`, `Timers.cs`  
+**Risk:** Maintainability — 6 hardcoded `if (Ping)` branches scattered across the codebase  
+**Status:** Open (interim fixes applied, full resolution in Phase B)
+
+**Current special cases:**
+
+| Branch | Location | Purpose |
+|--------|----------|--------|
+| Speech on start | `StartTimerInternal()` | `if (Ping) FireSoundRequested()` |
+| Skip speech on expiry | `OnTimerExpired()` | `if (type != Ping)` |
+| Not "running" | `Timers.TimerRunning()` | Excludes `btnPing` from running checks |
+| Mini view visibility | `ShowMiniTimer()` | Separate `PingTimer() && ShowPing()` |
+| Mini view data | `GetMiniViewData()` | Separate `btnPing` check alongside `IsRunning` |
+| Warning colors | `MiniView.cs` LoadData | `if (type != Ping)` skip warning |
+
+**Root cause:** Speech trigger direction (start vs. end) is encoded as a Style distinction rather than a timer attribute.
+
+**Fix:** Directional speech fields (`StartSpeech`/`EndSpeech`, `StartWAV`/`EndWAV`) + `ShowWarning` on styles table. See `architecture-redesign.md` Section 9 for full analysis.
+
+**Interim fixes applied:**
+- ✅ Warning colors skipped for Ping (commit `da28949`)
+- ✅ `GetMiniViewData()` includes Ping timers (commit `807093b`)
+- ✅ Style sync from grid to runtime (commit `807093b`)
+- ✅ Migration sets `Style='Pet'` for `(Pet)` categories (commit `703aad5`)
+
+**Effort:** 4 hours (part of Phase B Styles work)  
+**Priority:** Medium — interim fixes are stable; full resolution aligns with Styles refactor
+
 **Examples:**
 ```csharp
 // View positions
@@ -302,7 +335,7 @@ void grdTimers_CurrentCellDirtyStateChanged(object sender, EventArgs e)
 
 | ID | Status | Resolved Date | Notes |
 |----|--------|---------------|-------|
-| TD-001 | Open | — | |
+| TD-001 | ✅ Resolved | 2026-04-05 | All SQL parameterized (Phase D) |
 | TD-002 | Open | — | Partial with Active Views |
 | TD-003 | In Progress | — | Active Views feature |
 | TD-004 | Planned | — | |
@@ -312,6 +345,7 @@ void grdTimers_CurrentCellDirtyStateChanged(object sender, EventArgs e)
 | TD-008 | Open | — | |
 | TD-009 | Open | — | |
 | TD-010 | Open | — | |
+| TD-011 | Open | — | Ping special cases — interim fixes applied, full fix in Phase B |
 
 ---
 

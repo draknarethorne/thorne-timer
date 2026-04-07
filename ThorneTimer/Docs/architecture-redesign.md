@@ -149,16 +149,19 @@ CREATE TABLE styles (
     WarnForeColor INTEGER,
     WarnBackColor INTEGER,
     WarnTime TEXT DEFAULT '00:30',
-    PingForeColor INTEGER,
-    PingBackColor INTEGER,
-    PingTime TEXT DEFAULT '00:30',
-    ShowPing INTEGER DEFAULT 1,
+    ShowWarning INTEGER DEFAULT 1,  -- 0 = never show warning colors (e.g. Ping)
     Opacity INTEGER DEFAULT 100,
     FontSize INTEGER DEFAULT 8
 )
 ```
 
-Seed rows: `Normal`, `Buff`, `Pet`, `Ping` (migrated from current `settings` table values). Users can add custom styles like "EQ Dark Theme" or "Raid Mode".
+Seed rows: `Normal`, `Buff`, `Pet`, `Ping` (migrated from current `settings` table values). The `Ping` style seeds with `ShowWarning = 0`. Users can add custom styles like "EQ Dark Theme" or "Raid Mode".
+
+**Design notes:**
+
+- `ShowWarning` replaces the current hardcoded `if (type != Ping)` check in `MiniView.cs`. Each style decides whether warning colors apply when the timer nears expiry. This makes Ping's "no warning" behavior a style attribute rather than a code branch.
+- The old `PingForeColor`, `PingBackColor`, `PingTime`, and `ShowPing` settings are no longer per-style fields — they were artifacts of Ping being a special case. In the new model, Ping is just a style with its own `ForeColor`/`BackColor` and `ShowWarning = 0`.
+- The `ShowPing` visibility toggle (whether Ping timers appear at all) moves to the View level — a Ping view can be activated/deactivated like any other view.
 
 **Impact on Views:** The `miniviews` table's existing `StyleFilter` column becomes a foreign key to `styles.Name`. When a View is linked to a Style, it inherits that style's colors, opacity, and font size. This replaces the current global color settings entirely.
 
@@ -410,14 +413,29 @@ The Timers dialog replaces the current Timers tab for all CRUD operations. This 
 │  End Keyword:    [                           ]       │
 │  Duration:       [00:00:18                   ]       │
 │                                                      │
-│  Sound File:     [spell_dot.wav       ] [Browse]     │
-│  Speech:         [Torpor fading               ]      │
+│  ── Sound / Speech ──────────────────────────────    │
+│  Start WAV:      [                    ] [Browse]     │
+│  Start Speech:   [                           ]       │
+│  End WAV:        [spell_dot.wav       ] [Browse]     │
+│  End Speech:     [Torpor fading               ]      │
 │                                                      │
 │  [☑] Active    [☐] Case Sensitive    [☐] Loop        │
 │                                                      │
 │                           [Save]    [Cancel]         │
 └──────────────────────────────────────────────────────┘
 ```
+
+**Sound/Speech directionality:** Timers have two sound trigger points — **start** (when the timer begins counting) and **end** (when the timer expires). Each can independently have a WAV file and/or speech text. This replaces the current single `Speech` + `WAVFile` fields and eliminates the Ping special-case execution model (see Section 10).
+
+**Examples:**
+
+| Timer | Start Speech | End Speech | Behavior |
+|-------|-------------|------------|----------|
+| Torpor (Normal) | *(empty)* | Torpor fading | Speaks on expiry — standard timer |
+| Darkness (Ping) | Darkness | *(empty)* | Speaks immediately — alert/ping |
+| KEI (Buff) | Buff cast | Rebuff now | Speaks on both — new capability |
+
+**Migration:** Existing `Speech`/`WAVFile` map to `EndSpeech`/`EndWAV` for all styles except Ping, which maps to `StartSpeech`/`StartWAV` (matching current behavior).
 
 **Cross-dialog shortcuts:** The `[+]` buttons next to Category and Style dropdowns open their respective management dialog inline, so you can add a new category or style without leaving the timer editor. This keeps the workflow smooth — you don't have to close, go to Edit menu, create the entity, then come back.
 
@@ -657,22 +675,38 @@ The Timers dialog replaces the current Timers tab for all CRUD operations. This 
 
 **Risk:** Low. Voice settings are independent. MiniView settings can move to Settings dialog as an interim step.
 
-### Phase B: Styles Entity
+### Phase B: Styles Entity + Directional Speech
 
 **Status: Not started**
 
-**Goal:** Replace hardcoded color/appearance settings with a dynamic `styles` table
+**Goal:** Replace hardcoded color/appearance settings with a dynamic `styles` table; replace single Speech/WAVFile with directional Start/End pairs to eliminate Ping special-casing
 
-1. Create `styles` table schema and `Database` migration
-2. Seed default styles from current `settings` table values
-3. Create `Styles.cs` model class
-4. Create `FormManageStyles` dialog
-5. Add `Edit > Styles...` menu item
-6. Update `MiniViews.cs` to load appearance from `styles` table instead of `mv*` fields
-7. Update `miniviews.StyleFilter` to reference styles by name
-8. Remove MiniView appearance section from Settings dialog (it now lives in Styles)
-9. Remove `mv*` color/opacity/font fields from `MiniViews.cs`
-10. Keep `settings` table columns for backward compat but stop reading them
+**Styles table:**
+
+1. Create `styles` table schema with `ShowWarning` attribute (see Section 2.3)
+2. Seed default styles: Normal, Buff, Pet, Ping (Ping seeds with `ShowWarning = 0`)
+3. Migrate current `settings` table `mv*` values into seed rows
+4. Create `Styles.cs` model class
+5. Create `FormManageStyles` dialog
+6. Add `Edit > Styles...` menu item
+7. Update `MiniViews.cs` to load appearance from `styles` table instead of `mv*` fields
+8. Update `MiniView.cs` to use style's `ShowWarning` instead of hardcoded Ping check
+9. Update `miniviews.StyleFilter` to reference styles by name
+10. Remove MiniView appearance section from Settings dialog (it now lives in Styles)
+11. Remove `mv*` color/opacity/font fields from `MiniViews.cs`
+12. Keep `settings` table columns for backward compat but stop reading them
+
+**Directional speech (can be Phase B or deferred to Phase E with Timer Editor):**
+
+13. Add `StartSpeech`, `StartWAV` columns to `timers` table; rename `Speech` → `EndSpeech`, `WAVFile` → `EndWAV`
+14. Migrate: Ping timers → `StartSpeech`/`StartWAV`; all others → `EndSpeech`/`EndWAV`
+15. Simplify `StartTimerInternal` — fire start sound if `StartSpeech`/`StartWAV` populated (no Ping check)
+16. Simplify `OnTimerExpired` — fire end sound if `EndSpeech`/`EndWAV` populated (no Ping check)
+17. Evaluate whether `btnPing` ButtonState can merge with `btnStop` (Ping visual differences handled by Style)
+18. Remove `Timers.PingTimer()`, `Timers.TimerRunning()` Ping exclusion, `ShowMiniTimer()` Ping branch
+19. Update grid columns, `SyncTimerFieldsFromGrid`, `SaveTimer`, `LoadTimers` for new field names
+
+**See Section 9 for detailed analysis of current Ping technical debt and resolution approach.**
 
 ### Phase C: Classes Entity
 
@@ -821,7 +855,66 @@ Old columns in `settings` table (`MiniViewNormFore`, `MiniViewWarnBack`, etc.) s
 
 ---
 
-## 9. New Files — Complete Inventory
+## 9. Ping Execution Model — Technical Debt
+
+### Current State (v0.5.0)
+
+Ping timers have a fundamentally different execution model from Normal/Buff/Pet timers, implemented as hardcoded special cases throughout the codebase:
+
+| Branch Point | Location | What It Does |
+|-------------|----------|-------------|
+| Speech on start | `TimerRuntime.StartTimerInternal()` | `if (Ping) FireSoundRequested(ts)` — plays speech immediately when timer starts |
+| Skip speech on expiry | `TimerRuntime.OnTimerExpired()` | `if (type != Ping)` — suppresses end-of-timer speech for Ping |
+| Not "running" | `Timers.TimerRunning()` | Returns false for `btnPing` — Ping timers excluded from running-timer checks |
+| Mini view visibility | `MiniViews.ShowMiniTimer()` | Separate `Timers.PingTimer() && ShowPing()` check alongside `TimerRunning()` |
+| Mini view data | `TimerRuntime.GetMiniViewData()` | Separate `ts.ButtonState == btnPing` check alongside `ts.IsRunning` |
+| Warning colors | `MiniView.cs` LoadData | `if (type != Ping)` — skips warning coloration for Ping timers |
+
+**The underlying concept:** The only behavioral difference is *when* speech fires — **on start** (Ping) vs. **on expiry** (everything else). This is currently encoded as a style distinction, but it's really a timer attribute.
+
+### Resolution — Directional Speech (Phase B/E)
+
+Replace the single `Speech` and `WAVFile` fields with directional pairs:
+
+```sql
+ALTER TABLE timers ADD StartSpeech TEXT DEFAULT '';
+ALTER TABLE timers ADD StartWAV TEXT DEFAULT '';
+ALTER TABLE timers RENAME COLUMN Speech TO EndSpeech;   -- or migrate with new columns
+ALTER TABLE timers RENAME COLUMN WAVFile TO EndWAV;
+```
+
+**Migration:**
+- For timers where `Style != 'Ping'`: `Speech` → `EndSpeech`, `WAVFile` → `EndWAV` (current behavior preserved)
+- For timers where `Style == 'Ping'`: `Speech` → `StartSpeech`, `WAVFile` → `StartWAV` (matches current Ping-fires-on-start behavior)
+
+**Code simplification:** After migration, the timer engine becomes style-agnostic for sound:
+
+```csharp
+// StartTimerInternal — no more if(Ping) check
+if (!string.IsNullOrEmpty(ts.StartSpeech) || !string.IsNullOrEmpty(ts.StartWAV))
+    FireSoundRequested(ts.StartSpeech, ts.StartWAV);
+
+// OnTimerExpired — no more if(type != Ping) check
+if (!string.IsNullOrEmpty(ts.EndSpeech) || !string.IsNullOrEmpty(ts.EndWAV))
+    FireSoundRequested(ts.EndSpeech, ts.EndWAV);
+```
+
+**Warning colors** become a style attribute (`ShowWarning` on the `styles` table) rather than a hardcoded Ping exclusion.
+
+**"Running" state** simplification: With `ShowWarning` on the style and speech directionality on the timer, there's less reason for Ping to have a separate `btnPing` ButtonState. Ping could use the same `btnStop` state as Normal timers, with the visual differences handled entirely by the Style. This would eliminate the `TimerRunning()` / `PingTimer()` / `ShowMiniTimer()` branching. (Evaluate during Phase B — may require careful testing of the countdown display behavior.)
+
+### Interim Fixes Already Applied
+
+- ✅ `GetMiniViewData()` includes Ping timers (`|| ts.ButtonState == btnPing`) — commit `807093b`
+- ✅ `SyncTimerFieldsFromGrid()` syncs Style changes to runtime — commit `807093b`
+- ✅ Warning colors skipped for Ping in mini view — commit `da28949`
+- ✅ Migration sets `Style='Pet'` for `(Pet)` categories — commit `703aad5`
+
+These are correct interim fixes. They'll dissolve naturally when Styles (Phase B) and directional speech (Phase B/E) are implemented.
+
+---
+
+## 10. New Files — Complete Inventory
 
 ### `TimerRuntime.cs` — Timer Model Layer
 
