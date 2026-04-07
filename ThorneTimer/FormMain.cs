@@ -1478,6 +1478,7 @@ namespace ThorneTimer
                 Database.SaveTimer(con, grdTimers, row);
             }
 
+            timerRuntime.SyncTimerFieldsFromGrid(grdTimers);
             RepaintTimerGrid();
         }
 

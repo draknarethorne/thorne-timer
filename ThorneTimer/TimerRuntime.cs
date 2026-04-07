@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Windows.Forms;
 
 namespace ThorneTimer
 {
@@ -556,6 +557,40 @@ namespace ThorneTimer
         }
 
         /// <summary>
+        /// Sync editable fields (Name, Style, Keywords, etc.) from the grid
+        /// back to TimerRuntime without disturbing runtime state (ButtonState,
+        /// Count, Remaining, running timers).
+        /// </summary>
+        public void SyncTimerFieldsFromGrid(DataGridView grid)
+        {
+            lock (syncLock)
+            {
+                foreach (DataGridViewRow row in grid.Rows)
+                {
+                    long rowID = Convert.ToInt64(row.Cells[grid.Columns["ID"].Index].Value);
+                    var ts = timerStates.FirstOrDefault(t => t.TimerID == rowID);
+                    if (ts == null) continue;
+
+                    ts.Name = Convert.ToString(row.Cells[grid.Columns["Name"].Index].Value) ?? "";
+                    ts.Style = Convert.ToString(row.Cells[grid.Columns["Style"].Index].Value) ?? "Normal";
+                    ts.StartKeyword = Convert.ToString(row.Cells[grid.Columns["StartKeyword"].Index].Value) ?? "";
+                    ts.EndKeyword = Convert.ToString(row.Cells[grid.Columns["EndKeyword"].Index].Value) ?? "";
+                    ts.WAVFile = Convert.ToString(row.Cells[grid.Columns["WAVFile"].Index].Value) ?? "";
+                    ts.Speech = Convert.ToString(row.Cells[grid.Columns["Speech"].Index].Value) ?? "";
+                    ts.Duration = Convert.ToString(row.Cells[grid.Columns["Duration"].Index].Value) ?? "00:00:00";
+                    ts.CaseYn = Convert.ToInt64(row.Cells[grid.Columns["CaseYn"].Index].Value ?? 0);
+                    ts.EndlessYn = Convert.ToInt64(row.Cells[grid.Columns["EndlessYn"].Index].Value ?? 0);
+                    ts.DependsOnTimer = Convert.ToString(row.Cells[grid.Columns["DependsOnTimer"].Index].Value) ?? "";
+
+                    object delayVal = row.Cells[grid.Columns["DependsOnDelay"].Index].Value;
+                    long delay;
+                    long.TryParse(Convert.ToString(delayVal), out delay);
+                    ts.DependsOnDelay = delay;
+                }
+            }
+        }
+
+        /// <summary>
         /// Reset all timer counts.
         /// </summary>
         public void ResetCounts()
@@ -579,7 +614,7 @@ namespace ThorneTimer
                 var data = new List<MiniTimerData>();
                 foreach (var ts in timerStates)
                 {
-                    if (ts.IsRunning)
+                    if (ts.IsRunning || ts.ButtonState == Timers.btnPing)
                     {
                         data.Add(new MiniTimerData
                         {
