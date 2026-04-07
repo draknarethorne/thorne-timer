@@ -2,38 +2,75 @@
 
 ## 1. Current State Assessment
 
-The main form (`FormMain.cs`, ~2,483 lines) is currently doing *everything*: timer runtime logic, settings management, character/category/view CRUD, log parsing, voice synthesis, mini view management. Five tabs compete for attention and entity management uses inline-editable `DataGridView` grids where accidental edits are easy to make.
+The main form (`FormMain.cs`, ~2,244 lines) still manages timer runtime, settings, character/category/view CRUD, log parsing, voice synthesis, and mini view coordination. Five tabs remain, though significant runtime logic has been extracted to `TimerRuntime.cs`. Entity editing is still inline via `DataGridView` grids.
 
-**Current main form layout:**
+**Current main form layout (as of v0.5.0):**
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│ Menu: File | View | Watch | Help                         │
-├──────────────────────────────────────────────────────────┤
-│ Toolbar: [Character ▼] | [▶ Start Watching] | [⊞ Views] │
-├──────────────────────────────────────────────────────────┤
-│ Tabs: Timers | Characters | Categories | Views | Settings│
-│ ┌──────────────────────────────────────────────────────┐ │
-│ │                                                      │ │
-│ │  (grid + buttons per tab)                            │ │
-│ │  Settings tab: Voice Options group + MiniView group  │ │
-│ │                                                      │ │
-│ └──────────────────────────────────────────────────────┘ │
-├──────────────────────────────────────────────────────────┤
-│ Status: [Tome path] | [Watching: file] | [Timer stats]  │
-└──────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│ Menu: File | View | Watch | Help                                   │
+├────────────────────────────────────────────────────────────────────┤
+│ Toolbar: [Character ▼] | [▶ Watch] | [⊞ Views] | [⇄ Auto Switch] │
+│          [👁 All Classes] | [◫ Compact View]                       │
+├────────────────────────────────────────────────────────────────────┤
+│ Tabs: Timers | Characters | Categories | Views | Settings          │
+│ ┌────────────────────────────────────────────────────────────────┐ │
+│ │ Timer grid: Active, Name, Count, Category, Style, Class,      │ │
+│ │   Scope, StartKeyword, EndKeyword, Play, Sound, Speech,       │ │
+│ │   Duration, Remaining, Case, Loop, DependsOn, Delay,          │ │
+│ │   Start/Stop   (22 columns total, 9 hidden in compact mode)   │ │
+│ │                                                                │ │
+│ │ Row painting: style-driven colors (lightened style color for   │ │
+│ │   running timers, pink for inactive, accent on Remaining cell) │ │
+│ └────────────────────────────────────────────────────────────────┘ │
+├────────────────────────────────────────────────────────────────────┤
+│ Status: [Tome path] | [Watching: file] | [X/Y  Active: A  Run: R] │
+└────────────────────────────────────────────────────────────────────┘
 ```
 
-**Pain points:**
+**Menu structure (current):**
 
-- Settings tab is a flat collection of 30+ controls jammed into two group boxes
-- All entity editing is inline — easy to accidentally modify data
-- Characters, Categories, Views tabs clutter the main form when you're focused on timers
-- No concept of "Styles" as a first-class entity — colors are hardcoded per type
-- No concept of "Classes" — no way to filter timers by character class
-- `FormMain.cs` is a monolith that's hard to maintain
-- **Timer runtime state is coupled directly to grid cells** — `ProcessLogText` reads `StartKeyword`/`EndKeyword` from `DataGridViewCell` objects, `TimerElapsed`/`TimerExpired` write remaining time back into cells, `TimerPlus.RowIndex` identifies timers by grid row position (breaks on sort/filter), and `UpdateMiniTimers` iterates grid rows to build mini view data. There is no separate data model.
-- **Category auto-activation reads from the categories grid** — `ProcessLogText` iterates `grdCategories.Rows` to check zone keywords, tightly coupling log parsing to a UI control that should just be data
+```
+File                View                Watch              Help
+├─ New Tome...      ├─ Compact View     ├─ Start/Stop      ├─ About
+├─ Open Tome...     └─ Mini Views       │  Watching
+├─ Save Tome As...                      ├─ Auto-Switch
+├─ ──────────────                       │  Character
+├─ Open Recent  ▸                       └─ Show All
+├─ ──────────────                          Classes
+└─ Exit
+```
+
+**Toolbar (current):**
+
+| Button | Type | Purpose |
+|--------|------|---------|
+| `tscActiveCharacter` | ComboBox | Active character selection |
+| `tsbStartStopWatching` | Toggle | Start/stop log file watching |
+| `tsbMiniViews` | Toggle | Show/hide floating mini views |
+| `tsbAutoSwitch` | Toggle | Auto-switch character on log activity |
+| `tsbShowAllClasses` | Toggle | Show all timers vs. filter by active character's class |
+| `tsbCompactView` | Toggle | Compact view (hides config columns, narrows window) |
+
+**Window dimensions:** ClientSize=1400×700, MinimumSize=800×550. Compact view saves/restores per-mode widths via `CompactWidth`/`FullWidth` DB settings.
+
+**What's been resolved since initial assessment:**
+
+- ✅ Timer runtime decoupled from grid → `TimerRuntime.cs` with `TimerState` model
+- ✅ Classes entity exists → `classes` table, `ClassID` on timers/characters, grid filtering
+- ✅ Timer identification stable → `TimerPlus.TimerID` replaces `RowIndex`
+- ✅ Mini views use `TimerRuntime.GetMiniViewData()` instead of walking grid rows
+- ✅ All SQL parameterized (no injection)
+- ✅ `DependsOnTimer`/`DependsOnDelay` extracted from EndKeyword hack
+
+**Remaining pain points:**
+
+- Settings tab is still a flat collection of controls in two group boxes
+- All entity editing is still inline — easy to accidentally modify data
+- Characters, Categories, Views tabs still clutter the main form
+- Styles are not a first-class entity — colors are hardcoded per type in settings table
+- Category auto-activation still reads from `grdCategories.Rows` (deferred to Phase E)
+- Ping timer execution model has 6 hardcoded special cases (see Section 9)
 
 ---
 
@@ -44,11 +81,12 @@ The main form (`FormMain.cs`, ~2,483 lines) is currently doing *everything*: tim
 The main form becomes a **runtime-only timer dashboard**. No tabs. No entity management. The full window is dedicated to monitoring and controlling timers for the active character. All setup — creating, editing, and deleting timers — happens through dialogs opened from the Edit menu, consistent with every other entity.
 
 ```
-┌───────────────────────────────────────────────────────────────┐
-│ Menu: File | Edit | View | Watch | Help                       │
-├───────────────────────────────────────────────────────────────┤
-│ Toolbar: [Character ▼] | [▶ Start Watching] | [⊞ Views]      │
-├───────────────────────────────────────────────────────────────┤
+┌────────────────────────────────────────────────────────────────────┐
+│ Menu: File | Edit | View | Watch | Help                            │
+├────────────────────────────────────────────────────────────────────┤
+│ Toolbar: [Character ▼] | [▶ Watch] | [⊞ Views] | [⇄ Auto Switch] │
+│          [👁 All Classes] | [◫ Compact View]                      │
+├────────────────────────────────────────────────────────────────────┤
 │                                                               │
 │  ┌─────┬────────┬──────────┬────────┬──────┬─────┬──────────┐ │
 │  │Act. │ Name   │ Category │ Style  │ Dur. │ Rem │ Start/   │ │
@@ -82,15 +120,15 @@ The main form becomes a **runtime-only timer dashboard**. No tabs. No entity man
 ### 2.2 Menu Restructure
 
 ```
-File                Edit                  View               Watch         Help
-├─ New Tome...      ├─ Timers...          ├─ Mini Views      ├─ Start/     ├─ About
-├─ Open Tome...     ├─ Characters...      │                  │  Stop
-├─ Save Tome As...  ├─ Categories...      │                  │  Watching
-├─ ─────────────    ├─ Classes...         │                  │
-├─ Open Recent  ▸   ├─ Views...           │                  │
-├─ ─────────────    ├─ Styles...          │                  │
-└─ Exit             ├─ ─────────────      │                  │
-                    └─ Settings...        │                  │
+File                Edit                  View               Watch              Help
+├─ New Tome...      ├─ Timers...          ├─ Compact View     ├─ Start/Stop      ├─ About
+├─ Open Tome...     ├─ Characters...      └─ Mini Views       │  Watching
+├─ Save Tome As...  ├─ Categories...                         ├─ Auto-Switch
+├─ ─────────────    ├─ Classes...                            │  Character
+├─ Open Recent  ▸   ├─ Views...                              └─ Show All
+├─ ─────────────    ├─ Styles...                                Classes
+└─ Exit             ├─ ─────────────
+                    └─ Settings...
 ```
 
 **Rationale:**
@@ -132,8 +170,7 @@ A Style is a named visual theme that can be associated with a View. Instead of h
 │  Back:     [■] ← click to pick      Font:    [===10===]    │
 │                                                             │
 │  Warn Fore: [■]   Warn Back: [■]    Warn Time: [00:30]     │
-│  Ping Fore: [■]   Ping Back: [■]    Ping Time: [00:30]     │
-│  Show Ping: [☑]                                             │
+│  Show Warning: [☑]   (uncheck to suppress warning colors)   │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -286,6 +323,9 @@ Both features work together: a timer can be scoped to a Class *and* belong to a 
 │    GetVisibleTimers(classID) ── filtered for grid        │
 │    GetMiniViewData(styleFilter) ── filtered for views   │
 │    ResetCounts()                                        │
+│    SaveCharacterState(con, charID)                       │
+│    RestoreCharacterState(con, charID)                    │
+│    SyncTimerFieldsFromGrid(timers)                       │
 │                                                         │
 │  Events:                                                │
 │    TimerStateChanged    ── grid refreshes                │
@@ -331,12 +371,17 @@ class TimerState
     public long CaseYn;
     public long EndlessYn;
     public string Style;           // "Normal", "Buff", "Pet", "Ping"
+    public string Scope;           // "Character" or "World" (default)
+    public long DependsOnTimer;    // ID of timer that triggers this one
+    public long DependsOnDelay;    // seconds to wait after trigger
 
-    // ── Runtime state (not persisted) ──
+    // ── Runtime state (not persisted — or saved to timer_runtime_state) ──
     public string Remaining;       // "00:00:42" — updated by timer tick
     public string ButtonState;     // "Start", "Stop", "Buff", "Pet", "Ping"
     public int Count;              // trigger count for current session
     public TimerPlus RunningTimer; // null when stopped
+    public bool IsRunning;         // convenience: RunningTimer != null
+    public bool IsActive;          // mirrors ActiveYn for runtime toggling
 }
 ```
 
@@ -344,9 +389,12 @@ class TimerState
 
 - Grid setup and refresh (subscribes to `TimerRuntime.TimerStateChanged`)
 - Voice synthesis (subscribes to `TimerRuntime.TimerSoundRequested`)
-- Menu and toolbar handling
+- Menu and toolbar handling (compact view, auto-switch, show-all-classes toggles)
 - Mini view coordination (calls `TimerRuntime.GetMiniViewData()`)
-- Character switching (calls `TimerRuntime.GetVisibleTimers(classID)`)
+- Character switching (auto and manual — calls `TimerRuntime.GetVisibleTimers(classID)`)
+- Row painting (style-driven colors via `ApplyTimerRowColor`)
+- Compact view toggling (column visibility, window width save/restore)
+- Column width persistence (`SaveColumnWidths`/`LoadColumnWidths`)
 
 **What moves out of `FormMain` into `TimerRuntime`:**
 
@@ -594,13 +642,13 @@ The Timers dialog replaces the current Timers tab for all CRUD operations. This 
               └─▶│   Views    │──▶│   Styles   │
                  │ StyleFilter│   │ ForeColor  │
                  │ ActiveYn   │   │ BackColor  │
-                 └──────┬─────┘   │ Opacity    │
-                        │         │ FontSize   │
-                        ▼         │ WarnFore   │
-                 ┌────────────┐   │ WarnBack   │
-                 │ Mini Views │◀──│ PingFore   │
-                 │  (forms)   │   │ ...        │
-                 └────────────┘   └────────────┘
+                 └──────┬─────┘   │ WarnFore   │
+                        │         │ WarnBack   │
+                        ▼         │ ShowWarning│
+                 ┌────────────┐   │ Opacity    │
+                 │ Mini Views │◀──│ FontSize   │
+                 │  (forms)   │   └────────────┘
+                 └────────────┘
 ```
 
 **Timer runtime flow:**
@@ -621,37 +669,50 @@ The Timers dialog replaces the current Timers tab for all CRUD operations. This 
 
 ### New files to create
 
-| File | Purpose |
-|------|---------|
-| `TimerRuntime.cs` | In-memory timer model: `TimerState`, `CategoryState`, runtime logic, events |
-| `FormSettings.cs` / `.Designer.cs` | Settings dialog (voice options + general prefs) |
-| `FormManageTimers.cs` / `.Designer.cs` | Timer management dialog (grid + Add/Edit/Delete) |
-| `FormEditTimer.cs` / `.Designer.cs` | Single-timer editor dialog (all fields in a form layout) |
-| `FormManageCharacters.cs` / `.Designer.cs` | Character management dialog |
-| `FormManageCategories.cs` / `.Designer.cs` | Category management dialog |
-| `FormManageClasses.cs` / `.Designer.cs` | Class management dialog |
-| `FormManageViews.cs` / `.Designer.cs` | View management dialog |
-| `FormManageStyles.cs` / `.Designer.cs` | Style management dialog |
-| `Styles.cs` | `Styles.GridData` model class |
-| `Classes.cs` | `Classes.GridData` model class |
+| File | Purpose | Status |
+|------|---------|--------|
+| `TimerRuntime.cs` | In-memory timer model: `TimerState`, `CategoryState`, runtime logic, events | ✅ Created |
+| `LogMonitor.cs` | Multi-file log polling, `CharacterSwitched` event | ✅ Created |
+| `FormSettings.cs` / `.Designer.cs` | Settings dialog (voice options + general prefs) | Phase A |
+| `FormManageTimers.cs` / `.Designer.cs` | Timer management dialog (grid + Add/Edit/Delete) | Phase E |
+| `FormEditTimer.cs` / `.Designer.cs` | Single-timer editor dialog (all fields in a form layout) | Phase E |
+| `FormManageCharacters.cs` / `.Designer.cs` | Character management dialog | Phase E |
+| `FormManageCategories.cs` / `.Designer.cs` | Category management dialog | Phase E |
+| `FormManageClasses.cs` / `.Designer.cs` | Class management dialog | Phase E |
+| `FormManageViews.cs` / `.Designer.cs` | View management dialog | Phase E |
+| `FormManageStyles.cs` / `.Designer.cs` | Style management dialog | Phase B |
+| `Styles.cs` | `Styles.GridData` model class | Phase B |
 
-### Files to modify
+### Files already modified (Phase D and QOL work)
 
-| File | Changes |
-|------|---------|
-| `FormMain.cs` | Remove tabs, remove all entity grids, remove settings controls, add Edit menu, replace grid-coupled runtime with `TimerRuntime` subscription, make timer grid read-only |
-| `FormMain.Designer.cs` | Remove TabControl and all child controls, simplify to single timer grid + runtime buttons |
-| `Database.cs` | Add `styles` and `classes` tables, schema migrations, CRUD methods for new entities, add ClassID columns to timers/characters |
-| `MiniViews.cs` | Replace grid-walking with `TimerRuntime.GetMiniViewData()`, load style colors from `styles` table instead of `mv*` fields |
-| `TimerPlus.cs` | Change `RowIndex` to `TimerID` (stable identity instead of fragile grid position) |
-| `Timers.cs` | Add `ClassID` to `GridData` |
-| `Characters.cs` | Add `ClassID` to `GridData` |
+| File | Changes Already Made |
+|------|---------------------|
+| `TimerRuntime.cs` | ✅ `TimerState`/`CategoryState` classes, `LoadTimers()`/`LoadCategories()`, `ProcessLogText()`, `StartTimer()`/`StopTimer()`, `SaveCharacterState()`/`RestoreCharacterState()`, `GetMiniViewData()` (includes Ping), `SyncTimerFieldsFromGrid()`, `GetVisibleTimers()`, events |
+| `FormMain.cs` | ✅ Uses `TimerRuntime` for all operations, compact view (`ApplyCompactView` + width save/restore), style-driven row painting (`ApplyTimerRowColor`), status bar (visible/total/active/running), grid column ordering (`ResetTimersGridColumns`), auto-switch handling, `SyncTimerFieldsFromGrid` call from `SaveDataTimers` |
+| `FormMain.Designer.cs` | ✅ All sizes 1400×700, toolbar buttons (`tsbAutoSwitch`, `tsbShowAllClasses`, `tsbCompactView`), View menu items (Compact View, Mini Views), Watch menu items (Auto-Switch, Show All Classes) |
+| `Database.cs` | ✅ `classes` table + seed data, `ClassID` columns on timers/characters, `Scope` column, `DependsOnTimer`/`DependsOnDelay` columns, all SQL parameterized, `CompactWidth`/`FullWidth` settings, `grid_columns` table, `timer_runtime_state` table, `miniviews` table with full CRUD, `MigrateCategoryScopesToCharacter` (with Style='Pet' for Pet categories) |
+| `MiniViews.cs` | ✅ `UpdateMiniTimers(List<MiniTimerData>)` overload using runtime data, `RefreshMiniViews()`, `CreateMiniViews()` from DB, `SaveViewPositions()`, style-based routing via `StyleFilter` |
+| `MiniView.cs` | ✅ Warning color skip for Ping timers |
+| `TimerPlus.cs` | ✅ `TimerID` replaces `RowIndex` |
+| `Timers.cs` | ✅ `ClassID` in `GridData`, button state constants (`btnPing`, `btnPet`, `btnBuff`) |
+| `Characters.cs` | ✅ `ClassID` in `GridData` |
+| `LogMonitor.cs` | ✅ Multi-file polling, `CharacterSwitched` event, `AutoSwitchEnabled`, `SetActiveCharacter()` |
+
+### Files still to modify (Phases A, B, E)
+
+| File | Remaining Changes |
+|------|-------------------|
+| `FormMain.cs` | Remove tabs, remove entity grids, remove settings controls, add Edit menu, make timer grid read-only |
+| `FormMain.Designer.cs` | Remove TabControl and child controls, simplify to single timer grid + runtime buttons |
+| `Database.cs` | Add `styles` table, CRUD for new entities |
+| `MiniViews.cs` | Load style colors from `styles` table instead of `mv*` settings fields |
 
 ### Estimated FormMain.cs reduction
 
-- **Current:** ~2,483 lines
+- **Original:** ~2,483 lines (pre-TimerRuntime)
+- **Current:** ~2,244 lines (after extracting runtime logic to TimerRuntime.cs, but with new QOL features added)
 - **After all phases:** ~500–700 lines (grid setup, event subscriptions, menu/toolbar handlers, character switching, mini view coordination)
-- **~1,800 lines** move into `TimerRuntime.cs`, dialog forms, and the `Database.cs` CRUD layer
+- **~1,500+ lines** still to move into dialog forms and the `Database.cs` CRUD layer
 
 ---
 
@@ -756,6 +817,22 @@ The Timers dialog replaces the current Timers tab for all CRUD operations. This 
 - ✅ All SQL parameterized (no SQL injection)
 - ✅ Grid bug fixes (ResetTimersGridColumns, btnAddTimer defaults, ActiveYn checkbox sync)
 
+**QOL / GUI preparation work completed (incremental, post-Phase D):**
+
+- ✅ **Compact view**: `tsbCompactView` toolbar button + View > Compact View menu item. Hides 9 config-only columns (StartKeyword, EndKeyword, WAVFile, Speech, CaseYn, EndlessYn, DependsOnTimer, DependsOnDelay, WAV). Window width saves/restores per mode via `CompactWidth`/`FullWidth` DB settings. `ApplyCompactView(compact, initializing)` parameter prevents startup overwrite.
+- ✅ **Style-driven row painting**: `ApplyTimerRowColor()` paints running timer rows with lightened style colors (Normal=green, Buff=orange, Pet=orange, Ping=lime), deeper accent on Remaining cell. Inactive timers paint pink. Uses `GetStyleColor()` + `LightenColor()` helpers.
+- ✅ **Status bar redesign**: Format `Timers: X/Y   Active: A   Running: R` where X=visible, Y=total. `RepaintTimerGrid()` counts only visible rows for accurate compact/filtered stats.
+- ✅ **Grid column ordering**: `ResetTimersGridColumns()` establishes canonical display order + sort modes for all 22 columns. Called after grid setup and column width restoration.
+- ✅ **Column width persistence**: `grid_columns` table stores per-grid column widths. `SaveColumnWidths()`/`LoadColumnWidths()` persist on exit and restore on startup.
+- ✅ **Window dimensions**: ClientSize=1400×700, MinimumSize=800×550. `DefaultFullViewWidth=1400`, `DefaultCompactViewWidth=800`. Name column FillWeight=60 for proportional scaling.
+- ✅ **Mini view refresh on view toggle**: `RefreshMiniViews()` saves positions, destroys, recreates from DB when user activates/deactivates a view. `ValidateRowViews` calls it after saving.
+- ✅ **`SyncTimerFieldsFromGrid()`**: Syncs grid edits (Name, Style, Keywords, Duration, etc.) back to `TimerRuntime` without disturbing runtime state. Called from `SaveDataTimers()` after DB save.
+- ✅ **Ping timers in mini views**: `GetMiniViewData()` includes `ButtonState == btnPing` alongside `IsRunning`.
+- ✅ **Warning color skip for Ping**: `MiniView.cs` skips warning coloration for `ColorType.Ping` (interim fix; resolves with `ShowWarning` style attribute in Phase B).
+- ✅ **Migration: Style='Pet' for (Pet) categories**: `MigrateCategoryScopesToCharacter()` detects `(Pet)` in category names and includes `Style='Pet'` in the UPDATE, complementing the `#`-prefix EndKeyword detection.
+- ✅ **Toolbar buttons**: `tsbAutoSwitch` and `tsbShowAllClasses` with GDI+ 16×16 icons, CheckOnClick behavior, synced with menu items. `tsbCompactView` toggle. All always visible regardless of active tab.
+- ✅ **Show All Classes**: `tsbShowAllClasses` toolbar + Watch > Show All Classes menu. When unchecked, grid filters to active character's ClassID (or Global ClassID=0). Both click handlers call `RepaintTimerGrid()` after `RefreshTimerGridDataSource()` to update status bar.
+
 **Risk:** ~~Medium-high~~ Completed. Needs integration testing.
 
 ### Phase D+ and D++: Auto Character Switching + Timer Persistence
@@ -808,14 +885,7 @@ The Timers dialog replaces the current Timers tab for all CRUD operations. This 
 Each phase adds migrations using the existing `isFieldExist` / `isTableExist` pattern in `Database.Connection()`:
 
 ```csharp
-// Phase B: Styles table
-if (!isTableExist(con, "styles"))
-{
-    // CREATE TABLE styles(...)
-    // INSERT default rows migrated from settings values
-}
-
-// Phase C: Classes table + FK columns
+// ✅ Phase C: Classes table + FK columns (already implemented)
 if (!isTableExist(con, "classes"))
 {
     // CREATE TABLE classes(...)
@@ -829,6 +899,26 @@ if (!isFieldExist(con, "timers", "ClassID"))
 {
     // ALTER TABLE timers ADD ClassID INTEGER
 }
+
+// ✅ Phase D: Scope, DependsOn, Style (already implemented)
+if (!isFieldExist(con, "timers", "Scope"))
+{
+    // ALTER TABLE timers ADD Scope TEXT DEFAULT 'World'
+}
+if (!isFieldExist(con, "timers", "DependsOnTimer"))
+{
+    // ALTER TABLE timers ADD DependsOnTimer INTEGER DEFAULT 0
+    // ALTER TABLE timers ADD DependsOnDelay INTEGER DEFAULT 0
+}
+// Style column migration: @→Buff, #→Pet, Duration=0→Ping
+// timer_runtime_state table, grid_columns table, miniviews table
+
+// Phase B: Styles table (future)
+if (!isTableExist(con, "styles"))
+{
+    // CREATE TABLE styles(...)
+    // INSERT default rows migrated from settings values
+}
 ```
 
 Old columns in `settings` table (`MiniViewNormFore`, `MiniViewWarnBack`, etc.) stay in the schema (SQLite can't `DROP COLUMN`) but stop being read after Styles migration populates the `styles` table.
@@ -837,21 +927,27 @@ Old columns in `settings` table (`MiniViewNormFore`, `MiniViewWarnBack`, etc.) s
 
 ## 8. Summary — What Changes Where
 
-| What | Current Location | Future Location |
-|------|-----------------|----------------|
-| Voice settings | Settings tab (FormMain) | `Edit > Settings...` (FormSettings) |
-| MiniView colors/opacity/font | Settings tab (FormMain) | `Edit > Styles...` (FormManageStyles) → per-style in `styles` table |
-| Warning/Ping times | Settings tab (FormMain) | `Edit > Styles...` (FormManageStyles) → per-style |
-| Timer CRUD | Timers tab (FormMain), inline grid editing | `Edit > Timers...` (FormManageTimers) + FormEditTimer |
-| Timer runtime display | Timers tab grid (read-write) | Main form grid (read-only), `TimerRuntime` as model |
-| Timer runtime logic | FormMain.cs methods reading grid cells | `TimerRuntime.cs` operating on `TimerState` objects |
-| Category auto-activation | FormMain.cs reading `grdCategories` cells | `TimerRuntime.cs` reading `CategoryState` objects |
-| Character CRUD | Characters tab (FormMain) | `Edit > Characters...` (FormManageCharacters) |
-| Category CRUD | Categories tab (FormMain) | `Edit > Categories...` (FormManageCategories) |
-| View CRUD | Views tab (FormMain) | `Edit > Views...` (FormManageViews) |
-| Class CRUD | *(doesn't exist yet)* | `Edit > Classes...` (FormManageClasses) |
-| Timer filtering | Show all timers | Filter by Active Character's Class via `TimerRuntime` |
-| Mini view data | Walk `grdTimers.Rows` in `MiniViews.cs` | `TimerRuntime.GetMiniViewData(styleFilter)` |
+| What | Current Location | Future Location | Status |
+|------|-----------------|----------------|--------|
+| Voice settings | Settings tab (FormMain) | `Edit > Settings...` (FormSettings) | Phase A |
+| MiniView colors/opacity/font | Settings tab (FormMain) | `Edit > Styles...` (FormManageStyles) → per-style in `styles` table | Phase B |
+| Warning/Ping times | Settings tab (FormMain) | `Edit > Styles...` (FormManageStyles) → per-style `ShowWarning` | Phase B |
+| Speech/WAV directionality | Single `Speech`/`WAVFile` + Ping hardcoding | `StartSpeech`/`EndSpeech` + `StartWAV`/`EndWAV` per timer | Phase B/E |
+| Timer CRUD | Timers tab (FormMain), inline grid editing | `Edit > Timers...` (FormManageTimers) + FormEditTimer | Phase E |
+| Timer runtime display | ~~Timers tab grid (read-write)~~ → uses `TimerRuntime` as model | Main form grid (read-only) | ✅ Model done, grid still read-write |
+| Timer runtime logic | ~~FormMain.cs reading grid cells~~ → `TimerRuntime.cs` | `TimerRuntime.cs` operating on `TimerState` objects | ✅ Complete |
+| Category auto-activation | FormMain.cs reading `grdCategories` cells | `TimerRuntime.cs` reading `CategoryState` objects | Partial (runtime done, grid coupling remains) |
+| Character CRUD | Characters tab (FormMain) | `Edit > Characters...` (FormManageCharacters) | Phase E |
+| Category CRUD | Categories tab (FormMain) | `Edit > Categories...` (FormManageCategories) | Phase E |
+| View CRUD | Views tab (FormMain) | `Edit > Views...` (FormManageViews) | Phase E |
+| Class CRUD | ~~doesn't exist~~ → `classes` table + grid column | `Edit > Classes...` (FormManageClasses) | ✅ Infrastructure done, dialog Phase E |
+| Timer filtering | ~~Show all timers~~ → `ShowAllClasses` toggle | Filter by Active Character's Class | ✅ Complete |
+| Mini view data | ~~Walk `grdTimers.Rows`~~ → `TimerRuntime.GetMiniViewData()` | Same | ✅ Complete |
+| Compact view | *(didn't exist)* | Toolbar toggle + window sizing | ✅ Complete |
+| Row painting | *(didn't exist)* | Style-driven colors for running/inactive timers | ✅ Complete |
+| Column persistence | *(didn't exist)* | `grid_columns` table save/restore | ✅ Complete |
+| Auto character switching | Manual dropdown only | Multi-file polling + `CharacterSwitched` event | ✅ Complete |
+| Timer state persistence | Lost on switch | `timer_runtime_state` table + save/restore | ✅ Complete |
 
 ---
 
@@ -916,30 +1012,27 @@ These are correct interim fixes. They'll dissolve naturally when Styles (Phase B
 
 ## 10. New Files — Complete Inventory
 
-### `TimerRuntime.cs` — Timer Model Layer
+### `TimerRuntime.cs` — Timer Model Layer (✅ Created)
 
-**What moves here from `FormMain.cs`:**
+**Already implemented.** The following have been moved from `FormMain.cs`:
 
-| Method/Logic | Current Location | Notes |
-|-------------|-----------------|-------|
-| `ProcessLogText` keyword matching | `FormMain.ProcessLogText()` lines 1903-1986 | Category keyword checking + timer keyword checking |
-| `ActivateCategoryTimers` | `FormMain.ActivateCategoryTimers()` | Walks categories, toggles timer ActiveYn |
-| `TriggerRowTimer` | `FormMain.TriggerRowTimer()` | Dependency checking (EndKeyword tags) |
-| `StartRowTimer` | `FormMain.StartRowTimer()` | Creates TimerPlus, sets button state |
-| `StopRowTimer` | `FormMain.StopRowTimer()` | Stops TimerPlus, resets state |
-| `StartTimer` | `FormMain.StartTimer()` | TimerPlus lifecycle (create, subscribe, start) |
-| `StopTimer` | `FormMain.StopTimer()` | TimerPlus lifecycle (stop, dispose) |
-| `TimerElapsed` handler | `FormMain.TimerElapsed()` | Updates remaining time |
-| `TimerExpired` handler | `FormMain.TimerExpired()` | Handles timer completion, looping |
-| Timer count tracking | Scattered across FormMain | Count incremented on trigger |
-| `List<TimerPlus> timers` field | `FormMain` member | Active timer references |
+| Method/Logic | Status | Notes |
+|-------------|--------|-------|
+| `ProcessLogText` keyword matching | ✅ Moved | Category keyword checking + timer keyword checking |
+| `ActivateCategoryTimers` | ✅ Moved | Walks `CategoryState` list, toggles timer ActiveYn |
+| Timer trigger with dependency checking | ✅ Moved | `StartTimerInternal` handles `DependsOnTimer`/`DependsOnDelay` |
+| Start/Stop timer lifecycle | ✅ Moved | Creates `TimerPlus`, sets button state |
+| `TimerElapsed` / `TimerExpired` handlers | ✅ Moved | Updates `TimerState.Remaining`, fires events |
+| Timer count tracking | ✅ Moved | Count incremented on trigger |
+| `SaveCharacterState()` / `RestoreCharacterState()` | ✅ New | Scope-aware timer persistence for character switching |
+| `SyncTimerFieldsFromGrid()` | ✅ New | Syncs grid edits back to `TimerState` without disturbing runtime |
 
-**New code:**
+**Also includes:**
 
-- `TimerState` class (DB fields + runtime state)
+- `TimerState` class (DB fields + runtime state, including `Scope`, `DependsOnTimer`, `DependsOnDelay`)
 - `CategoryState` class (loaded from categories table)
 - `GetVisibleTimers(long? classID)` — returns filtered list for grid display
-- `GetMiniViewData(string styleFilter)` — returns data for a specific mini view
+- `GetMiniViewData(string styleFilter)` — returns data for a specific mini view (includes Ping)
 - `TimerStateChanged` event
 - `TimerSoundRequested` event
 
@@ -1013,7 +1106,7 @@ These are correct interim fixes. They'll dissolve naturally when Styles (Phase B
 **New code:**
 
 - Style grid showing Name, ForeColor, BackColor, Opacity, FontSize
-- Detail panel: all color pickers, opacity/font sliders, warn/ping settings
+- Detail panel: all color pickers, opacity/font sliders, ShowWarning toggle, warn colors/time
 - Database calls: new CRUD methods in `Database.cs`
 
 ### `Styles.cs` — Style Model
@@ -1030,10 +1123,7 @@ class Styles
         public int WarnForeColor { get; set; }
         public int WarnBackColor { get; set; }
         public string WarnTime { get; set; }
-        public int PingForeColor { get; set; }
-        public int PingBackColor { get; set; }
-        public string PingTime { get; set; }
-        public long ShowPing { get; set; }
+        public long ShowWarning { get; set; }  // 0 = suppress warning colors (e.g. Ping)
         public long Opacity { get; set; }
         public long FontSize { get; set; }
     }
