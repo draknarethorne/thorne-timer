@@ -167,13 +167,19 @@ namespace ThorneTimer
                     // Restore runtime state if this timer was already tracked
                     if (previousStates.TryGetValue(gd.ID, out TimerState prev))
                     {
-                        ts.ButtonState = prev.ButtonState;
                         ts.Count = prev.Count;
-                        ts.Remaining = prev.Remaining;
 
-                        // If it was running and still exists, keep it running
-                        // The RunningTimer entry in runningTimers list still references the old state,
-                        // but the TimerPlus object is still ticking. We'll leave it alone.
+                        // Only preserve running state (ButtonState/Remaining) if
+                        // the timer actually has a live TimerPlus in runningTimers.
+                        // This prevents stale "was running" markers from leaking
+                        // across character switches (SaveCharacterState stops the
+                        // TimerPlus but leaves markers on TimerState for DB save).
+                        bool actuallyRunning = runningTimers.Any(rt => rt.TimerID == gd.ID);
+                        if (actuallyRunning)
+                        {
+                            ts.ButtonState = prev.ButtonState;
+                            ts.Remaining = prev.Remaining;
+                        }
                     }
 
                     timerStates.Add(ts);
@@ -781,19 +787,26 @@ namespace ThorneTimer
         {
             lock (syncLock)
             {
-                // Stop Character-scope running timers (freeze their remaining time)
+                // Stop Character-scope running timers and freeze their state
+                // for DB persistence so RestoreCharacterState can restart them.
                 foreach (var ts in timerStates)
                 {
                     if (ts.Scope == "Character" && ts.IsRunning)
                     {
-                        // Capture current remaining time from the TimerPlus
+                        // Capture current remaining time BEFORE StopTimerInternal clears it
+                        string remaining = "";
                         var rt = runningTimers.FirstOrDefault(r => r.TimerID == ts.TimerID);
                         if (rt != null)
                         {
-                            ts.Remaining = rt.Timer.GetTimeRemaining();
+                            remaining = rt.Timer.GetTimeRemaining();
                         }
                         StopTimerInternal(ts, false);
-                        // Mark with the style button state so we know it was running
+                        // Restore the frozen remaining and mark with the style button
+                        // state so the DB snapshot knows this timer was running.
+                        // Note: in-memory state retains these markers, but LoadTimers
+                        // will only preserve state for timers still in runningTimers,
+                        // so these stale markers won't leak to the next character.
+                        ts.Remaining = remaining;
                         ts.ButtonState = GetStyleButtonState(ts.Style);
                     }
                 }
