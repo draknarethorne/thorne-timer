@@ -709,7 +709,7 @@ namespace ThorneTimer
             }
 
             // Read all categories
-            var categoriesToMigrate = new List<Tuple<long, long>>(); // CategoryID, ClassID
+            var categoriesToMigrate = new List<Tuple<long, long, bool>>(); // CategoryID, ClassID, isPet
             cmd.CommandText = "SELECT ID, Name FROM categories";
             using (SQLiteDataReader rdr = cmd.ExecuteReader())
             {
@@ -722,7 +722,8 @@ namespace ThorneTimer
 
                     if (matchedClassId >= 0)
                     {
-                        categoriesToMigrate.Add(Tuple.Create(catId, matchedClassId));
+                        bool isPet = catName.IndexOf("(Pet)", StringComparison.OrdinalIgnoreCase) >= 0;
+                        categoriesToMigrate.Add(Tuple.Create(catId, matchedClassId, isPet));
                     }
                 }
             }
@@ -731,10 +732,15 @@ namespace ThorneTimer
             // Deactivate them (ActiveYn=0) so upgrading users start clean —
             // they opt-in to class-specific timers per character rather than
             // inheriting whatever was active in the old database for every character.
+            // For (Pet) categories, also set Style='Pet' since the EndKeyword-based
+            // inference may have classified some pet buffs as 'Buff' instead.
             foreach (var cat in categoriesToMigrate)
             {
                 cmd.Parameters.Clear();
-                cmd.CommandText = "UPDATE timers SET Scope = 'Character', ClassID = @classId, ActiveYn = 0 WHERE CategoryID = @catId";
+                if (cat.Item3)
+                    cmd.CommandText = "UPDATE timers SET Scope = 'Character', ClassID = @classId, ActiveYn = 0, Style = 'Pet' WHERE CategoryID = @catId";
+                else
+                    cmd.CommandText = "UPDATE timers SET Scope = 'Character', ClassID = @classId, ActiveYn = 0 WHERE CategoryID = @catId";
                 cmd.Parameters.AddWithValue("@classId", cat.Item2);
                 cmd.Parameters.AddWithValue("@catId", cat.Item1);
                 cmd.ExecuteNonQuery();
