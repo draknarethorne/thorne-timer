@@ -59,6 +59,23 @@ namespace ThorneTimer
             return activeViews.Count > 0;
         }
 
+        /// <summary>
+        /// Saves current positions, destroys all mini views, and recreates
+        /// them from the database.  Used when the user activates or
+        /// deactivates a view while mini views are visible.
+        /// </summary>
+        public void RefreshMiniViews(SQLiteConnection con, string activeCharacterID)
+        {
+            if (activeViews.Count == 0) return;
+
+            // Persist current positions before tearing down
+            Dictionary<int, Point> positions = GetCurrentViewPositions();
+            Database.SaveViewPositions(con, positions);
+
+            DestroyMiniViews();
+            CreateMiniViews(con, activeCharacterID);
+        }
+
         public bool MiniViewsHidden()
         {
             return activeViews.Count == 0;

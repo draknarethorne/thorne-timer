@@ -303,7 +303,7 @@ namespace ThorneTimer
             bool compactView = Database.GetSetting(con, "CompactView") == "1";
             tsbCompactView.Checked = compactView;
             compactViewToolStripMenuItem.Checked = compactView;
-            ApplyCompactView(compactView);
+            ApplyCompactView(compactView, initializing: true);
 
             // Restore persisted column widths
             LoadColumnWidths("Timers", grdTimers);
@@ -1374,6 +1374,8 @@ namespace ThorneTimer
         void ValidateRowViews(object sender, DataGridViewCellCancelEventArgs data)
         {
             SaveDataViews();
+            miniViews.RefreshMiniViews(con, activeCharacterID);
+            UpdateMiniView();
         }
 
         void SaveDataViews()
@@ -1796,7 +1798,7 @@ namespace ThorneTimer
         /// When switching to full view, auto-widens the window if it is
         /// too narrow for all columns, clamped to the current screen.
         /// </summary>
-        private void ApplyCompactView(bool compact)
+        private void ApplyCompactView(bool compact, bool initializing = false)
         {
             foreach (string colName in CompactHiddenColumns)
             {
@@ -1810,19 +1812,16 @@ namespace ThorneTimer
 
             if (compact)
             {
-                // Save current (full) width, restore compact width
-                fullViewWidth = this.Width;
+                if (!initializing) fullViewWidth = this.Width;
                 this.Width = compactViewWidth;
             }
             else
             {
-                // Save current (compact) width, restore full width
-                compactViewWidth = this.Width;
+                if (!initializing) compactViewWidth = this.Width;
                 int targetWidth = Math.Max(fullViewWidth, DefaultFullViewWidth);
                 Screen screen = Screen.FromControl(this);
                 this.Width = Math.Min(targetWidth, screen.WorkingArea.Width);
 
-                // Nudge left if the wider window extends past the screen edge
                 if (this.Right > screen.WorkingArea.Right)
                 {
                     this.Left = Math.Max(screen.WorkingArea.Left,
