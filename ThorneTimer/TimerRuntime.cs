@@ -789,9 +789,11 @@ namespace ThorneTimer
             {
                 // Stop Character-scope running timers and freeze their state
                 // for DB persistence so RestoreCharacterState can restart them.
+                // Include Ping timers — they have a live TimerPlus even though
+                // TimerRunning() excludes them from the "running" concept.
                 foreach (var ts in timerStates)
                 {
-                    if (ts.Scope == "Character" && ts.IsRunning)
+                    if (ts.Scope == "Character" && (ts.IsRunning || Timers.PingTimer(ts.ButtonState)))
                     {
                         // Capture current remaining time BEFORE StopTimerInternal clears it
                         string remaining = "";
@@ -838,7 +840,9 @@ namespace ThorneTimer
                     if (ts.Scope != "Character") continue;
 
                     // Was this timer running when the character was last active?
-                    if (Timers.TimerRunning(saved.ButtonState) && !string.IsNullOrEmpty(saved.Remaining))
+                    // Include Ping timers — they have style-based ButtonState markers too.
+                    if ((Timers.TimerRunning(saved.ButtonState) || Timers.PingTimer(saved.ButtonState))
+                        && !string.IsNullOrEmpty(saved.Remaining))
                     {
                         if (!ValidDuration(saved.Remaining)) continue;
                         if (TimerPlus.GetMilliseconds(saved.Remaining) <= 0) continue;
