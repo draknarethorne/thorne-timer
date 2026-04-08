@@ -1,0 +1,50 @@
+name: "✨ Feature request"
+description: Propose new functionality or an improvement to Thorne Timer.
+title: "feat: "
+labels: ["enhancement", "needs-triage"]
+assignees:
+  - draknarethorne
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What pain point or gameplay limitation are we solving?
+      placeholder: When multi-boxing, I have to manually track buff durations across characters...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the desired behavior or feature.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope / components likely affected
+      description: Which parts of the application would this touch? (e.g., timer grid, mini views, log parsing, database, etc.)
+
+  - type: dropdown
+    id: risk
+    attributes:
+      label: Risk level
+      options:
+        - low
+        - medium
+        - high
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Alignment
+      options:
+        - label: This request enhances the timer/overlay experience without breaking existing functionality.
+          required: true
+        - label: I reviewed the roadmap and existing issues before requesting this.
+          required: false

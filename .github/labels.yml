@@ -1,0 +1,97 @@
+# Thorne Timer — Canonical Label Definitions
+# Synced via .github/workflows/label-sync.yml (when added)
+# Manual edits in GitHub UI will be overwritten on next sync.
+
+# --- Core ---
+
+- name: bug
+  color: "d73a4a"
+  description: Something is broken and needs a fix.
+
+- name: enhancement
+  color: "a2eeef"
+  description: New feature or improvement request.
+
+- name: needs-triage
+  color: "fbca04"
+  description: Newly captured work awaiting classification and prioritization.
+
+- name: documentation
+  color: "0075ca"
+  description: Documentation improvements or additions.
+
+- name: automation
+  color: "bfdadc"
+  description: CI/CD, workflows, or build infrastructure.
+
+# --- Priority ---
+
+- name: "priority:critical"
+  color: "b60205"
+  description: Crash, data loss, or completely blocked functionality.
+
+- name: "priority:high"
+  color: "d93f0b"
+  description: Significant impact; should be addressed soon.
+
+- name: "priority:medium"
+  color: "fbca04"
+  description: Noticeable impact but not blocking core functionality.
+
+- name: "priority:low"
+  color: "0e8a16"
+  description: Minor issue or cosmetic improvement.
+
+# --- Component ---
+
+- name: "component:timer-grid"
+  color: "5319e7"
+  description: Main timer grid and data management.
+
+- name: "component:mini-views"
+  color: "5319e7"
+  description: Always-on-top overlay windows (Normal, Buff, Pet, Ping).
+
+- name: "component:log-monitor"
+  color: "5319e7"
+  description: Log file parsing and event detection.
+
+- name: "component:character-switch"
+  color: "5319e7"
+  description: Character switching, state save/restore.
+
+- name: "component:audio"
+  color: "5319e7"
+  description: Text-to-speech, WAV playback, and audio alerts.
+
+- name: "component:database"
+  color: "5319e7"
+  description: SQLite tome, schema migrations, CRUD operations.
+
+# --- Phase ---
+
+- name: "phase:B"
+  color: "c5def5"
+  description: "Phase B: Directional speech and Ping refactor."
+
+- name: "phase:C"
+  color: "c5def5"
+  description: "Phase C: Custom views and configuration."
+
+- name: "phase:E"
+  color: "c5def5"
+  description: "Phase E: Class profiles and zone awareness."
+
+# --- Status ---
+
+- name: "wontfix"
+  color: "ffffff"
+  description: This will not be worked on.
+
+- name: "duplicate"
+  color: "cfd3d7"
+  description: This issue already exists.
+
+- name: "good first issue"
+  color: "7057ff"
+  description: Good for newcomers to the project.
