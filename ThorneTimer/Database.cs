@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Data.SQLite;
 using System.Drawing;
 using System.IO;
@@ -118,6 +119,10 @@ namespace ThorneTimer
 
                 // Create grid_columns table for persisting column widths across sessions
                 cmd.CommandText = "CREATE TABLE grid_columns(ID INTEGER PRIMARY KEY AUTOINCREMENT, GridName TEXT, ColumnName TEXT, Width INTEGER)";
+                cmd.ExecuteNonQuery();
+
+                // Create grid_sort_state table for persisting multi-column sort across sessions
+                cmd.CommandText = "CREATE TABLE grid_sort_state(ID INTEGER PRIMARY KEY AUTOINCREMENT, GridName TEXT, ColumnName TEXT, SortDirection INTEGER, SortOrder INTEGER)";
                 cmd.ExecuteNonQuery();
 
                 // Create timer_runtime_state table for persisting timer counts and state
@@ -450,7 +455,27 @@ namespace ThorneTimer
                 {
                     SQLiteCommand cmd = new SQLiteCommand(con)
                     {
-                        CommandText = "CREATE TABLE grid_columns(ID INTEGER PRIMARY KEY AUTOINCREMENT, GridName TEXT, ColumnName TEXT, Width INTEGER)"
+                        CommandText = "CREATE TABLE grid_columns(ID INTEGER PRIMARY KEY AUTOINCREMENT, GridName TEXT, ColumnName TEXT, Width INTEGER, FillWeight REAL DEFAULT 100)"
+                    };
+                    cmd.ExecuteNonQuery();
+                }
+
+                // Add FillWeight column if upgrading from an older schema
+                if (isTableExist(con, "grid_columns") && !isFieldExist(con, "grid_columns", "FillWeight"))
+                {
+                    SQLiteCommand cmd = new SQLiteCommand(con)
+                    {
+                        CommandText = "ALTER TABLE grid_columns ADD FillWeight REAL DEFAULT 100"
+                    };
+                    cmd.ExecuteNonQuery();
+                }
+
+                // Create grid_sort_state table if it doesn't exist (for multi-column sort persistence)
+                if (!isTableExist(con, "grid_sort_state"))
+                {
+                    SQLiteCommand cmd = new SQLiteCommand(con)
+                    {
+                        CommandText = "CREATE TABLE grid_sort_state(ID INTEGER PRIMARY KEY AUTOINCREMENT, GridName TEXT, ColumnName TEXT, SortDirection INTEGER, SortOrder INTEGER)"
                     };
                     cmd.ExecuteNonQuery();
                 }
@@ -1556,8 +1581,39 @@ namespace ThorneTimer
         }
 
         /// <summary>
-        /// Saves column widths for a grid to the database.
-        /// Only saves visible, resizable columns.
+        /// Gets saved column FillWeights for a grid from the database.
+        /// Returns a dictionary keyed by ColumnName with FillWeight values.
+        /// </summary>
+        static public Dictionary<string, float> GetColumnFillWeights(SQLiteConnection con, string gridName)
+        {
+            var weights = new Dictionary<string, float>();
+
+            if (!isFieldExist(con, "grid_columns", "FillWeight"))
+                return weights;
+
+            SQLiteCommand cmd = new SQLiteCommand(con)
+            {
+                CommandText = "SELECT ColumnName, FillWeight FROM grid_columns WHERE GridName = @grid"
+            };
+            cmd.Parameters.AddWithValue("@grid", gridName);
+
+            using (SQLiteDataReader rdr = cmd.ExecuteReader())
+            {
+                while (rdr.Read())
+                {
+                    string colName = rdr.GetString(0);
+                    float fw = rdr.IsDBNull(1) ? 100f : (float)rdr.GetDouble(1);
+                    weights[colName] = fw;
+                }
+            }
+
+            return weights;
+        }
+
+        /// <summary>
+        /// Saves column widths and FillWeights for a grid to the database.
+        /// Saves all resizable columns (including hidden ones) so that
+        /// compact/advanced view widths survive across sessions.
         /// </summary>
         static public void SaveColumnWidths(SQLiteConnection con, string gridName, DataGridView grid)
         {
@@ -1568,17 +1624,76 @@ namespace ThorneTimer
             cmd.Parameters.AddWithValue("@grid", gridName);
             cmd.ExecuteNonQuery();
 
-            // Insert current widths for visible, resizable columns
+            // Insert current widths for all resizable columns (visible and hidden)
             foreach (DataGridViewColumn col in grid.Columns)
             {
-                if (!col.Visible || col.Resizable == DataGridViewTriState.False)
+                if (col.Resizable == DataGridViewTriState.False)
                     continue;
 
-                cmd.CommandText = "INSERT INTO grid_columns (GridName, ColumnName, Width) VALUES (@grid, @col, @width)";
+                cmd.CommandText = "INSERT INTO grid_columns (GridName, ColumnName, Width, FillWeight) VALUES (@grid, @col, @width, @fw)";
                 cmd.Parameters.Clear();
                 cmd.Parameters.AddWithValue("@grid", gridName);
                 cmd.Parameters.AddWithValue("@col", col.Name);
                 cmd.Parameters.AddWithValue("@width", col.Width);
+                cmd.Parameters.AddWithValue("@fw", col.FillWeight);
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        /// <summary>
+        /// Gets saved sort state for a grid from the database.
+        /// Returns a list of (ColumnName, SortDirection) in sort order.
+        /// </summary>
+        static public List<Tuple<string, ListSortDirection>> GetSortState(SQLiteConnection con, string gridName)
+        {
+            var sorts = new List<Tuple<string, ListSortDirection>>();
+            if (!isTableExist(con, "grid_sort_state")) return sorts;
+
+            SQLiteCommand cmd = new SQLiteCommand(con)
+            {
+                CommandText = "SELECT ColumnName, SortDirection FROM grid_sort_state WHERE GridName = @grid ORDER BY SortOrder"
+            };
+            cmd.Parameters.AddWithValue("@grid", gridName);
+
+            using (SQLiteDataReader rdr = cmd.ExecuteReader())
+            {
+                while (rdr.Read())
+                {
+                    string colName = rdr.GetString(0);
+                    int dir = rdr.GetInt32(1);
+                    sorts.Add(Tuple.Create(colName, dir == 0 ? ListSortDirection.Ascending : ListSortDirection.Descending));
+                }
+            }
+
+            return sorts;
+        }
+
+        /// <summary>
+        /// Saves the current multi-column sort state for a grid to the database.
+        /// </summary>
+        static public void SaveSortState(SQLiteConnection con, string gridName, ListSortDescriptionCollection sortDescriptions)
+        {
+            if (!isTableExist(con, "grid_sort_state")) return;
+
+            SQLiteCommand cmd = new SQLiteCommand(con);
+
+            // Delete existing entries for this grid
+            cmd.CommandText = "DELETE FROM grid_sort_state WHERE GridName = @grid";
+            cmd.Parameters.AddWithValue("@grid", gridName);
+            cmd.ExecuteNonQuery();
+
+            if (sortDescriptions == null) return;
+
+            // Insert each sort column in order
+            for (int i = 0; i < sortDescriptions.Count; i++)
+            {
+                var desc = sortDescriptions[i];
+                cmd.CommandText = "INSERT INTO grid_sort_state (GridName, ColumnName, SortDirection, SortOrder) VALUES (@grid, @col, @dir, @order)";
+                cmd.Parameters.Clear();
+                cmd.Parameters.AddWithValue("@grid", gridName);
+                cmd.Parameters.AddWithValue("@col", desc.PropertyDescriptor.Name);
+                cmd.Parameters.AddWithValue("@dir", desc.SortDirection == ListSortDirection.Ascending ? 0 : 1);
+                cmd.Parameters.AddWithValue("@order", i);
                 cmd.ExecuteNonQuery();
             }
         }

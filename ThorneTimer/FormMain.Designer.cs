@@ -112,11 +112,15 @@
             this.autoSwitchToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.showAllClassesToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.compactViewToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.refreshTimersToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.viewSeparator1 = new System.Windows.Forms.ToolStripSeparator();
+            this.watchSeparator1 = new System.Windows.Forms.ToolStripSeparator();
             this.colorDialog1 = new System.Windows.Forms.ColorDialog();
             this.statusStrip = new System.Windows.Forms.StatusStrip();
             this.statusTomePath = new System.Windows.Forms.ToolStripStatusLabel();
             this.statusParsing = new System.Windows.Forms.ToolStripStatusLabel();
             this.statusTimerStats = new System.Windows.Forms.ToolStripStatusLabel();
+            this.statusSortInfo = new System.Windows.Forms.ToolStripStatusLabel();
             this.menuStrip1.SuspendLayout();
             this.tabCtrlMain.SuspendLayout();
             this.tabTimers.SuspendLayout();
@@ -330,7 +334,9 @@
             // 
             this.viewToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.miniViewsToolStripMenuItem,
-            this.compactViewToolStripMenuItem});
+            this.compactViewToolStripMenuItem,
+            this.viewSeparator1,
+            this.refreshTimersToolStripMenuItem});
             this.viewToolStripMenuItem.Name = "viewToolStripMenuItem";
             this.viewToolStripMenuItem.Size = new System.Drawing.Size(44, 20);
             this.viewToolStripMenuItem.Text = "&View";
@@ -351,10 +357,20 @@
             this.compactViewToolStripMenuItem.ToolTipText = "Toggle compact view. Hides configuration columns and shows only runtime columns.";
             this.compactViewToolStripMenuItem.Click += new System.EventHandler(this.compactViewToolStripMenuItem_Click);
             // 
+            // refreshTimersToolStripMenuItem
+            // 
+            this.refreshTimersToolStripMenuItem.Name = "refreshTimersToolStripMenuItem";
+            this.refreshTimersToolStripMenuItem.ShortcutKeys = System.Windows.Forms.Keys.F5;
+            this.refreshTimersToolStripMenuItem.Size = new System.Drawing.Size(160, 22);
+            this.refreshTimersToolStripMenuItem.Text = "&Refresh Sort";
+            this.refreshTimersToolStripMenuItem.ToolTipText = "Re-apply the current sort order to the timer grid (F5).";
+            this.refreshTimersToolStripMenuItem.Click += new System.EventHandler(this.refreshTimersToolStripMenuItem_Click);
+            // 
             // watchToolStripMenuItem
             // 
             this.watchToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.startStopWatchingToolStripMenuItem,
+            this.watchSeparator1,
             this.autoSwitchToolStripMenuItem,
             this.showAllClassesToolStripMenuItem});
             this.watchToolStripMenuItem.Name = "watchToolStripMenuItem";
@@ -1012,6 +1028,7 @@
             this.statusStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.statusTomePath,
             this.statusParsing,
+            this.statusSortInfo,
             this.statusTimerStats});
             this.statusStrip.Location = new System.Drawing.Point(0, 678);
             this.statusStrip.Name = "statusStrip";
@@ -1031,6 +1048,13 @@
             this.statusParsing.Name = "statusParsing";
             this.statusParsing.Size = new System.Drawing.Size(27, 17);
             this.statusParsing.Text = "Idle";
+            // 
+            // statusSortInfo
+            // 
+            this.statusSortInfo.BorderSides = System.Windows.Forms.ToolStripStatusLabelBorderSides.Left;
+            this.statusSortInfo.Name = "statusSortInfo";
+            this.statusSortInfo.Size = new System.Drawing.Size(0, 17);
+            this.statusSortInfo.Visible = false;
             // 
             // statusTimerStats
             // 
@@ -1109,10 +1133,13 @@
         private System.Windows.Forms.ToolStripMenuItem viewToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem miniViewsToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem compactViewToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem refreshTimersToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem watchToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem startStopWatchingToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem autoSwitchToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem showAllClassesToolStripMenuItem;
+        private System.Windows.Forms.ToolStripSeparator viewSeparator1;
+        private System.Windows.Forms.ToolStripSeparator watchSeparator1;
         private System.Windows.Forms.TabPage tabCategories;
         private System.Windows.Forms.Button btnAddCategory;
         private System.Windows.Forms.Button btnDeleteCategory;
@@ -1170,6 +1197,7 @@
         private System.Windows.Forms.ToolStripStatusLabel statusTomePath;
         private System.Windows.Forms.ToolStripStatusLabel statusParsing;
         private System.Windows.Forms.ToolStripStatusLabel statusTimerStats;
+        private System.Windows.Forms.ToolStripStatusLabel statusSortInfo;
     }
 }
 

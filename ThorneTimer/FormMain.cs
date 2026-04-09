@@ -78,6 +78,10 @@ namespace ThorneTimer
         int fullViewWidth = DefaultFullViewWidth;
         int compactViewWidth = DefaultCompactViewWidth;
 
+        // Per-view FillWeight cache so compact/advanced column proportions survive toggling
+        private Dictionary<string, float> _advancedFillWeights = new Dictionary<string, float>();
+        private Dictionary<string, float> _compactFillWeights = new Dictionary<string, float>();
+
         readonly MiniViews miniViews = new MiniViews();
         readonly TimerRuntime timerRuntime = new TimerRuntime();
         readonly LogMonitor logMonitor = new LogMonitor();
@@ -309,6 +313,24 @@ namespace ThorneTimer
             LoadColumnWidths("Timers", grdTimers);
             LoadColumnWidths("Characters", grdCharacters);
             LoadColumnWidths("Categories", grdCategories);
+
+            // Seed per-view FillWeight caches from the current (post-load) state
+            // so the very first compact/advanced toggle has weights to restore.
+            // The DB stores all columns: visible ones have the current view's
+            // FillWeights; hidden ones have the other view's FillWeights.
+            // Seed both caches — the first toggle will refine the "other" view.
+            var initialWeights = new Dictionary<string, float>();
+            foreach (DataGridViewColumn col in grdTimers.Columns)
+                initialWeights[col.Name] = col.FillWeight;
+            _compactFillWeights = new Dictionary<string, float>(initialWeights);
+            _advancedFillWeights = new Dictionary<string, float>(initialWeights);
+
+            // Restore persisted multi-column sort state
+            LoadSortState("Timers", grdTimers);
+
+            // Sorting fires ListChanged(Reset) which rebuilds grid rows,
+            // clearing custom cell styles and row visibility.
+            RefreshGridAfterSort();
 
             UpdateMiniView();
 
@@ -748,6 +770,11 @@ namespace ThorneTimer
             Database.SaveColumnWidths(con, "Characters", grdCharacters);
             Database.SaveColumnWidths(con, "Categories", grdCategories);
 
+            // Persist multi-column sort state
+            var timerList = grdTimers.DataSource as SortableBindingList<Timers.GridData>;
+            if (timerList != null)
+                Database.SaveSortState(con, "Timers", timerList.SortDescriptions);
+
             SaveDataTimers();
             SaveDataCharacters();
             SaveDataCategories();
@@ -867,6 +894,9 @@ namespace ThorneTimer
 
         /// <summary>
         /// Applies saved column widths from the database to a grid.
+        /// For visible columns, sets Width (which adjusts FillWeight in Fill mode).
+        /// For hidden columns, sets FillWeight directly so the proportion is
+        /// correct when the column becomes visible.
         /// Silently skips columns that no longer exist.
         /// </summary>
         private void LoadColumnWidths(string gridName, DataGridView grid)
@@ -874,6 +904,8 @@ namespace ThorneTimer
             try
             {
                 Dictionary<string, int> widths = Database.GetColumnWidths(con, gridName);
+                Dictionary<string, float> fillWeights = Database.GetColumnFillWeights(con, gridName);
+
                 foreach (var kvp in widths)
                 {
                     if (grid.Columns.Contains(kvp.Key))
@@ -885,10 +917,67 @@ namespace ThorneTimer
                         }
                     }
                 }
+
+                // Restore FillWeights for hidden columns so they display
+                // correctly when toggled back to visible in Fill mode.
+                foreach (var kvp in fillWeights)
+                {
+                    if (grid.Columns.Contains(kvp.Key))
+                    {
+                        DataGridViewColumn col = grid.Columns[kvp.Key];
+                        if (!col.Visible && kvp.Value > 0)
+                        {
+                            col.FillWeight = kvp.Value;
+                        }
+                    }
+                }
             }
             catch (Exception)
             {
                 // Database may not have the table yet; ignore
+            }
+        }
+
+        /// <summary>
+        /// Applies saved multi-column sort state from the database to the timer grid.
+        /// Falls back to Properties.Settings SortColumn if no database sort state exists.
+        /// </summary>
+        private void LoadSortState(string gridName, DataGridView grid)
+        {
+            try
+            {
+                var sorts = Database.GetSortState(con, gridName);
+                if (sorts.Count > 0)
+                {
+                    var list = grid.DataSource as SortableBindingList<Timers.GridData>;
+                    if (list != null)
+                    {
+                        var tuples = sorts
+                            .Select(s => (s.Item1, s.Item2))
+                            .ToArray();
+                        list.ApplyMultiSort(tuples);
+                        UpdateSortGlyphs();
+                        return;
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                // Database may not have the table yet; fall through to default
+            }
+
+            // Fallback: single-column sort from Properties.Settings
+            try
+            {
+                string sortCol = Properties.Settings.Default.SortColumn;
+                if (!string.IsNullOrEmpty(sortCol) && grid.Columns.Contains(sortCol))
+                {
+                    grid.Sort(grid.Columns[sortCol], ListSortDirection.Ascending);
+                }
+            }
+            catch (Exception)
+            {
+                // Ignore
             }
         }
 
@@ -929,23 +1018,23 @@ namespace ThorneTimer
             grdTimers.Columns["DependsOnDelay"].DisplayIndex = i++;
             grdTimers.Columns["StartStop"].DisplayIndex = i++;
 
-            grdTimers.Columns["ActiveYn"].SortMode = DataGridViewColumnSortMode.Automatic;
-            grdTimers.Columns["Name"].SortMode = DataGridViewColumnSortMode.Automatic;
+            grdTimers.Columns["ActiveYn"].SortMode = DataGridViewColumnSortMode.Programmatic;
+            grdTimers.Columns["Name"].SortMode = DataGridViewColumnSortMode.Programmatic;
             grdTimers.Columns["Count"].SortMode = DataGridViewColumnSortMode.NotSortable;
-            grdTimers.Columns["CategoryID"].SortMode = DataGridViewColumnSortMode.Automatic;
-            grdTimers.Columns["Style"].SortMode = DataGridViewColumnSortMode.Automatic;
-            grdTimers.Columns["ClassID"].SortMode = DataGridViewColumnSortMode.Automatic;
-            grdTimers.Columns["Scope"].SortMode = DataGridViewColumnSortMode.Automatic;
-            grdTimers.Columns["StartKeyword"].SortMode = DataGridViewColumnSortMode.Automatic;
-            grdTimers.Columns["EndKeyword"].SortMode = DataGridViewColumnSortMode.Automatic;
+            grdTimers.Columns["CategoryID"].SortMode = DataGridViewColumnSortMode.Programmatic;
+            grdTimers.Columns["Style"].SortMode = DataGridViewColumnSortMode.Programmatic;
+            grdTimers.Columns["ClassID"].SortMode = DataGridViewColumnSortMode.Programmatic;
+            grdTimers.Columns["Scope"].SortMode = DataGridViewColumnSortMode.Programmatic;
+            grdTimers.Columns["StartKeyword"].SortMode = DataGridViewColumnSortMode.Programmatic;
+            grdTimers.Columns["EndKeyword"].SortMode = DataGridViewColumnSortMode.Programmatic;
             grdTimers.Columns["WAV"].SortMode = DataGridViewColumnSortMode.NotSortable;
             grdTimers.Columns["WAVFile"].SortMode = DataGridViewColumnSortMode.NotSortable;
             grdTimers.Columns["Speech"].SortMode = DataGridViewColumnSortMode.NotSortable;
-            grdTimers.Columns["Duration"].SortMode = DataGridViewColumnSortMode.Automatic;
+            grdTimers.Columns["Duration"].SortMode = DataGridViewColumnSortMode.Programmatic;
             grdTimers.Columns["Remaining"].SortMode = DataGridViewColumnSortMode.NotSortable;
             grdTimers.Columns["CaseYn"].SortMode = DataGridViewColumnSortMode.NotSortable;
             grdTimers.Columns["EndlessYn"].SortMode = DataGridViewColumnSortMode.NotSortable;
-            grdTimers.Columns["DependsOnTimer"].SortMode = DataGridViewColumnSortMode.Automatic;
+            grdTimers.Columns["DependsOnTimer"].SortMode = DataGridViewColumnSortMode.Programmatic;
             grdTimers.Columns["DependsOnDelay"].SortMode = DataGridViewColumnSortMode.NotSortable;
             grdTimers.Columns["StartStop"].SortMode = DataGridViewColumnSortMode.NotSortable;
         }
@@ -1214,13 +1303,6 @@ namespace ThorneTimer
 
             grdTimers.RowValidating += ValidateRowTimers;
             grdTimers.EditingControlShowing += GrdTimers_EditingControlShowing;
-
-            string sortName = (Properties.Settings.Default.SortColumn.Length > 0) ? Properties.Settings.Default.SortColumn : "Name";
-            DataGridViewColumn sortColumn = grdTimers.Columns[sortName];
-            if (sortColumn != null)
-            {
-                grdTimers.Sort(sortColumn, ListSortDirection.Ascending);
-            }
 
             ResetTimersGridColumns();
         }
@@ -1798,9 +1880,24 @@ namespace ThorneTimer
         /// Remaining, Start/Stop, Count.
         /// When switching to full view, auto-widens the window if it is
         /// too narrow for all columns, clamped to the current screen.
+        /// Saves and restores per-view FillWeights so column proportions
+        /// survive the toggle without being redistributed by Fill mode.
         /// </summary>
         private void ApplyCompactView(bool compact, bool initializing = false)
         {
+            // Capture current FillWeights before the toggle
+            if (!initializing)
+            {
+                var weights = new Dictionary<string, float>();
+                foreach (DataGridViewColumn col in grdTimers.Columns)
+                    weights[col.Name] = col.FillWeight;
+
+                if (compact) // leaving advanced ? save advanced weights
+                    _advancedFillWeights = weights;
+                else         // leaving compact  ? save compact weights
+                    _compactFillWeights = weights;
+            }
+
             foreach (string colName in CompactHiddenColumns)
             {
                 if (grdTimers.Columns.Contains(colName))
@@ -1827,6 +1924,22 @@ namespace ThorneTimer
                 {
                     this.Left = Math.Max(screen.WorkingArea.Left,
                         screen.WorkingArea.Right - this.Width);
+                }
+            }
+
+            // Restore FillWeights for the target view so columns keep
+            // the proportions the user had before the last toggle.
+            var target = compact ? _compactFillWeights : _advancedFillWeights;
+            if (target != null && target.Count > 0)
+            {
+                foreach (var kvp in target)
+                {
+                    if (grdTimers.Columns.Contains(kvp.Key))
+                    {
+                        var col = grdTimers.Columns[kvp.Key];
+                        if (col.Visible && kvp.Value > 0)
+                            col.FillWeight = kvp.Value;
+                    }
                 }
             }
         }
@@ -1932,6 +2045,13 @@ namespace ThorneTimer
 
             // Apply class filter for new character
             RefreshTimerGridDataSource();
+
+            // Re-apply sort order — LoadTimerRuntime changed cell
+            // values so the rows may be in stale order.
+            var autoList = grdTimers.DataSource as SortableBindingList<Timers.GridData>;
+            if (autoList != null)
+                autoList.ReapplySort();
+            RefreshGridAfterSort();
 
             // Update status bar
             statusParsing.Text = "Watching: " + Path.GetFileName(logMonitor.FilePath) + " (auto)";
@@ -2294,6 +2414,13 @@ namespace ThorneTimer
             // Apply class filter for new character
             RefreshTimerGridDataSource();
 
+            // Re-apply sort order — LoadTimerRuntime changed cell
+            // values so the rows may be in stale order.
+            var manualList = grdTimers.DataSource as SortableBindingList<Timers.GridData>;
+            if (manualList != null)
+                manualList.ReapplySort();
+            RefreshGridAfterSort();
+
             // Update status bar if watching
             if (tsbStartStopWatching.Text == stopWatchingText && logMonitor.FilePath != null)
             {
@@ -2604,11 +2731,133 @@ namespace ThorneTimer
 
         private void grdTimers_ColumnHeaderMouseClick(object sender, DataGridViewCellMouseEventArgs e)
         {
-            // SyncRuntimeToGrid already repaints colors and updates the status bar
-            SyncRuntimeToGrid();
+            var list = grdTimers.DataSource as SortableBindingList<Timers.GridData>;
+            string dataPropertyName = grdTimers.Columns[e.ColumnIndex].DataPropertyName;
+            var prop = (list != null && !string.IsNullOrEmpty(dataPropertyName))
+                ? TypeDescriptor.GetProperties(typeof(Timers.GridData))[dataPropertyName]
+                : null;
 
-            // Sorting resets row visibility — reapply class filter
+            if (prop != null && list != null)
+            {
+                // Ctrl+Click: remove column from multi-sort chain
+                if (Control.ModifierKeys.HasFlag(Keys.Control))
+                {
+                    list.RemoveSortColumn(prop);
+                }
+                // Shift+Click: add to multi-column sort chain or toggle direction
+                else if (Control.ModifierKeys.HasFlag(Keys.Shift))
+                {
+                    list.AddOrToggleSortColumn(prop);
+                }
+                else
+                {
+                    // Normal click: single-column sort with asc/desc toggle.
+                    // If already sorting by this column alone, toggle direction;
+                    // otherwise start a fresh ascending sort.
+                    var descs = list.SortDescriptions;
+                    ListSortDirection newDir = ListSortDirection.Ascending;
+
+                    if (descs.Count == 1 && descs[0].PropertyDescriptor.Name == prop.Name)
+                    {
+                        newDir = descs[0].SortDirection == ListSortDirection.Ascending
+                            ? ListSortDirection.Descending
+                            : ListSortDirection.Ascending;
+                    }
+
+                    list.ApplyMultiSort((prop.Name, newDir));
+                }
+
+                UpdateSortGlyphs();
+            }
+
+            RefreshGridAfterSort();
+        }
+
+        /// <summary>
+        /// Post-sort recovery: reapplies row colors, class-based row visibility,
+        /// and column header sort glyphs.  Call after any operation that triggers
+        /// a sort (which fires ListChanged Reset, clearing custom cell styles
+        /// and row visibility).
+        /// </summary>
+        private void RefreshGridAfterSort()
+        {
+            SyncRuntimeToGrid();
             RefreshTimerGridDataSource();
+            UpdateSortGlyphs();
+        }
+
+        /// <summary>
+        /// Updates column header sort glyphs to reflect the current sort state.
+        /// Uses native OS-styled arrows via SortGlyphDirection.
+        /// When multi-column sorting is active (2+ columns), shows a summary
+        /// in the status strip; hidden otherwise.
+        /// </summary>
+        private void UpdateSortGlyphs()
+        {
+            var list = grdTimers.DataSource as SortableBindingList<Timers.GridData>;
+            if (list == null) return;
+
+            var descriptions = list.SortDescriptions;
+
+            // Clear all glyphs
+            foreach (DataGridViewColumn col in grdTimers.Columns)
+                col.HeaderCell.SortGlyphDirection = SortOrder.None;
+
+            // Set glyphs on sorted columns
+            for (int i = 0; i < descriptions.Count; i++)
+            {
+                string propName = descriptions[i].PropertyDescriptor.Name;
+                foreach (DataGridViewColumn col in grdTimers.Columns)
+                {
+                    if (col.DataPropertyName == propName)
+                    {
+                        col.HeaderCell.SortGlyphDirection = descriptions[i].SortDirection == ListSortDirection.Ascending
+                            ? SortOrder.Ascending
+                            : SortOrder.Descending;
+                        break;
+                    }
+                }
+            }
+
+            // Show multi-sort summary in status strip only when 2+ columns are sorted
+            if (descriptions.Count > 1)
+            {
+                var parts = new string[descriptions.Count];
+                for (int i = 0; i < descriptions.Count; i++)
+                {
+                    string propName = descriptions[i].PropertyDescriptor.Name;
+                    string header = propName;
+                    foreach (DataGridViewColumn col in grdTimers.Columns)
+                    {
+                        if (col.DataPropertyName == propName)
+                        {
+                            header = col.HeaderText;
+                            break;
+                        }
+                    }
+                    string arrow = descriptions[i].SortDirection == ListSortDirection.Ascending ? "\u25B2" : "\u25BC";
+                    parts[i] = header + " " + arrow;
+                }
+                statusSortInfo.Text = "Sort: " + string.Join(" \u2192 ", parts);
+                statusSortInfo.Visible = true;
+            }
+            else
+            {
+                statusSortInfo.Visible = false;
+            }
+        }
+
+        /// <summary>
+        /// Re-applies the current sort order to the timer grid without reloading data.
+        /// Triggered by View ? Refresh Sort (F5).
+        /// </summary>
+        private void refreshTimersToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            var list = grdTimers.DataSource as SortableBindingList<Timers.GridData>;
+            if (list == null) return;
+
+            list.ReapplySort();
+            RefreshGridAfterSort();
         }
 
         private void lblBuffPickFore_Click(object sender, EventArgs e)
