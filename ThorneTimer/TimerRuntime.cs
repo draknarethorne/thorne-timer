@@ -729,12 +729,35 @@ namespace ThorneTimer
         private bool ValidDuration(string durationText)
         {
             if (string.IsNullOrEmpty(durationText)) return false;
-            if (durationText.Length != 8) return false;
-            if (durationText.Substring(2, 1) != ":" || durationText.Substring(5, 1) != ":") return false;
 
-            return int.TryParse(durationText.Substring(0, 2), out _)
-                && int.TryParse(durationText.Substring(3, 2), out _)
-                && int.TryParse(durationText.Substring(6, 2), out _);
+            // Check for DD HH:MM:SS or DDd HH:MM:SS (space separates days from time)
+            int spaceIdx = durationText.IndexOf(' ');
+            if (spaceIdx > 0)
+            {
+                string dayPart = durationText.Substring(0, spaceIdx).TrimEnd('d');
+                if (dayPart.Length == 0 || !int.TryParse(dayPart, out _))
+                    return false;
+
+                string[] parts = durationText.Substring(spaceIdx + 1).Split(':');
+                if (parts.Length != 3) return false;
+
+                foreach (string p in parts)
+                {
+                    if (p.Length != 2 || !int.TryParse(p, out _)) return false;
+                }
+                return true;
+            }
+
+            // HH:MM:SS
+            string[] timeParts = durationText.Split(':');
+            if (timeParts.Length != 3) return false;
+
+            foreach (string p in timeParts)
+            {
+                if (p.Length != 2 || !int.TryParse(p, out _)) return false;
+            }
+
+            return true;
         }
 
         // --- Event firing helpers ---

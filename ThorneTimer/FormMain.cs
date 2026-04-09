@@ -1591,32 +1591,43 @@ namespace ThorneTimer
         {
             string durationText = (string)durationCell.Value + "";
 
-            durationCell.ErrorText = "Invalid Duration. Use 'HH:MM:SS'";
+            durationCell.ErrorText = "Invalid Duration. Use 'HH:MM:SS' or 'DD HH:MM:SS' (or 'DDd HH:MM:SS')";
 
-            if (durationText.Length != 8)
+            // Check for DD HH:MM:SS or DDd HH:MM:SS (space separates days from time)
+            int spaceIdx = durationText.IndexOf(' ');
+            if (spaceIdx > 0)
             {
-                return false;
+                string dayPart = durationText.Substring(0, spaceIdx).TrimEnd('d');
+                if (dayPart.Length == 0 || !int.TryParse(dayPart, out _))
+                    return false;
+
+                string timePart = durationText.Substring(spaceIdx + 1);
+                string[] parts = timePart.Split(':');
+                if (parts.Length != 3)
+                    return false;
+
+                foreach (string p in parts)
+                {
+                    if (p.Length != 2 || !int.TryParse(p, out _))
+                        return false;
+                }
+
+                durationCell.ErrorText = "";
+                return true;
             }
 
-            if (durationText.Substring(2, 1) != ":" || durationText.Substring(5, 1) != ":")
-            {
+            // HH:MM:SS
+            string[] timeParts = durationText.Split(':');
+            if (timeParts.Length != 3)
                 return false;
-            }
 
-            string s1 = durationText.Substring(0, 2);
-            string s2 = durationText.Substring(3, 2);
-            string s3 = durationText.Substring(6, 2);
-            bool r1 = int.TryParse(s1, out _);
-            bool r2 = int.TryParse(s2, out _);
-            bool r3 = int.TryParse(s3, out _);
-
-            if (r1 == false || r2 == false || r3 == false)
+            foreach (string p in timeParts)
             {
-                return false;
+                if (p.Length != 2 || !int.TryParse(p, out _))
+                    return false;
             }
 
             durationCell.ErrorText = "";
-
             return true;
         }
 
