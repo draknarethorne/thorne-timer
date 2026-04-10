@@ -17,6 +17,16 @@ namespace ThorneTimer
         private ListSortDirection _sortDirection = ListSortDirection.Ascending;
         private PropertyDescriptor _sortProperty;
         private ListSortDescriptionCollection _sortDescriptions = new ListSortDescriptionCollection();
+        private readonly Dictionary<string, Func<object, object>> _displayResolvers = new Dictionary<string, Func<object, object>>();
+
+        /// <summary>
+        /// Registers a function that converts a raw property value (e.g. a numeric ID) to
+        /// the display value (e.g. a name string) used for sort comparison.
+        /// </summary>
+        public void RegisterDisplayResolver(string propertyName, Func<object, object> resolver)
+        {
+            _displayResolvers[propertyName] = resolver;
+        }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SortableBindingList{T}"/> class.
@@ -297,9 +307,16 @@ namespace ThorneTimer
             for (int i = 0; i < _sortDescriptions.Count; i++)
             {
                 var desc = _sortDescriptions[i];
-                int result = CompareValues(
-                    desc.PropertyDescriptor.GetValue(lhs),
-                    desc.PropertyDescriptor.GetValue(rhs));
+                object lhsVal = desc.PropertyDescriptor.GetValue(lhs);
+                object rhsVal = desc.PropertyDescriptor.GetValue(rhs);
+
+                if (_displayResolvers.TryGetValue(desc.PropertyDescriptor.Name, out var resolver))
+                {
+                    lhsVal = resolver(lhsVal);
+                    rhsVal = resolver(rhsVal);
+                }
+
+                int result = CompareValues(lhsVal, rhsVal);
 
                 if (desc.SortDirection == ListSortDirection.Descending)
                     result = -result;

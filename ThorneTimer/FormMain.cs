@@ -1,4 +1,4 @@
-using System;
+ï»¿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -29,6 +29,9 @@ namespace ThorneTimer
         }
         public FormMain()
         {
+            ThorneLog.Separator("FORM INIT");
+            ThorneLog.Info("FormMain constructor starting");
+
             InitializeComponent();
 
             // Migrate user settings from previous version on first run after upgrade
@@ -38,6 +41,7 @@ namespace ThorneTimer
                 Properties.Settings.Default.NeedsUpgrade = false;
                 Properties.Settings.Default.Save();
                 needsSizeNudge = true;
+                ThorneLog.Info("User settings migrated from previous version");
             }
 
             // Resolve initial database: saved path > default (next to exe)
@@ -47,10 +51,23 @@ namespace ThorneTimer
                 dbPath = Database.GetDefaultDatabasePath();
                 Properties.Settings.Default.DatabasePath = dbPath;
                 Properties.Settings.Default.Save();
+                ThorneLog.Info($"Database path resolved to default: {dbPath}");
             }
+            else
+            {
+                ThorneLog.Info($"Database path from settings: {dbPath}");
+            }
+
+            ThorneLog.Info("Opening database connection...");
             con = Database.Connection(dbPath);
+            ThorneLog.Info("Database connection established");
+
+            // Load log settings from DB now that connection is open
+            ThorneLog.LoadSettings(con);
+
             AddToRecentDatabases(dbPath);
             UpdateTitleBar(dbPath);
+            ThorneLog.Info("FormMain constructor complete");
         }
 
         bool needsSizeNudge = false;
@@ -82,6 +99,14 @@ namespace ThorneTimer
         private Dictionary<string, float> _advancedFillWeights = new Dictionary<string, float>();
         private Dictionary<string, float> _compactFillWeights = new Dictionary<string, float>();
 
+        // Temporary auto-switch suppression after a manual character switch.
+        // Cleared automatically when the active character's log generates content
+        // (meaning the user settled on that character), or on explicit toggle.
+        private bool autoSwitchSuppressed = false;
+
+        // Reference count for nested BeginGridUpdate/EndGridUpdate calls
+        private int _gridUpdateDepth = 0;
+
         readonly MiniViews miniViews = new MiniViews();
         readonly TimerRuntime timerRuntime = new TimerRuntime();
         readonly LogMonitor logMonitor = new LogMonitor();
@@ -92,11 +117,12 @@ namespace ThorneTimer
         Bitmap iconMiniViews;
         Bitmap iconAutoSwitch;
         Bitmap iconAllClasses;
+        Bitmap iconActiveOnly;
         Bitmap iconCompactView;
 
         private void CreateToolbarIcons()
         {
-            // Green play triangle — Start Watching
+            // Green play triangle â€” Start Watching
             iconPlay = new Bitmap(16, 16);
             using (var g = Graphics.FromImage(iconPlay))
             {
@@ -106,7 +132,7 @@ namespace ThorneTimer
                     g.FillPolygon(brush, new[] { new Point(4, 2), new Point(14, 8), new Point(4, 14) });
             }
 
-            // Red stop square — Stop Watching
+            // Red stop square â€” Stop Watching
             iconStop = new Bitmap(16, 16);
             using (var g = Graphics.FromImage(iconStop))
             {
@@ -115,7 +141,7 @@ namespace ThorneTimer
                     g.FillRectangle(brush, 3, 3, 10, 10);
             }
 
-            // Mini Views icon — four small windows in a grid
+            // Mini Views icon â€” four small windows in a grid
             iconMiniViews = new Bitmap(16, 16);
             using (var g = Graphics.FromImage(iconMiniViews))
             {
@@ -129,7 +155,7 @@ namespace ThorneTimer
                 }
             }
 
-            // Auto-Switch icon — two curved arrows forming a cycle
+            // Auto-Switch icon â€” two curved arrows forming a cycle
             iconAutoSwitch = new Bitmap(16, 16);
             using (var g = Graphics.FromImage(iconAutoSwitch))
             {
@@ -150,7 +176,7 @@ namespace ThorneTimer
                     g.FillPolygon(brush, new[] { new Point(3, 7), new Point(3, 13), new Point(1, 10) });
             }
 
-            // All Classes icon — three person silhouettes
+            // All Classes icon â€” three person silhouettes
             iconAllClasses = new Bitmap(16, 16);
             using (var g = Graphics.FromImage(iconAllClasses))
             {
@@ -173,7 +199,7 @@ namespace ThorneTimer
                 }
             }
 
-            // Compact View icon — three descending horizontal lines (collapsed columns)
+            // Compact View icon â€” three descending horizontal lines (collapsed columns)
             iconCompactView = new Bitmap(16, 16);
             using (var g = Graphics.FromImage(iconCompactView))
             {
@@ -188,6 +214,22 @@ namespace ThorneTimer
                 }
             }
 
+            // Active Only icon â€” a checkmark inside a circle
+            iconActiveOnly = new Bitmap(16, 16);
+            using (var g = Graphics.FromImage(iconActiveOnly))
+            {
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                var green = Color.FromArgb(40, 160, 40);
+                using (var pen = new Pen(green, 1.4f))
+                    g.DrawEllipse(pen, 1, 1, 13, 13);
+                using (var pen = new Pen(green, 2f))
+                {
+                    g.DrawLine(pen, 4, 8, 7, 11);
+                    g.DrawLine(pen, 7, 11, 12, 4);
+                }
+            }
+
             // Set initial images
             tsbStartStopWatching.Image = iconPlay;
             startStopWatchingToolStripMenuItem.Image = iconPlay;
@@ -197,6 +239,8 @@ namespace ThorneTimer
             autoSwitchToolStripMenuItem.Image = iconAutoSwitch;
             tsbShowAllClasses.Image = iconAllClasses;
             showAllClassesToolStripMenuItem.Image = iconAllClasses;
+            tsbShowActiveOnly.Image = iconActiveOnly;
+            showActiveOnlyToolStripMenuItem.Image = iconActiveOnly;
             tsbCompactView.Image = iconCompactView;
             compactViewToolStripMenuItem.Image = iconCompactView;
         }
@@ -289,52 +333,108 @@ namespace ThorneTimer
             showAllClassesToolStripMenuItem.Checked = showAllClasses;
             timerRuntime.ShowAllClasses = showAllClasses;
 
+            // Restore show-active-only setting
+            bool showActiveOnly = Database.GetSetting(con, "ShowActiveOnly") == "1";
+            tsbShowActiveOnly.Checked = showActiveOnly;
+            showActiveOnlyToolStripMenuItem.Checked = showActiveOnly;
+            timerRuntime.ShowActiveOnly = showActiveOnly;
+
+            // Suppress SelectedIndexChanged during setup â€” setting DataSource
+            // and SelectedItem each fire the event, which would trigger full
+            // LoadTimerRuntime cycles before the app is ready.  This was the
+            // root cause of duplicate TimerPlus instances and cross-character
+            // timer state bleed.
+            tscActiveCharacter.SelectedIndexChanged -= tscActiveCharacter_SelectedIndexChanged;
             SetupActiveCharacters();
-            SetupTimerGrid();
-            SetupCharacterGrid();
-            SetupCategoriesGrid();
-            SetupViewsGrid();
+            tscActiveCharacter.SelectedIndexChanged += tscActiveCharacter_SelectedIndexChanged;
 
-            // Load timer and category data into TimerRuntime
-            LoadTimerRuntime();
+            ThorneLog.Separator("FORM LOAD");
+            ThorneLog.Info($"FormMain_Load: activeCharacterID={activeCharacterID}");
+            ThorneLog.Info($"FormMain_Load: autoSwitch={autoSwitch}, showAllClasses={showAllClasses}, showActiveOnly={showActiveOnly}");
 
-            // Apply class filter based on active character
-            RefreshTimerGridDataSource();
+            // Dump loaded reference data for diagnostics
+            ThorneLog.DumpClasses("Startup", con);
+            ThorneLog.DumpCharacters("Startup", Database.GetActiveCharacters(con));
+            ThorneLog.DumpCategories("Startup", Database.GetCategories(con));
 
-            // Restore compact view setting
-            compactViewWidth = SafeParseInt(Database.GetSetting(con, "CompactWidth"), this.Width < DefaultFullViewWidth ? this.Width : DefaultCompactViewWidth);
-            fullViewWidth = SafeParseInt(Database.GetSetting(con, "FullWidth"), Math.Max(this.Width, DefaultFullViewWidth));
-            bool compactView = Database.GetSetting(con, "CompactView") == "1";
-            tsbCompactView.Checked = compactView;
-            compactViewToolStripMenuItem.Checked = compactView;
-            ApplyCompactView(compactView, initializing: true);
+            // Hide the grid and suppress layout/auto-size for the entire
+            // setup + data-load sequence so nothing paints until the end.
+            grdTimers.Visible = false;
+            BeginGridUpdate();
+            try
+            {
+                SetupTimerGrid();
+                SetupCharacterGrid();
+                SetupCategoriesGrid();
+                SetupViewsGrid();
+                // Load timer and category data into TimerRuntime
+                var savedStates = LoadTimerRuntime();
 
-            // Restore persisted column widths
-            LoadColumnWidths("Timers", grdTimers);
-            LoadColumnWidths("Characters", grdCharacters);
-            LoadColumnWidths("Categories", grdCategories);
+                // On app startup, restore World-scope timers that were running
+                // when the app last closed, adjusting for elapsed offline time.
+                // Reuse the savedStates already loaded above (no second DB query).
+                ThorneLog.Info($"FormMain_Load: calling RestoreWorldTimersOnStartup with {savedStates.Count} saved states");
+                timerRuntime.RestoreWorldTimersOnStartup(savedStates);
 
-            // Seed per-view FillWeight caches from the current (post-load) state
-            // so the very first compact/advanced toggle has weights to restore.
-            // The DB stores all columns: visible ones have the current view's
-            // FillWeights; hidden ones have the other view's FillWeights.
-            // Seed both caches — the first toggle will refine the "other" view.
-            var initialWeights = new Dictionary<string, float>();
-            foreach (DataGridViewColumn col in grdTimers.Columns)
-                initialWeights[col.Name] = col.FillWeight;
-            _compactFillWeights = new Dictionary<string, float>(initialWeights);
-            _advancedFillWeights = new Dictionary<string, float>(initialWeights);
+                // Sync world timer restores to the grid
+                SyncRuntimeToGrid();
 
-            // Restore persisted multi-column sort state
-            LoadSortState("Timers", grdTimers);
+                ThorneLog.Info("FormMain_Load: timer load + restore complete");
+                ThorneLog.DumpTimerGrid("Startup-complete", grdTimers);
 
-            // Sorting fires ListChanged(Reset) which rebuilds grid rows,
-            // clearing custom cell styles and row visibility.
-            RefreshGridAfterSort();
+                // Restore compact view setting
+                compactViewWidth = SafeParseInt(Database.GetSetting(con, "CompactWidth"), this.Width < DefaultFullViewWidth ? this.Width : DefaultCompactViewWidth);
+                fullViewWidth = SafeParseInt(Database.GetSetting(con, "FullWidth"), Math.Max(this.Width, DefaultFullViewWidth));
+                bool compactView = Database.GetSetting(con, "CompactView") == "1";
+                tsbCompactView.Checked = compactView;
+                compactViewToolStripMenuItem.Checked = compactView;
+                ApplyCompactView(compactView, initializing: true);
+
+                // Restore persisted column widths
+                LoadColumnWidths("Timers", grdTimers);
+                LoadColumnWidths("Characters", grdCharacters);
+                LoadColumnWidths("Categories", grdCategories);
+
+                // Seed per-view FillWeight caches from the current (post-load) state
+                // so the very first compact/advanced toggle has weights to restore.
+                // The DB stores all columns: visible ones have the current view's
+                // FillWeights; hidden ones have the other view's FillWeights.
+                // Seed both caches â€” the first toggle will refine the "other" view.
+                var initialWeights = new Dictionary<string, float>();
+                foreach (DataGridViewColumn col in grdTimers.Columns)
+                    initialWeights[col.Name] = col.FillWeight;
+                _compactFillWeights = new Dictionary<string, float>(initialWeights);
+                _advancedFillWeights = new Dictionary<string, float>(initialWeights);
+
+                // Restore persisted multi-column sort state
+                LoadSortState("Timers", grdTimers);
+
+                // Sorting fires ListChanged(Reset) which rebuilds grid rows,
+                // clearing custom cell styles and row visibility.
+                RefreshGridAfterSort();
+            }
+            finally
+            {
+                EndGridUpdate();
+                grdTimers.Visible = true;
+            }
 
             UpdateMiniView();
 
             PopulateRecentDatabases();
+
+            this.Shown += FormMain_Shown;
+        }
+
+        private void FormMain_Shown(object sender, EventArgs e)
+        {
+            // Force the grid to recalculate its Fill layout now that
+            // the form is fully visible.  Without this toggle, columns
+            // appear draggable but won't actually resize until the user
+            // manually resizes the form (a known WinForms quirk when
+            // AutoSizeColumnsMode=Fill is set before initial layout).
+            grdTimers.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
+            grdTimers.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
         }
 
         private void UpdateTitleBar(string dbPath)
@@ -550,6 +650,11 @@ namespace ThorneTimer
             showAllClassesToolStripMenuItem.Checked = showAllClasses;
             timerRuntime.ShowAllClasses = showAllClasses;
 
+            bool showActiveOnly = Database.GetSetting(con, "ShowActiveOnly") == "1";
+            tsbShowActiveOnly.Checked = showActiveOnly;
+            showActiveOnlyToolStripMenuItem.Checked = showActiveOnly;
+            timerRuntime.ShowActiveOnly = showActiveOnly;
+
             bool compactView = Database.GetSetting(con, "CompactView") == "1";
             tsbCompactView.Checked = compactView;
             compactViewToolStripMenuItem.Checked = compactView;
@@ -563,7 +668,9 @@ namespace ThorneTimer
             grdViews.RowValidating -= ValidateRowViews;
 
             // Reload grids
+            tscActiveCharacter.SelectedIndexChanged -= tscActiveCharacter_SelectedIndexChanged;
             SetupActiveCharacters();
+            tscActiveCharacter.SelectedIndexChanged += tscActiveCharacter_SelectedIndexChanged;
             grdTimers.DataSource = null;
             grdTimers.Columns.Clear();
             SetupTimerGrid();
@@ -578,13 +685,20 @@ namespace ThorneTimer
             SetupViewsGrid();
 
             // Reload TimerRuntime with new database data
-            LoadTimerRuntime();
+            BeginGridUpdate();
+            try
+            {
+                LoadTimerRuntime();
 
-            // Apply class filter based on active character
-            RefreshTimerGridDataSource();
+                // Re-apply compact view after grid rebuild
+                ApplyCompactView(tsbCompactView.Checked);
 
-            // Re-apply compact view after grid rebuild
-            ApplyCompactView(tsbCompactView.Checked);
+                RefreshGridAfterSort();
+            }
+            finally
+            {
+                EndGridUpdate();
+            }
 
             UpdateMiniView();
         }
@@ -688,7 +802,7 @@ namespace ThorneTimer
                     }
                     else
                     {
-                        // Yes — replace the existing one
+                        // Yes â€” replace the existing one
                         string currentDbPath = Properties.Settings.Default.DatabasePath ?? "";
                         if (string.Equals(Path.GetFullPath(currentDbPath), Path.GetFullPath(targetPath), StringComparison.OrdinalIgnoreCase))
                         {
@@ -763,6 +877,10 @@ namespace ThorneTimer
 
         private void FormMain_FormClosing(Object sender, FormClosingEventArgs e)
         {
+            ThorneLog.Separator("FORM CLOSING");
+            ThorneLog.Info($"FormClosing: activeCharacterID={activeCharacterID}");
+            ThorneLog.DumpTimerGrid("FormClosing-before", grdTimers);
+
             SaveProperties();
 
             // Persist column widths
@@ -781,12 +899,17 @@ namespace ThorneTimer
             SaveDataViews();
 
             // Save timer runtime state (counts + running timer info) for persistence
+            ThorneLog.Info("FormClosing: saving character state");
             var closingStates = timerRuntime.SaveCharacterState();
+            ThorneLog.Info($"FormClosing: saving timer states (charID={activeCharacterID}, {closingStates.Count} timer(s))");
             Database.SaveTimerStates(con, closingStates, activeCharacterID);
+            ThorneLog.Info("FormClosing: state persisted, stopping timers");
 
             // Stop remaining timers (World-scope) and log monitor gracefully
             timerRuntime.StopAllTimers();
             logMonitor.Stop();
+
+            ThorneLog.Info("FormClosing: shutdown complete");
         }
 
         /// <summary>
@@ -815,7 +938,7 @@ namespace ThorneTimer
             if (IsVisibleOnAnyScreen(windowRect))
                 return location;
 
-            // Entirely offscreen — clamp to nearest screen with a small inset
+            // Entirely offscreen â€” clamp to nearest screen with a small inset
             const int inset = 10;
             Screen nearest = Screen.FromPoint(location);
             Rectangle area = nearest.WorkingArea;
@@ -834,7 +957,7 @@ namespace ThorneTimer
 
                 // One-time nudge on version upgrade: bump saved size up to
                 // the new default so existing users see the improved layout.
-                // Only fires once — after that their chosen size is respected.
+                // Only fires once â€” after that their chosen size is respected.
                 if (needsSizeNudge)
                 {
                     bool isCompact = Database.GetSetting(con, "CompactView") == "1";
@@ -995,6 +1118,73 @@ namespace ThorneTimer
             }
         }
 
+        void GrdTimers_CellToolTipTextNeeded(object sender, DataGridViewCellToolTipTextNeededEventArgs e)
+        {
+            if (e.RowIndex < 0) return;
+            if (e.ColumnIndex < 0) return;
+
+            var grid = (DataGridView)sender;
+            string colName = grid.Columns[e.ColumnIndex].Name;
+
+            switch (colName)
+            {
+                case "Scope":
+                    var scopeValue = grid.Rows[e.RowIndex].Cells[e.ColumnIndex].Value as string;
+                    switch (scopeValue)
+                    {
+                        case "World":
+                            e.ToolTipText = "Shared timer across all characters. Always counting.";
+                            break;
+                        case "Character":
+                            e.ToolTipText = "Per-character timer. Pauses when the character is offline.";
+                            break;
+                        case "Character+":
+                            e.ToolTipText = "Per-character timer. Continues counting while the character is offline\n(server-tracked cooldowns like item recast timers).";
+                            break;
+                    }
+                    break;
+
+                case "Style":
+                    var styleValue = grid.Rows[e.RowIndex].Cells[e.ColumnIndex].Value as string;
+                    switch (styleValue)
+                    {
+                        case "Normal":
+                            e.ToolTipText = "Standard timer. Shows warning colors when nearing expiry.";
+                            break;
+                        case "Buff":
+                            e.ToolTipText = "Buff timer. Restarts if the keyword fires again while running.\nUses buff-style colors in mini views.";
+                            break;
+                        case "Pet":
+                            e.ToolTipText = "Pet timer. Restarts if the keyword fires again while running.\nUses pet-style colors in mini views.";
+                            break;
+                        case "Ping":
+                            e.ToolTipText = "Ping timer. Fires a repeating notification.\nNo warning colors shown in mini views.";
+                            break;
+                    }
+                    break;
+
+                case "ActiveYn":
+                    e.ToolTipText = "Controls whether this timer participates in log-file keyword matching.";
+                    break;
+
+                case "CaseYn":
+                    e.ToolTipText = "When checked, keyword matching is case-sensitive.";
+                    break;
+
+                case "EndlessYn":
+                    e.ToolTipText = "When checked, the timer restarts automatically when it expires.";
+                    break;
+
+                case "ClassID":
+                    e.ToolTipText = "Filters which characters see this timer.\nGlobal (blank) means all characters see it.";
+                    break;
+
+                case "CategoryID":
+                    e.ToolTipText = "Logical grouping for this timer. Categories with Start/End Keywords\ncan automatically activate or deactivate all their timers\nbased on log events (e.g. entering or leaving a zone).";
+                    break;
+            }
+        }
+
         private void ResetTimersGridColumns()
         {
             int i = 1;
@@ -1007,15 +1197,15 @@ namespace ThorneTimer
             grdTimers.Columns["Scope"].DisplayIndex = i++;
             grdTimers.Columns["StartKeyword"].DisplayIndex = i++;
             grdTimers.Columns["EndKeyword"].DisplayIndex = i++;
+            grdTimers.Columns["DependsOnTimer"].DisplayIndex = i++;
+            grdTimers.Columns["DependsOnDelay"].DisplayIndex = i++;
+            grdTimers.Columns["Speech"].DisplayIndex = i++;
             grdTimers.Columns["WAV"].DisplayIndex = i++;
             grdTimers.Columns["WAVFile"].DisplayIndex = i++;
-            grdTimers.Columns["Speech"].DisplayIndex = i++;
             grdTimers.Columns["Duration"].DisplayIndex = i++;
             grdTimers.Columns["Remaining"].DisplayIndex = i++;
             grdTimers.Columns["CaseYn"].DisplayIndex = i++;
             grdTimers.Columns["EndlessYn"].DisplayIndex = i++;
-            grdTimers.Columns["DependsOnTimer"].DisplayIndex = i++;
-            grdTimers.Columns["DependsOnDelay"].DisplayIndex = i++;
             grdTimers.Columns["StartStop"].DisplayIndex = i++;
 
             grdTimers.Columns["ActiveYn"].SortMode = DataGridViewColumnSortMode.Programmatic;
@@ -1252,17 +1442,17 @@ namespace ThorneTimer
                 DataPropertyName = "Scope",
                 FlatStyle = FlatStyle.Flat
             };
-            cboScope.Items.AddRange("Character", "World");
+            cboScope.Items.AddRange("Character", "Character+", "World");
             grdTimers.Columns.Add(cboScope);
-            grdTimers.Columns["Scope"].Width = 80;
-            grdTimers.Columns["Scope"].MinimumWidth = 60;
+            grdTimers.Columns["Scope"].Width = 90;
+            grdTimers.Columns["Scope"].MinimumWidth = 70;
 
             grdTimers.Columns.Add("DependsOnTimer", "Depends On");
             grdTimers.Columns["DependsOnTimer"].DataPropertyName = "DependsOnTimer";
             grdTimers.Columns["DependsOnTimer"].Width = 100;
             grdTimers.Columns["DependsOnTimer"].MinimumWidth = 60;
 
-            grdTimers.Columns.Add("DependsOnDelay", "Delay (s)");
+            grdTimers.Columns.Add("DependsOnDelay", "Depends Delay");
             grdTimers.Columns["DependsOnDelay"].DataPropertyName = "DependsOnDelay";
             grdTimers.Columns["DependsOnDelay"].Width = 55;
             grdTimers.Columns["DependsOnDelay"].MinimumWidth = 40;
@@ -1301,8 +1491,35 @@ namespace ThorneTimer
 
             grdTimers.DataSource = Database.GetTimers(con);
 
+            // Register display-name resolvers so sorting uses the visible name
+            // (e.g. "Necromancer") instead of the raw numeric ID.
+            var timerList = grdTimers.DataSource as SortableBindingList<Timers.GridData>;
+            if (timerList != null)
+            {
+                var categories = Database.GetGridCategories(con);
+                var catLookup = new Dictionary<long, string>();
+                foreach (var c in categories) catLookup[c.Value] = c.Text;
+                timerList.RegisterDisplayResolver("CategoryID", raw =>
+                {
+                    if (raw is long id && catLookup.TryGetValue(id, out string name)) return name;
+                    if (raw is int intId && catLookup.TryGetValue(intId, out string name2)) return name2;
+                    return raw?.ToString() ?? "";
+                });
+
+                var classes = Database.GetGridClasses(con);
+                var clsLookup = new Dictionary<long, string>();
+                foreach (var c in classes) clsLookup[c.Value] = c.Text;
+                timerList.RegisterDisplayResolver("ClassID", raw =>
+                {
+                    if (raw is long id && clsLookup.TryGetValue(id, out string name)) return name;
+                    if (raw is int intId && clsLookup.TryGetValue(intId, out string name2)) return name2;
+                    return raw?.ToString() ?? "";
+                });
+            }
+
             grdTimers.RowValidating += ValidateRowTimers;
             grdTimers.EditingControlShowing += GrdTimers_EditingControlShowing;
+            grdTimers.CellToolTipTextNeeded += GrdTimers_CellToolTipTextNeeded;
 
             ResetTimersGridColumns();
         }
@@ -1437,7 +1654,7 @@ namespace ThorneTimer
             grdViews.Columns["ActiveYn"].Width = 50;
             grdViews.Columns["ActiveYn"].MinimumWidth = 50;
 
-            // Hide position/sort columns — managed internally
+            // Hide position/sort columns â€” managed internally
             grdViews.Columns.Add("PositionX", "PositionX");
             grdViews.Columns["PositionX"].DataPropertyName = "PositionX";
             grdViews.Columns["PositionX"].Visible = false;
@@ -1548,7 +1765,11 @@ namespace ThorneTimer
                 Database.SaveViewPositions(con, positions);
             }
 
+            // Detach SelectedIndexChanged before refreshing the combo box to
+            // prevent a full LoadTimerRuntime cycle during exit/save.
+            tscActiveCharacter.SelectedIndexChanged -= tscActiveCharacter_SelectedIndexChanged;
             SetupActiveCharacters();
+            tscActiveCharacter.SelectedIndexChanged += tscActiveCharacter_SelectedIndexChanged;
         }
 
         void SaveDataTimers()
@@ -1749,6 +1970,10 @@ namespace ThorneTimer
 
         private void StopAllTimers()
         {
+            // Capture running state before stopping
+            var states = timerRuntime.SaveCharacterState();
+            Database.SaveTimerStates(con, states, activeCharacterID);
+
             timerRuntime.StopAllTimers();
             SyncRuntimeToGrid();
         }
@@ -1814,11 +2039,29 @@ namespace ThorneTimer
             startStopWatchingToolStripMenuItem.Image = iconPlay;
             statusParsing.Text = "Idle";
 
+            // Clear temporary suppression â€” no log monitoring means nothing to suppress
+            autoSwitchSuppressed = false;
+            logMonitor.SuppressedAutoSwitchCharacterID = 0;
+
             logMonitor.Stop();
         }
 
         private void OnLogChunkReceived(object sender, LogChunkReceivedEventArgs e)
         {
+            // The active character's log is generating content.  If auto-switch
+            // was temporarily suppressed (manual character switch), re-enable it
+            // â€” the user has settled on this character.
+            if (autoSwitchSuppressed)
+            {
+                autoSwitchSuppressed = false;
+                logMonitor.SuppressedAutoSwitchCharacterID = 0;
+                this.BeginInvoke(new Action(() =>
+                {
+                    if (tsbStartStopWatching.Text == stopWatchingText && logMonitor.FilePath != null)
+                        statusParsing.Text = "Watching: " + Path.GetFileName(logMonitor.FilePath);
+                }));
+            }
+
             timerRuntime.ProcessLogText(e.Text);
         }
 
@@ -1826,6 +2069,8 @@ namespace ThorneTimer
         {
             bool enabled = autoSwitchToolStripMenuItem.Checked;
             tsbAutoSwitch.Checked = enabled;
+            autoSwitchSuppressed = false;  // explicit toggle overrides temporary suppression
+            logMonitor.SuppressedAutoSwitchCharacterID = 0;
             logMonitor.AutoSwitchEnabled = enabled;
             Database.SetSetting(con, "AutoSwitchEnabled", enabled ? "1" : "0");
         }
@@ -1834,6 +2079,8 @@ namespace ThorneTimer
         {
             bool enabled = tsbAutoSwitch.Checked;
             autoSwitchToolStripMenuItem.Checked = enabled;
+            autoSwitchSuppressed = false;  // explicit toggle overrides temporary suppression
+            logMonitor.SuppressedAutoSwitchCharacterID = 0;
             logMonitor.AutoSwitchEnabled = enabled;
             Database.SetSetting(con, "AutoSwitchEnabled", enabled ? "1" : "0");
         }
@@ -1858,6 +2105,26 @@ namespace ThorneTimer
             RepaintTimerGrid();
         }
 
+        private void tsbShowActiveOnly_Click(object sender, EventArgs e)
+        {
+            bool activeOnly = tsbShowActiveOnly.Checked;
+            showActiveOnlyToolStripMenuItem.Checked = activeOnly;
+            timerRuntime.ShowActiveOnly = activeOnly;
+            Database.SetSetting(con, "ShowActiveOnly", activeOnly ? "1" : "0");
+            RefreshTimerGridDataSource();
+            RepaintTimerGrid();
+        }
+
+        private void showActiveOnlyToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            bool activeOnly = showActiveOnlyToolStripMenuItem.Checked;
+            tsbShowActiveOnly.Checked = activeOnly;
+            timerRuntime.ShowActiveOnly = activeOnly;
+            Database.SetSetting(con, "ShowActiveOnly", activeOnly ? "1" : "0");
+            RefreshTimerGridDataSource();
+            RepaintTimerGrid();
+        }
+
         private void tsbCompactView_Click(object sender, EventArgs e)
         {
             bool compact = tsbCompactView.Checked;
@@ -1875,7 +2142,7 @@ namespace ThorneTimer
         }
 
         /// <summary>
-        /// Columns hidden in compact mode — configuration-only columns
+        /// Columns hidden in compact mode â€” configuration-only columns
         /// that aren't needed during active play.
         /// </summary>
         private static readonly string[] CompactHiddenColumns = new[]
@@ -1909,12 +2176,20 @@ namespace ThorneTimer
                     _compactFillWeights = weights;
             }
 
-            foreach (string colName in CompactHiddenColumns)
+            BeginGridUpdate();
+            try
             {
-                if (grdTimers.Columns.Contains(colName))
+                foreach (string colName in CompactHiddenColumns)
                 {
-                    grdTimers.Columns[colName].Visible = !compact;
+                    if (grdTimers.Columns.Contains(colName))
+                    {
+                        grdTimers.Columns[colName].Visible = !compact;
+                    }
                 }
+            }
+            finally
+            {
+                EndGridUpdate();
             }
 
             if (this.WindowState != FormWindowState.Normal) return;
@@ -1967,8 +2242,8 @@ namespace ThorneTimer
         }
 
         /// <summary>
-        /// Refreshes the timer grid row visibility based on class filter.
-        /// Called when ShowAllClasses toggle changes or after character switch.
+        /// Refreshes the timer grid row visibility based on class and active filters.
+        /// Called when ShowAllClasses or ShowActiveOnly toggles change, or after character switch.
         /// </summary>
         private void RefreshTimerGridDataSource()
         {
@@ -1980,28 +2255,42 @@ namespace ThorneTimer
 
             long classID = GetActiveCharacterClassID();
             bool showAll = timerRuntime.ShowAllClasses;
+            bool activeOnly = timerRuntime.ShowActiveOnly;
 
-            // Detach the current cell before changing row visibility —
+            // Detach the current cell before changing row visibility â€”
             // WinForms throws InvalidOperationException if you try to
             // hide the row the CurrencyManager is currently pointing to.
             grdTimers.CurrentCell = null;
 
-            foreach (DataGridViewRow row in grdTimers.Rows)
+            BeginGridUpdate();
+            try
             {
-                if (row.IsNewRow) continue;
+                foreach (DataGridViewRow row in grdTimers.Rows)
+                {
+                    if (row.IsNewRow) continue;
 
-                if (showAll)
-                {
-                    row.Visible = true;
+                    bool visible = true;
+
+                    // Class filter
+                    if (!showAll)
+                    {
+                        long timerClassID = Convert.ToInt64(row.Cells[grdTimers.Columns["ClassID"].Index].Value);
+                        visible = (timerClassID == 0 || (classID > 0 && timerClassID == classID));
+                    }
+
+                    // Active filter
+                    if (visible && activeOnly)
+                    {
+                        long activeYn = Convert.ToInt64(row.Cells[grdTimers.Columns["ActiveYn"].Index].Value);
+                        visible = (activeYn == 1);
+                    }
+
+                    row.Visible = visible;
                 }
-                else
-                {
-                    long timerClassID = Convert.ToInt64(row.Cells[grdTimers.Columns["ClassID"].Index].Value);
-                    // Global timers (ClassID=0) always visible.
-                    // Class-specific timers visible only if they match the active character's class.
-                    // If the character has no class set (classID=0), only global timers are shown.
-                    row.Visible = (timerClassID == 0 || (classID > 0 && timerClassID == classID));
-                }
+            }
+            finally
+            {
+                EndGridUpdate();
             }
 
             // Restore selection to the first visible row
@@ -2028,6 +2317,10 @@ namespace ThorneTimer
                 return;
             }
 
+            ThorneLog.Separator("CHARACTER SWITCH (auto)");
+            ThorneLog.Info($"Auto-switch FROM charID={activeCharacterID} TO charID={e.NewCharacterID}");
+            ThorneLog.DumpTimerGrid("AutoSwitch-before", grdTimers);
+
             // Save outgoing character's timer state
             var outgoingStates = timerRuntime.SaveCharacterState();
             Database.SaveTimerStates(con, outgoingStates, activeCharacterID);
@@ -2051,20 +2344,32 @@ namespace ThorneTimer
             // Tell LogMonitor which character is now active
             logMonitor.SetActiveCharacter(e.NewCharacterID);
 
-            // Reload timers and restore incoming character's state
-            LoadTimerRuntime();
+            // Suppress per-cell repaints during the full reload cycle
+            grdTimers.Visible = false;
+            BeginGridUpdate();
+            try
+            {
+                // Reload timers and restore incoming character's state
+                LoadTimerRuntime();
 
-            // Apply class filter for new character
-            RefreshTimerGridDataSource();
+                ThorneLog.DumpTimerGrid("AutoSwitch-after", grdTimers);
 
-            // Re-apply sort order — LoadTimerRuntime changed cell
-            // values so the rows may be in stale order.
-            var autoList = grdTimers.DataSource as SortableBindingList<Timers.GridData>;
-            if (autoList != null)
-                autoList.ReapplySort();
-            RefreshGridAfterSort();
+                // Re-apply sort order â€” LoadTimerRuntime changed cell
+                // values so the rows may be in stale order.
+                var autoList = grdTimers.DataSource as SortableBindingList<Timers.GridData>;
+                if (autoList != null)
+                    autoList.ReapplySort();
+                RefreshGridAfterSort();
+            }
+            finally
+            {
+                EndGridUpdate();
+                grdTimers.Visible = true;
+            }
 
-            // Update status bar
+            // Update status bar â€” auto-switch just fired, so suppression is cleared
+            autoSwitchSuppressed = false;
+            logMonitor.SuppressedAutoSwitchCharacterID = 0;
             statusParsing.Text = "Watching: " + Path.GetFileName(logMonitor.FilePath) + " (auto)";
 
             // Refresh mini views
@@ -2080,9 +2385,13 @@ namespace ThorneTimer
         /// Loads timer and category data from the database into TimerRuntime.
         /// Restores persisted state (counts + Character-scope running timers)
         /// from timer_runtime_state.
+        /// Returns the loaded saved states so callers (e.g. startup) can reuse
+        /// them for RestoreWorldTimersOnStartup without a redundant DB query.
         /// </summary>
-        private void LoadTimerRuntime()
+        private Dictionary<long, TimerState> LoadTimerRuntime()
         {
+            ThorneLog.Info($"LoadTimerRuntime: activeCharacterID={activeCharacterID}");
+
             var timerData = Database.GetTimers(con);
             timerRuntime.LoadTimers(timerData);
 
@@ -2090,11 +2399,17 @@ namespace ThorneTimer
             timerRuntime.LoadCategories(catData);
 
             // Restore persisted Character-scope timer state
+            ThorneLog.Debug($"LoadTimerRuntime: calling LoadTimerStates for charID={activeCharacterID}");
             var savedStates = Database.LoadTimerStates(con, activeCharacterID);
+            ThorneLog.Debug($"LoadTimerRuntime: calling RestoreCharacterState with {savedStates.Count} saved states");
             timerRuntime.RestoreCharacterState(savedStates);
+            ThorneLog.Debug("LoadTimerRuntime: calling SyncRuntimeToGrid");
 
             // Sync to grid
             SyncRuntimeToGrid();
+
+            ThorneLog.Info("LoadTimerRuntime: complete");
+            return savedStates;
         }
 
         /// <summary>
@@ -2108,38 +2423,48 @@ namespace ThorneTimer
                 return;
             }
 
-            var states = timerRuntime.GetAllStates();
-            foreach (DataGridViewRow row in grdTimers.Rows)
+            ThorneLog.Debug($"SyncRuntimeToGrid: {grdTimers.Rows.Count} grid rows");
+
+            BeginGridUpdate();
+            try
             {
-                long rowID = Convert.ToInt64(row.Cells[grdTimers.Columns["ID"].Index].Value);
-                var ts = states.FirstOrDefault(s => s.TimerID == rowID);
-                if (ts == null) continue;
-
-                // Sync per-character ActiveYn preference
-                DataGridViewCheckBoxCell activeCell = row.Cells[grdTimers.Columns["ActiveYn"].Index] as DataGridViewCheckBoxCell;
-                if (activeCell != null)
+                var states = timerRuntime.GetAllStates();
+                foreach (DataGridViewRow row in grdTimers.Rows)
                 {
-                    activeCell.Value = ts.ActiveYn;
+                    long rowID = Convert.ToInt64(row.Cells[grdTimers.Columns["ID"].Index].Value);
+                    var ts = states.FirstOrDefault(s => s.TimerID == rowID);
+                    if (ts == null) continue;
+
+                    // Sync per-character ActiveYn preference
+                    DataGridViewCheckBoxCell activeCell = row.Cells[grdTimers.Columns["ActiveYn"].Index] as DataGridViewCheckBoxCell;
+                    if (activeCell != null)
+                    {
+                        activeCell.Value = ts.ActiveYn;
+                    }
+
+                    // Sync count
+                    DataGridViewCell countCell = row.Cells[grdTimers.Columns["Count"].Index];
+                    countCell.Value = ts.Count > 0 ? ts.Count.ToString() : null;
+
+                    // Sync button state
+                    DataGridViewButtonCell btnCell = (DataGridViewButtonCell)row.Cells[grdTimers.Columns["StartStop"].Index];
+                    btnCell.Value = ts.ButtonState;
+                    if (ts.ButtonState != Timers.btnStart)
+                    {
+                        btnCell.UseColumnTextForButtonValue = false;
+                    }
+
+                    // Sync remaining
+                    DataGridViewCell remainingCell = row.Cells[grdTimers.Columns["Remaining"].Index];
+                    remainingCell.Value = ts.Remaining;
+
+                    // Sync color
+                    ApplyTimerRowColor(row, ts);
                 }
-
-                // Sync count
-                DataGridViewCell countCell = row.Cells[grdTimers.Columns["Count"].Index];
-                countCell.Value = ts.Count > 0 ? ts.Count.ToString() : null;
-
-                // Sync button state
-                DataGridViewButtonCell btnCell = (DataGridViewButtonCell)row.Cells[grdTimers.Columns["StartStop"].Index];
-                btnCell.Value = ts.ButtonState;
-                if (ts.ButtonState != Timers.btnStart)
-                {
-                    btnCell.UseColumnTextForButtonValue = false;
-                }
-
-                // Sync remaining
-                DataGridViewCell remainingCell = row.Cells[grdTimers.Columns["Remaining"].Index];
-                remainingCell.Value = ts.Remaining;
-
-                // Sync color
-                ApplyTimerRowColor(row, ts);
+            }
+            finally
+            {
+                EndGridUpdate();
             }
 
             RepaintTimerGrid();
@@ -2207,16 +2532,25 @@ namespace ThorneTimer
         }
 
         /// <summary>
-        /// Handles TimerStateChanged events from TimerRuntime — updates the grid row for the affected timer.
+        /// Handles TimerStateChanged events from TimerRuntime â€” updates the grid row for the affected timer.
         /// </summary>
         private void OnTimerStateChanged(object sender, TimerStateChangedEventArgs e)
         {
             if (InvokeRequired)
             {
-                this.BeginInvoke(new Action<object, TimerStateChangedEventArgs>(OnTimerStateChanged), sender, e);
+                // Capture the active character NOW (on the firing thread) so
+                // that late-arriving events queued via BeginInvoke don't
+                // persist state under a different character after a switch.
+                string capturedCharID = activeCharacterID;
+                this.BeginInvoke(new Action(() => HandleTimerStateChanged(e, capturedCharID)));
                 return;
             }
 
+            HandleTimerStateChanged(e, activeCharacterID);
+        }
+
+        private void HandleTimerStateChanged(TimerStateChangedEventArgs e, string forCharacterID)
+        {
             try
             {
                 // Find the grid row for this timer
@@ -2254,6 +2588,27 @@ namespace ThorneTimer
 
                 RepaintTimerGrid();
                 UpdateMiniView(false);
+
+                // Persist on meaningful state transitions (start, stop, expire,
+                // keyword-stop, deactivate-stop, offline-expire).  This is the
+                // single persistence point for ALL timer scopes â€” no per-scope
+                // or per-UI-path special cases.  Ticks are excluded so we only
+                // write to the DB when something actually changes.
+                //
+                // Guard: if the character has changed since this event fired
+                // (e.g. BeginInvoke callback arrived after a character switch),
+                // skip persistence â€” the event belongs to the old character and
+                // LoadTimerRuntime has already loaded the new character's state.
+                if (e.IsTransition && forCharacterID == activeCharacterID)
+                {
+                    var tsPersist = timerRuntime.GetState(e.TimerID);
+                    if (tsPersist != null)
+                    {
+                        if (tsPersist.Scope == "Character" || tsPersist.Scope == "Character+")
+                            ThorneLog.Debug($"HandleStateChanged PERSIST TID={e.TimerID} Scope={tsPersist.Scope} charID={activeCharacterID} Btn={tsPersist.ButtonState} Rem={tsPersist.Remaining} Act={tsPersist.ActiveYn}");
+                        Database.SaveSingleTimerState(con, tsPersist, activeCharacterID);
+                    }
+                }
             }
             catch
             {
@@ -2294,7 +2649,7 @@ namespace ThorneTimer
         }
 
         /// <summary>
-        /// Handles category activation events — syncs grid checkboxes and saves.
+        /// Handles category activation events â€” syncs grid checkboxes and saves.
         /// </summary>
         private void OnCategoryTimersActivated(object sender, EventArgs e)
         {
@@ -2377,7 +2732,9 @@ namespace ThorneTimer
                     Database.DeleteCharacter(con, Convert.ToString(idCell.Value));
 
                     grdCharacters.DataSource = Database.GetCharacters(con);
+                    tscActiveCharacter.SelectedIndexChanged -= tscActiveCharacter_SelectedIndexChanged;
                     SetupActiveCharacters();
+                    tscActiveCharacter.SelectedIndexChanged += tscActiveCharacter_SelectedIndexChanged;
                 }
             }
         }
@@ -2407,11 +2764,16 @@ namespace ThorneTimer
 
         private void tscActiveCharacter_SelectedIndexChanged(object sender, EventArgs e)
         {
+            ThorneLog.Separator("CHARACTER SWITCH (manual)");
+            ThorneLog.Info($"Switch FROM charID={activeCharacterID}");
+            ThorneLog.DumpTimerGrid("ManualSwitch-before", grdTimers);
+
             // Save outgoing character's timer state before switching
             var outgoingStates = timerRuntime.SaveCharacterState();
             Database.SaveTimerStates(con, outgoingStates, activeCharacterID);
 
             activeCharacterID = (tscActiveCharacter.SelectedItem as ComboBoxItem).Value.ToString();
+            ThorneLog.Info($"Switch TO charID={activeCharacterID}");
             Database.SetSetting(con, "ActiveCharacterID", activeCharacterID);
 
             // Tell LogMonitor which character is now active
@@ -2419,23 +2781,47 @@ namespace ThorneTimer
             long.TryParse(activeCharacterID, out newCharID);
             logMonitor.SetActiveCharacter(newCharID);
 
-            // Reload timers and restore incoming character's state
-            LoadTimerRuntime();
+            // Temporarily suppress auto-switch so the log monitor doesn't
+            // immediately yank back to the previously-playing character.
+            // Only the outgoing character is suppressed â€” a brand-new login
+            // on a different character will still trigger a switch.
+            // Re-enables automatically when the active character's log
+            // generates content (see OnLogChunkReceived).
+            if (logMonitor.AutoSwitchEnabled)
+            {
+                autoSwitchSuppressed = true;
+                logMonitor.SuppressedAutoSwitchCharacterID = newCharID;
+            }
 
-            // Apply class filter for new character
-            RefreshTimerGridDataSource();
+            // Suppress per-cell repaints during the full reload cycle
+            grdTimers.Visible = false;
+            BeginGridUpdate();
+            try
+            {
+                // Reload timers and restore incoming character's state
+                LoadTimerRuntime();
 
-            // Re-apply sort order — LoadTimerRuntime changed cell
-            // values so the rows may be in stale order.
-            var manualList = grdTimers.DataSource as SortableBindingList<Timers.GridData>;
-            if (manualList != null)
-                manualList.ReapplySort();
-            RefreshGridAfterSort();
+                ThorneLog.DumpTimerGrid("ManualSwitch-after", grdTimers);
+
+                // Re-apply sort order â€” LoadTimerRuntime changed cell
+                // values so the rows may be in stale order.
+                var manualList = grdTimers.DataSource as SortableBindingList<Timers.GridData>;
+                if (manualList != null)
+                    manualList.ReapplySort();
+                RefreshGridAfterSort();
+            }
+            finally
+            {
+                EndGridUpdate();
+                grdTimers.Visible = true;
+            }
 
             // Update status bar if watching
             if (tsbStartStopWatching.Text == stopWatchingText && logMonitor.FilePath != null)
             {
-                statusParsing.Text = "Watching: " + Path.GetFileName(logMonitor.FilePath);
+                statusParsing.Text = autoSwitchSuppressed
+                    ? "Watching: " + Path.GetFileName(logMonitor.FilePath) + " (auto-switch paused)"
+                    : "Watching: " + Path.GetFileName(logMonitor.FilePath);
             }
 
             UpdateMiniView();
@@ -2558,9 +2944,9 @@ namespace ThorneTimer
 
         private void lblWarnPickFore_Click(object sender, EventArgs e)
         {
-            colorDialog1.Color = lblWarnPickFore.BackColor;
-            colorDialog1.ShowDialog();
-            lblWarnPickFore.BackColor = colorDialog1.Color;
+            colorDialogPicker.Color = lblWarnPickFore.BackColor;
+            colorDialogPicker.ShowDialog();
+            lblWarnPickFore.BackColor = colorDialogPicker.Color;
 
             miniViews.mvWarnForeColor = lblWarnPickFore.BackColor.ToArgb();
             Database.SetSetting(con, "MiniViewWarnFore", miniViews.mvWarnForeColor);
@@ -2569,9 +2955,9 @@ namespace ThorneTimer
 
         private void lblWarnPickBack_Click(object sender, EventArgs e)
         {
-            colorDialog1.Color = lblWarnPickBack.BackColor;
-            colorDialog1.ShowDialog();
-            lblWarnPickBack.BackColor = colorDialog1.Color;
+            colorDialogPicker.Color = lblWarnPickBack.BackColor;
+            colorDialogPicker.ShowDialog();
+            lblWarnPickBack.BackColor = colorDialogPicker.Color;
 
             miniViews.mvWarnBackColor = lblWarnPickBack.BackColor.ToArgb();
             Database.SetSetting(con, "MiniViewWarnBack", miniViews.mvWarnBackColor);
@@ -2660,9 +3046,9 @@ namespace ThorneTimer
 
         private void lblNormPickFore_Click(object sender, EventArgs e)
         {
-            colorDialog1.Color = lblNormPickFore.BackColor;
-            colorDialog1.ShowDialog();
-            lblNormPickFore.BackColor = colorDialog1.Color;
+            colorDialogPicker.Color = lblNormPickFore.BackColor;
+            colorDialogPicker.ShowDialog();
+            lblNormPickFore.BackColor = colorDialogPicker.Color;
 
             miniViews.mvNormForeColor = lblNormPickFore.BackColor.ToArgb();
             Database.SetSetting(con, "MiniViewNormFore", miniViews.mvNormForeColor);
@@ -2671,9 +3057,9 @@ namespace ThorneTimer
 
         private void lblNormPickBack_Click(object sender, EventArgs e)
         {
-            colorDialog1.Color = lblNormPickBack.BackColor;
-            colorDialog1.ShowDialog();
-            lblNormPickBack.BackColor = colorDialog1.Color;
+            colorDialogPicker.Color = lblNormPickBack.BackColor;
+            colorDialogPicker.ShowDialog();
+            lblNormPickBack.BackColor = colorDialogPicker.Color;
 
             miniViews.mvNormBackColor = lblNormPickBack.BackColor.ToArgb();
             Database.SetSetting(con, "MiniViewNormBack", miniViews.mvNormBackColor);
@@ -2691,9 +3077,9 @@ namespace ThorneTimer
 
         private void lblPingPickFore_Click(object sender, EventArgs e)
         {
-            colorDialog1.Color = lblPingPickFore.BackColor;
-            colorDialog1.ShowDialog();
-            lblPingPickFore.BackColor = colorDialog1.Color;
+            colorDialogPicker.Color = lblPingPickFore.BackColor;
+            colorDialogPicker.ShowDialog();
+            lblPingPickFore.BackColor = colorDialogPicker.Color;
 
             miniViews.mvPingForeColor = lblPingPickFore.BackColor.ToArgb();
             Database.SetSetting(con, "MiniViewPingFore", miniViews.mvPingForeColor);
@@ -2702,9 +3088,9 @@ namespace ThorneTimer
 
         private void lblPingPickBack_Click(object sender, EventArgs e)
         {
-            colorDialog1.Color = lblPingPickBack.BackColor;
-            colorDialog1.ShowDialog();
-            lblPingPickBack.BackColor = colorDialog1.Color;
+            colorDialogPicker.Color = lblPingPickBack.BackColor;
+            colorDialogPicker.ShowDialog();
+            lblPingPickBack.BackColor = colorDialogPicker.Color;
 
             miniViews.mvPingBackColor = lblPingPickBack.BackColor.ToArgb();
             Database.SetSetting(con, "MiniViewPingBack", miniViews.mvPingBackColor);
@@ -2785,6 +3171,36 @@ namespace ThorneTimer
         }
 
         /// <summary>
+        /// Suspends grid layout and disables AutoSizeColumnsMode to prevent
+        /// per-cell/per-row repaint during bulk operations.
+        /// Supports nesting â€” only the outermost call changes the grid state.
+        /// Always pair with EndGridUpdate().
+        /// </summary>
+        private void BeginGridUpdate()
+        {
+            if (_gridUpdateDepth == 0)
+            {
+                grdTimers.SuspendLayout();
+                grdTimers.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
+            }
+            _gridUpdateDepth++;
+        }
+
+        /// <summary>
+        /// Resumes grid layout and restores AutoSizeColumnsMode after a bulk operation.
+        /// Only the outermost EndGridUpdate actually restores the grid.
+        /// </summary>
+        private void EndGridUpdate()
+        {
+            _gridUpdateDepth--;
+            if (_gridUpdateDepth == 0)
+            {
+                grdTimers.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+                grdTimers.ResumeLayout(true);
+            }
+        }
+
+        /// <summary>
         /// Post-sort recovery: reapplies row colors, class-based row visibility,
         /// and column header sort glyphs.  Call after any operation that triggers
         /// a sort (which fires ListChanged Reset, clearing custom cell styles
@@ -2812,7 +3228,10 @@ namespace ThorneTimer
 
             // Clear all glyphs
             foreach (DataGridViewColumn col in grdTimers.Columns)
-                col.HeaderCell.SortGlyphDirection = SortOrder.None;
+            {
+                if (col.SortMode != DataGridViewColumnSortMode.NotSortable)
+                    col.HeaderCell.SortGlyphDirection = SortOrder.None;
+            }
 
             // Set glyphs on sorted columns
             for (int i = 0; i < descriptions.Count; i++)
@@ -2822,9 +3241,10 @@ namespace ThorneTimer
                 {
                     if (col.DataPropertyName == propName)
                     {
-                        col.HeaderCell.SortGlyphDirection = descriptions[i].SortDirection == ListSortDirection.Ascending
-                            ? SortOrder.Ascending
-                            : SortOrder.Descending;
+                        if (col.SortMode != DataGridViewColumnSortMode.NotSortable)
+                            col.HeaderCell.SortGlyphDirection = descriptions[i].SortDirection == ListSortDirection.Ascending
+                                ? SortOrder.Ascending
+                                : SortOrder.Descending;
                         break;
                     }
                 }
@@ -2873,9 +3293,9 @@ namespace ThorneTimer
 
         private void lblBuffPickFore_Click(object sender, EventArgs e)
         {
-            colorDialog1.Color = lblBuffPickFore.BackColor;
-            colorDialog1.ShowDialog();
-            lblBuffPickFore.BackColor = colorDialog1.Color;
+            colorDialogPicker.Color = lblBuffPickFore.BackColor;
+            colorDialogPicker.ShowDialog();
+            lblBuffPickFore.BackColor = colorDialogPicker.Color;
 
             miniViews.mvBuffForeColor = lblBuffPickFore.BackColor.ToArgb();
             Database.SetSetting(con, "MiniViewBuffFore", miniViews.mvBuffForeColor);
@@ -2884,9 +3304,9 @@ namespace ThorneTimer
 
         private void lblBuffPickBack_Click(object sender, EventArgs e)
         {
-            colorDialog1.Color = lblBuffPickBack.BackColor;
-            colorDialog1.ShowDialog();
-            lblBuffPickBack.BackColor = colorDialog1.Color;
+            colorDialogPicker.Color = lblBuffPickBack.BackColor;
+            colorDialogPicker.ShowDialog();
+            lblBuffPickBack.BackColor = colorDialogPicker.Color;
 
             miniViews.mvBuffBackColor = lblBuffPickBack.BackColor.ToArgb();
             Database.SetSetting(con, "MiniViewBuffBack", miniViews.mvBuffBackColor);

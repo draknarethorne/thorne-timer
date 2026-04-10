@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Data.SQLite;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Speech.Synthesis;
 using System.Windows.Forms;
 
@@ -568,7 +569,7 @@ namespace ThorneTimer
                 {
                     SQLiteCommand cmd = new SQLiteCommand(con)
                     {
-                        CommandText = "CREATE TABLE timer_runtime_state(ID INTEGER PRIMARY KEY AUTOINCREMENT, TimerID INTEGER NOT NULL, CharacterID INTEGER, Remaining TEXT, ButtonState TEXT, Count INTEGER DEFAULT 0, StartedAt TEXT, ActiveYn INTEGER DEFAULT 1, UNIQUE(TimerID, CharacterID))"
+                        CommandText = "CREATE TABLE timer_runtime_state(ID INTEGER PRIMARY KEY AUTOINCREMENT, TimerID INTEGER NOT NULL, CharacterID INTEGER, Remaining TEXT, ButtonState TEXT, Count INTEGER DEFAULT 0, SavedAtUtc TEXT, ActiveYn INTEGER DEFAULT 1, UNIQUE(TimerID, CharacterID))"
                     };
                     cmd.ExecuteNonQuery();
                 }
@@ -579,6 +580,18 @@ namespace ThorneTimer
                     SQLiteCommand cmd = new SQLiteCommand(con)
                     {
                         CommandText = "ALTER TABLE timer_runtime_state ADD ActiveYn INTEGER DEFAULT 1"
+                    };
+                    cmd.ExecuteNonQuery();
+                }
+
+                // Rename StartedAt → SavedAtUtc to reflect actual semantics
+                // (it stores the UTC timestamp when the remaining-time snapshot was saved,
+                //  not when the timer originally started)
+                if (isTableExist(con, "timer_runtime_state") && isFieldExist(con, "timer_runtime_state", "StartedAt"))
+                {
+                    SQLiteCommand cmd = new SQLiteCommand(con)
+                    {
+                        CommandText = "ALTER TABLE timer_runtime_state RENAME COLUMN StartedAt TO SavedAtUtc"
                     };
                     cmd.ExecuteNonQuery();
                 }
@@ -628,6 +641,15 @@ namespace ThorneTimer
                     SQLiteCommand cmd = new SQLiteCommand(con)
                     {
                         CommandText = "ALTER TABLE settings ADD ShowAllClasses INTEGER DEFAULT 1"
+                    };
+                    cmd.ExecuteNonQuery();
+                }
+
+                if (!isFieldExist(con, "settings", "ShowActiveOnly"))
+                {
+                    SQLiteCommand cmd = new SQLiteCommand(con)
+                    {
+                        CommandText = "ALTER TABLE settings ADD ShowActiveOnly INTEGER DEFAULT 0"
                     };
                     cmd.ExecuteNonQuery();
                 }
@@ -695,6 +717,53 @@ namespace ThorneTimer
                     }
                 }
 
+                // One-time cleanup: deduplicate World timer rows (NULL CharacterID)
+                // caused by SQLite treating NULL as distinct in UNIQUE constraints.
+                // For each TimerID with multiple NULL-CharacterID rows, keep only the
+                // one with the highest ID (most recent) and delete the rest.
+                if (!isFieldExist(con, "settings", "NullRowsDeduped"))
+                {
+                    SQLiteCommand cmd = new SQLiteCommand(con)
+                    {
+                        CommandText = "ALTER TABLE settings ADD NullRowsDeduped INTEGER DEFAULT 0"
+                    };
+                    cmd.ExecuteNonQuery();
+                }
+
+                {
+                    string deduped = GetSetting(con, "NullRowsDeduped");
+                    if (deduped == "0" || deduped == "")
+                    {
+                        SQLiteCommand cmd = new SQLiteCommand(con)
+                        {
+                            CommandText = "DELETE FROM timer_runtime_state WHERE CharacterID IS NULL AND ID NOT IN (SELECT MAX(ID) FROM timer_runtime_state WHERE CharacterID IS NULL GROUP BY TimerID)"
+                        };
+                        cmd.ExecuteNonQuery();
+
+                        cmd.CommandText = "UPDATE settings SET NullRowsDeduped = 1";
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+
+                // Add log settings columns
+                if (!isFieldExist(con, "settings", "LogMinLevel"))
+                {
+                    SQLiteCommand cmd = new SQLiteCommand(con)
+                    {
+                        CommandText = "ALTER TABLE settings ADD LogMinLevel TEXT DEFAULT 'Debug'"
+                    };
+                    cmd.ExecuteNonQuery();
+                }
+
+                if (!isFieldExist(con, "settings", "LogRetentionDays"))
+                {
+                    SQLiteCommand cmd = new SQLiteCommand(con)
+                    {
+                        CommandText = "ALTER TABLE settings ADD LogRetentionDays INTEGER DEFAULT 30"
+                    };
+                    cmd.ExecuteNonQuery();
+                }
+
                 // Seed default views if miniviews table is empty
                 SeedDefaultViews(con);
             }
@@ -708,6 +777,51 @@ namespace ThorneTimer
         static public SQLiteConnection Connection()
         {
             return Connection(GetDefaultDatabasePath());
+        }
+
+        /// <summary>
+        /// Creates a timestamped backup of the database file in a Backups subfolder
+        /// next to the original. Old backups beyond the retention count are pruned.
+        /// Returns the backup path on success, or null on failure.
+        /// </summary>
+        static public string BackupDatabase(string dbPath, int maxBackups = 10)
+        {
+            try
+            {
+                if (!File.Exists(dbPath)) return null;
+
+                string dbDir = Path.GetDirectoryName(dbPath);
+                string backupDir = Path.Combine(dbDir, "Backups");
+                if (!Directory.Exists(backupDir))
+                    Directory.CreateDirectory(backupDir);
+
+                string baseName = Path.GetFileNameWithoutExtension(dbPath);
+                string ext = Path.GetExtension(dbPath);
+                string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                string backupPath = Path.Combine(backupDir, $"{baseName}_{timestamp}{ext}");
+
+                File.Copy(dbPath, backupPath, overwrite: true);
+
+                // Prune old backups beyond maxBackups (keep newest)
+                if (maxBackups > 0)
+                {
+                    var backups = Directory.GetFiles(backupDir, $"{baseName}_*{ext}")
+                        .Select(f => new FileInfo(f))
+                        .OrderByDescending(fi => fi.CreationTime)
+                        .Skip(maxBackups)
+                        .ToList();
+                    foreach (var old in backups)
+                    {
+                        try { old.Delete(); } catch { }
+                    }
+                }
+
+                return backupPath;
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         /// <summary>
@@ -971,8 +1085,9 @@ namespace ThorneTimer
             "MiniViewShowPing", "MiniViewPingFore", "MiniViewPingBack", "MiniViewPingTime",
             "MiniViewBuffFore", "MiniViewBuffBack",
             "VoiceVolume", "VoiceRate", "VoiceEnabled",
-            "ShowAllClasses", "CompactView", "AutoSwitchEnabled",
-            "CompactWidth", "FullWidth"
+            "ShowAllClasses", "ShowActiveOnly", "CompactView", "AutoSwitchEnabled",
+            "CompactWidth", "FullWidth",
+            "LogMinLevel", "LogRetentionDays"
         };
 
         static public void SetSetting(SQLiteConnection con, string column, string value)
@@ -1035,7 +1150,16 @@ namespace ThorneTimer
             cmd.Parameters.AddWithValue("@wavFile", Convert.ToString(WAVFile.Value));
             cmd.Parameters.AddWithValue("@speech", Convert.ToString(Speech.Value));
             cmd.Parameters.AddWithValue("@duration", Convert.ToString(Duration.Value));
-            cmd.Parameters.AddWithValue("@activeYn", Convert.ToInt32(ActiveYn.Value));
+
+            // For Character / Character+ scopes, ActiveYn is per-character and
+            // stored in timer_runtime_state.  Always write 0 to the global timers
+            // table so it doesn't bleed to other characters on reload.
+            // World-scope ActiveYn is global and written as-is.
+            string scopeValue = Convert.ToString(Scope.Value);
+            int globalActiveYn = (scopeValue == "Character" || scopeValue == "Character+")
+                ? 0
+                : Convert.ToInt32(ActiveYn.Value);
+            cmd.Parameters.AddWithValue("@activeYn", globalActiveYn);
             cmd.Parameters.AddWithValue("@caseYn", Convert.ToInt32(CaseYn.Value));
             cmd.Parameters.AddWithValue("@endlessYn", Convert.ToInt32(EndlessYn.Value));
             cmd.Parameters.AddWithValue("@style", Convert.ToString(Style.Value));
@@ -1069,6 +1193,9 @@ namespace ThorneTimer
         static public SortableBindingList<Timers.GridData> GetTimers(SQLiteConnection con)
         {
             SortableBindingList<Timers.GridData> gridData = new SortableBindingList<Timers.GridData>();
+
+            // Suppress per-item ListChanged events during bulk load
+            gridData.RaiseListChangedEvents = false;
 
             SQLiteCommand cmd = new SQLiteCommand(con)
             {
@@ -1121,6 +1248,10 @@ namespace ThorneTimer
             }
 
             rdr.Close();
+
+            // Re-enable events and notify that the list is ready
+            gridData.RaiseListChangedEvents = true;
+            gridData.ResetBindings();
 
             return gridData;
         }
@@ -1220,12 +1351,24 @@ namespace ThorneTimer
         static public void DeleteCharacter(SQLiteConnection con, string ID)
         {
             if (!int.TryParse(ID, out int idValue)) return;
+
+            // Delete persisted timer runtime state for this character
+            SQLiteCommand cmdState = new SQLiteCommand(con)
+            {
+                CommandText = "DELETE FROM timer_runtime_state WHERE CharacterID = @id"
+            };
+            cmdState.Parameters.AddWithValue("@id", idValue);
+            int stateRows = cmdState.ExecuteNonQuery();
+            ThorneLog.Info($"DeleteCharacter ID={idValue}: removed {stateRows} timer_runtime_state row(s)");
+
+            // Delete the character record
             SQLiteCommand cmd = new SQLiteCommand(con)
             {
                 CommandText = "DELETE FROM characters WHERE ID = @id"
             };
             cmd.Parameters.AddWithValue("@id", idValue);
             cmd.ExecuteNonQuery();
+            ThorneLog.Info($"DeleteCharacter ID={idValue}: character deleted");
         }
 
         static public void SaveCharacter(SQLiteConnection con, DataGridView dataGridView, DataGridViewRow row)
@@ -1706,21 +1849,118 @@ namespace ThorneTimer
         {
             if (!isTableExist(con, "timer_runtime_state")) return;
 
+            ThorneLog.Info($"SaveTimerStates called: characterID={characterID}, stateCount={states.Count}");
+
+            // Wipe-and-replace: delete ALL rows for the scopes being saved,
+            // then insert fresh data.  This eliminates stale rows left behind
+            // when a timer's scope changes (e.g. World → Character → World)
+            // or when timers are deleted from the timers table.
+            using (var txn = con.BeginTransaction())
+            {
+                SQLiteCommand cmd = new SQLiteCommand(con);
+
+                // Clear all World-scope rows (CharacterID IS NULL)
+                cmd.CommandText = "DELETE FROM timer_runtime_state WHERE CharacterID IS NULL";
+                int worldDeleted = cmd.ExecuteNonQuery();
+                ThorneLog.Debug($"  Bulk-delete: {worldDeleted} World (NULL) rows removed");
+
+                // Clear all rows for this character
+                if (!string.IsNullOrEmpty(characterID))
+                {
+                    cmd.CommandText = "DELETE FROM timer_runtime_state WHERE CharacterID = @delCharID";
+                    cmd.Parameters.Clear();
+                    cmd.Parameters.AddWithValue("@delCharID", characterID);
+                    int charDeleted = cmd.ExecuteNonQuery();
+                    ThorneLog.Debug($"  Bulk-delete: {charDeleted} Character (charID={characterID}) rows removed");
+                }
+
+                // Insert fresh rows for every timer
+                foreach (var ts in states)
+                {
+                    // World timers are global — always store with NULL CharacterID
+                    // so they load regardless of which character is active.
+                    // Character / Character+ timers store per-character.
+                    string effectiveCharID = (ts.Scope == "World") ? null : characterID;
+
+                    // Log every timer that has non-default state (running, remaining, non-zero count)
+                    if (ts.IsRunning || !string.IsNullOrEmpty(ts.Remaining) || ts.ButtonState != Timers.btnStart || ts.Count > 0)
+                        ThorneLog.Debug($"  SAVE TID={ts.TimerID} \"{ts.Name}\" Scope={ts.Scope} effCID={effectiveCharID ?? "NULL"} Btn={ts.ButtonState} Rem={ts.Remaining} Act={ts.ActiveYn} IsRunning={ts.IsRunning} Count={ts.Count}");
+
+                    cmd.CommandText = "INSERT INTO timer_runtime_state (TimerID, CharacterID, Remaining, ButtonState, Count, SavedAtUtc, ActiveYn) VALUES (@timerID, @charID, @remaining, @btnState, @count, @savedAtUtc, @activeYn)";
+                    cmd.Parameters.Clear();
+                    cmd.Parameters.AddWithValue("@timerID", ts.TimerID);
+                    cmd.Parameters.AddWithValue("@charID", string.IsNullOrEmpty(effectiveCharID) ? (object)DBNull.Value : (object)effectiveCharID);
+                    cmd.Parameters.AddWithValue("@remaining", ts.Remaining ?? "");
+                    cmd.Parameters.AddWithValue("@btnState", ts.ButtonState ?? Timers.btnStart);
+                    cmd.Parameters.AddWithValue("@count", ts.Count);
+
+                    // Only persist SavedAtUtc for scopes that use offline adjustment
+                    // (Character+ and World).  Character-scope timers pause on switch
+                    // and resume with their saved remaining — no offline adjustment.
+                    // This prevents stale SavedAtUtc values from causing incorrect
+                    // time subtraction if a timer's scope is later changed.
+                    bool needsSavedAtUtc = ts.IsRunning
+                        && (ts.Scope == "Character+" || ts.Scope == "World");
+                    cmd.Parameters.AddWithValue("@savedAtUtc",
+                        needsSavedAtUtc ? (object)DateTime.UtcNow.ToString("o") : (object)DBNull.Value);
+
+                    cmd.Parameters.AddWithValue("@activeYn", ts.ActiveYn);
+                    cmd.ExecuteNonQuery();
+                }
+
+                txn.Commit();
+            }
+        }
+
+        /// <summary>
+        /// Persists a single timer's runtime state for the given character.
+        /// Used to immediately record state changes (e.g. user stops a timer)
+        /// so the database stays in sync with the UI without waiting for a
+        /// full save cycle (character switch or app close).
+        /// </summary>
+        static public void SaveSingleTimerState(SQLiteConnection con, TimerState ts, string characterID)
+        {
+            if (!isTableExist(con, "timer_runtime_state")) return;
+
+            // World timers are global — always store with NULL CharacterID
+            // so they load regardless of which character is active.
+            string effectiveCharID = (ts.Scope == "World") ? null : characterID;
+
+            ThorneLog.Debug($"SaveSingleTimerState TID={ts.TimerID} \"{ts.Name}\" Scope={ts.Scope} charID={characterID} effCID={effectiveCharID ?? "NULL"} Btn={ts.ButtonState} Rem={ts.Remaining} Act={ts.ActiveYn} IsRunning={ts.IsRunning} Count={ts.Count}");
+
             SQLiteCommand cmd = new SQLiteCommand(con);
 
-            foreach (var ts in states)
+            // Always delete both scope variants for this TimerID to prevent
+            // stale rows when a timer's scope changes (e.g. World → Character).
+            // The NULL row handles World scope; the charID row handles Character scope.
+            cmd.CommandText = "DELETE FROM timer_runtime_state WHERE TimerID = @delTID AND CharacterID IS NULL";
+            cmd.Parameters.AddWithValue("@delTID", ts.TimerID);
+            cmd.ExecuteNonQuery();
+
+            if (!string.IsNullOrEmpty(characterID))
             {
-                cmd.CommandText = "INSERT OR REPLACE INTO timer_runtime_state (TimerID, CharacterID, Remaining, ButtonState, Count, StartedAt, ActiveYn) VALUES (@timerID, @charID, @remaining, @btnState, @count, @startedAt, @activeYn)";
+                cmd.CommandText = "DELETE FROM timer_runtime_state WHERE TimerID = @delTID2 AND CharacterID = @delCharID";
                 cmd.Parameters.Clear();
-                cmd.Parameters.AddWithValue("@timerID", ts.TimerID);
-                cmd.Parameters.AddWithValue("@charID", string.IsNullOrEmpty(characterID) ? (object)DBNull.Value : (object)characterID);
-                cmd.Parameters.AddWithValue("@remaining", ts.Remaining ?? "");
-                cmd.Parameters.AddWithValue("@btnState", ts.ButtonState ?? Timers.btnStart);
-                cmd.Parameters.AddWithValue("@count", ts.Count);
-                cmd.Parameters.AddWithValue("@startedAt", ts.IsRunning ? DateTime.UtcNow.ToString("o") : (object)DBNull.Value);
-                cmd.Parameters.AddWithValue("@activeYn", ts.ActiveYn);
+                cmd.Parameters.AddWithValue("@delTID2", ts.TimerID);
+                cmd.Parameters.AddWithValue("@delCharID", characterID);
                 cmd.ExecuteNonQuery();
             }
+
+            cmd.CommandText = "INSERT INTO timer_runtime_state (TimerID, CharacterID, Remaining, ButtonState, Count, SavedAtUtc, ActiveYn) VALUES (@timerID, @charID, @remaining, @btnState, @count, @savedAtUtc, @activeYn)";
+            cmd.Parameters.Clear();
+            cmd.Parameters.AddWithValue("@timerID", ts.TimerID);
+            cmd.Parameters.AddWithValue("@charID", string.IsNullOrEmpty(effectiveCharID) ? (object)DBNull.Value : (object)effectiveCharID);
+            cmd.Parameters.AddWithValue("@remaining", ts.Remaining ?? "");
+            cmd.Parameters.AddWithValue("@btnState", ts.ButtonState ?? Timers.btnStart);
+            cmd.Parameters.AddWithValue("@count", ts.Count);
+
+            bool needsSavedAtUtc = ts.IsRunning
+                && (ts.Scope == "Character+" || ts.Scope == "World");
+            cmd.Parameters.AddWithValue("@savedAtUtc",
+                needsSavedAtUtc ? (object)DateTime.UtcNow.ToString("o") : (object)DBNull.Value);
+
+            cmd.Parameters.AddWithValue("@activeYn", ts.ActiveYn);
+            cmd.ExecuteNonQuery();
         }
 
         /// <summary>
@@ -1732,18 +1972,47 @@ namespace ThorneTimer
             var result = new Dictionary<long, TimerState>();
             if (!isTableExist(con, "timer_runtime_state")) return result;
 
+            // Load World-scope rows first (CharacterID IS NULL), then
+            // character-specific rows.  Character-specific rows overwrite
+            // any matching TimerID from the World query, so per-character
+            // state always takes precedence.
             SQLiteCommand cmd = new SQLiteCommand(con);
 
+            string worldQuery = "SELECT * FROM timer_runtime_state WHERE CharacterID IS NULL";
+            string charQuery;
             if (string.IsNullOrEmpty(characterID))
             {
-                cmd.CommandText = "SELECT * FROM timer_runtime_state WHERE CharacterID IS NULL";
+                charQuery = null; // no character-specific rows to load
             }
             else
             {
-                cmd.CommandText = "SELECT * FROM timer_runtime_state WHERE CharacterID = @charID";
-                cmd.Parameters.AddWithValue("@charID", characterID);
+                charQuery = "SELECT * FROM timer_runtime_state WHERE CharacterID = @charID";
             }
 
+            // Pass 1: World rows
+            cmd.CommandText = worldQuery;
+            ReadTimerStateRows(cmd, result);
+
+            // Pass 2: Character-specific rows (overwrite on conflict)
+            if (charQuery != null)
+            {
+                cmd.CommandText = charQuery;
+                cmd.Parameters.Clear();
+                cmd.Parameters.AddWithValue("@charID", characterID);
+                ReadTimerStateRows(cmd, result);
+            }
+
+            ThorneLog.DumpSavedStates($"LoadTimerStates charID={characterID}", result);
+
+            return result;
+        }
+
+        /// <summary>
+        /// Reads timer_runtime_state rows from the given command into the dictionary.
+        /// Overwrites existing entries on TimerID conflict.
+        /// </summary>
+        static private void ReadTimerStateRows(SQLiteCommand cmd, Dictionary<long, TimerState> result)
+        {
             using (SQLiteDataReader rdr = cmd.ExecuteReader())
             {
                 while (rdr.Read())
@@ -1759,11 +2028,22 @@ namespace ThorneTimer
                         Count = rdr.IsDBNull(rdr.GetOrdinal("Count")) ? 0 : rdr.GetInt32(rdr.GetOrdinal("Count")),
                         ActiveYn = activeOrdinal >= 0 && !rdr.IsDBNull(activeOrdinal) ? rdr.GetInt64(activeOrdinal) : 1
                     };
+
+                    int savedAtUtcOrdinal = -1;
+                    try { savedAtUtcOrdinal = rdr.GetOrdinal("SavedAtUtc"); } catch { }
+                    if (savedAtUtcOrdinal >= 0 && !rdr.IsDBNull(savedAtUtcOrdinal))
+                    {
+                        DateTime parsed;
+                        if (DateTime.TryParse(rdr.GetString(savedAtUtcOrdinal), null,
+                            System.Globalization.DateTimeStyles.RoundtripKind, out parsed))
+                        {
+                            ts.SavedAtUtc = parsed.ToUniversalTime();
+                        }
+                    }
+
                     result[timerID] = ts;
                 }
             }
-
-            return result;
         }
 
         /// <summary>

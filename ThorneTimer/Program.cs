@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -14,9 +15,39 @@ namespace ThorneTimer
         [STAThread]
         static void Main()
         {
+            ThorneLog.Separator("APPLICATION START");
+            ThorneLog.Info($"Version: {System.Reflection.Assembly.GetExecutingAssembly().GetName().Version}");
+            ThorneLog.Info($"Runtime: {Environment.Version}");
+            ThorneLog.Info($"OS: {Environment.OSVersion}");
+            ThorneLog.Info($"User: {Environment.UserName}");
+            ThorneLog.Info($"Working Dir: {Environment.CurrentDirectory}");
+
+            // Create a backup of the database before doing anything else
+            string dbPath = Properties.Settings.Default.DatabasePath;
+            if (string.IsNullOrEmpty(dbPath) || !File.Exists(dbPath))
+                dbPath = Database.GetDefaultDatabasePath();
+
+            if (File.Exists(dbPath))
+            {
+                string backupPath = Database.BackupDatabase(dbPath);
+                if (backupPath != null)
+                    ThorneLog.Info($"Database backup created: {backupPath}");
+                else
+                    ThorneLog.Warn("Database backup failed or skipped");
+            }
+            else
+            {
+                ThorneLog.Info("No existing database to backup (new install)");
+            }
+
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+
+            ThorneLog.Info("Launching main form...");
             Application.Run(new FormMain());
+
+            ThorneLog.Separator("APPLICATION EXIT");
+            ThorneLog.Info("Application shutdown complete");
         }
     }
 }

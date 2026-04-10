@@ -64,6 +64,14 @@ namespace ThorneTimer
         public bool AutoSwitchEnabled { get; set; } = true;
 
         /// <summary>
+        /// When set to a positive character ID, auto-switch ignores growth
+        /// from that specific character only.  Other characters (e.g. a
+        /// brand-new login) still trigger a switch normally.  Set to 0 to
+        /// clear the suppression.
+        /// </summary>
+        public long SuppressedAutoSwitchCharacterID { get; set; }
+
+        /// <summary>
         /// Fired when new text is read from the active character's log file.
         /// </summary>
         public event EventHandler<LogChunkReceivedEventArgs> LogChunkReceived;
@@ -227,6 +235,16 @@ namespace ThorneTimer
                             // Non-active file is growing — potential character switch
                             if (growth >= SwitchThresholdBytes && AutoSwitchEnabled)
                             {
+                                // If this specific character is suppressed (manual switch),
+                                // track its size but don't trigger a switch.  Other
+                                // characters (e.g. a brand-new login) still switch normally.
+                                if (SuppressedAutoSwitchCharacterID > 0
+                                    && state.CharacterID == SuppressedAutoSwitchCharacterID)
+                                {
+                                    state.LastFileSize = currentSize;
+                                    continue;
+                                }
+
                                 // Find the old active character
                                 long oldCharID = 0;
                                 lock (stateLock)

@@ -53,6 +53,7 @@ Desktop.ini
 *.db
 # Allow the example database shipped with the project
 !ThorneTimer/Data/ThorneTimer.db
+ThorneTimer/Data/Backups/*
 *.bak
 *.backup
 *.tmp

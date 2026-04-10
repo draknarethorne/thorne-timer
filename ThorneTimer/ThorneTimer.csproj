@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\packages\EntityFramework.6.3.0\build\EntityFramework.props" Condition="Exists('..\packages\EntityFramework.6.3.0\build\EntityFramework.props')" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
@@ -123,6 +123,7 @@
   <ItemGroup>
     <Compile Include="Categories.cs" />
     <Compile Include="LogMonitor.cs" />
+    <Compile Include="ThorneLog.cs" />
     <Compile Include="TimerRuntime.cs" />
     <Compile Include="Timers.cs" />
     <Compile Include="MiniViews.cs" />

@@ -32,6 +32,7 @@ namespace ThorneTimer
         // Runtime-only state
         public string ButtonState { get; set; }
         public int Count { get; set; }
+        public DateTime? SavedAtUtc { get; set; }
 
         public TimerState()
         {
@@ -66,6 +67,14 @@ namespace ThorneTimer
         public int Count { get; set; }
         public TimerPlus.TimerType TheType { get; set; }
         public bool Expired { get; set; }
+
+        /// <summary>
+        /// True when the timer underwent a meaningful state transition
+        /// (start, stop, expire, keyword-stop, deactivate-stop, offline-expire).
+        /// False for periodic ticks and restore-restart (UI sync only).
+        /// Used by the UI to persist state immediately on transitions.
+        /// </summary>
+        public bool IsTransition { get; set; }
     }
 
     /// <summary>
@@ -154,7 +163,6 @@ namespace ThorneTimer
                         Speech = gd.Speech ?? "",
                         Duration = gd.Duration ?? "00:00:00",
                         Remaining = gd.Remaining ?? "",
-                        ActiveYn = gd.ActiveYn,
                         CaseYn = gd.CaseYn,
                         EndlessYn = gd.EndlessYn,
                         Style = gd.Style ?? "Normal",
@@ -163,6 +171,16 @@ namespace ThorneTimer
                         DependsOnDelay = gd.DependsOnDelay,
                         ClassID = gd.ClassID
                     };
+
+                    // For World-scope timers, the global timers.ActiveYn is
+                    // authoritative — all characters share the same setting.
+                    // For Character / Character+ timers, ActiveYn is per-character
+                    // and comes from timer_runtime_state.  Default to 0 here;
+                    // RestoreCharacterState will set the correct per-character value.
+                    if (string.IsNullOrEmpty(ts.Scope) || ts.Scope == "World")
+                        ts.ActiveYn = gd.ActiveYn;
+                    else
+                        ts.ActiveYn = 0;
 
                     // Restore runtime state if this timer was already tracked
                     if (previousStates.TryGetValue(gd.ID, out TimerState prev))
@@ -180,6 +198,12 @@ namespace ThorneTimer
                             ts.ButtonState = prev.ButtonState;
                             ts.Remaining = prev.Remaining;
                         }
+
+                        ThorneLog.Debug($"LoadTimers TID={gd.ID} \"{gd.Name}\" Scope={ts.Scope} hasPrev=true actuallyRunning={actuallyRunning} Btn={ts.ButtonState} Rem={ts.Remaining} Act={ts.ActiveYn} Count={ts.Count}");
+                    }
+                    else
+                    {
+                        ThorneLog.Debug($"LoadTimers TID={gd.ID} \"{gd.Name}\" Scope={ts.Scope} hasPrev=false Btn={ts.ButtonState} Rem={ts.Remaining} Act={ts.ActiveYn}");
                     }
 
                     timerStates.Add(ts);
@@ -196,6 +220,9 @@ namespace ThorneTimer
                         runningTimers.RemoveAt(i);
                     }
                 }
+
+                ThorneLog.Info($"LoadTimers complete: {timerStates.Count} timers, {runningTimers.Count} running");
+                ThorneLog.DumpTimerStates("LoadTimers-end", timerStates);
             }
         }
 
@@ -286,7 +313,7 @@ namespace ThorneTimer
                         if (ts.IsRunning)
                         {
                             StopTimerInternal(ts, false);
-                            FireStateChanged(ts, false);
+                            FireStateChanged(ts, false, isTransition: true);
                         }
                     }
                 }
@@ -339,7 +366,7 @@ namespace ThorneTimer
                 if (ts != null && ts.IsRunning)
                 {
                     StopTimerInternal(ts, false);
-                    FireStateChanged(ts, false);
+                    FireStateChanged(ts, false, isTransition: true);
                 }
             }
         }
@@ -409,7 +436,7 @@ namespace ThorneTimer
                 FireSoundRequested(ts);
             }
 
-            FireStateChanged(ts, false);
+            FireStateChanged(ts, false, isTransition: true);
         }
 
         /// <summary>
@@ -427,6 +454,7 @@ namespace ThorneTimer
                         rt.Timer.Stop();
                         rt.Timer.ElapsedTime = 0;
                         rt.Timer.Start();
+                        break; // reset only applies to one instance
                     }
                     else
                     {
@@ -435,8 +463,8 @@ namespace ThorneTimer
                         rt.Timer.TimerExpired -= OnTimerExpired;
                         rt.Timer.Dispose();
                         runningTimers.RemoveAt(i);
+                        // Don't break � clean up ALL instances for this TimerID
                     }
-                    break;
                 }
             }
 
@@ -490,7 +518,7 @@ namespace ThorneTimer
                     FireSoundRequested(ts);
                 }
 
-                FireStateChanged(ts, true);
+                FireStateChanged(ts, true, isTransition: true);
             }
         }
 
@@ -538,7 +566,7 @@ namespace ThorneTimer
                         if (!activate && ts.IsRunning)
                         {
                             StopTimerInternal(ts, false);
-                            FireStateChanged(ts, false);
+                            FireStateChanged(ts, false, isTransition: true);
                         }
                     }
                 }
@@ -592,6 +620,13 @@ namespace ThorneTimer
                     long delay;
                     long.TryParse(Convert.ToString(delayVal), out delay);
                     ts.DependsOnDelay = delay;
+
+                    // Sync fields that affect per-character state persistence
+                    ts.ActiveYn = Convert.ToInt64(row.Cells[grid.Columns["ActiveYn"].Index].Value ?? 0);
+                    ts.Scope = Convert.ToString(row.Cells[grid.Columns["Scope"].Index].Value) ?? "World";
+
+                    object classVal = row.Cells[grid.Columns["ClassID"].Index].Value;
+                    ts.ClassID = (classVal == null || classVal == DBNull.Value) ? 0 : Convert.ToInt64(classVal);
                 }
             }
         }
@@ -640,6 +675,12 @@ namespace ThorneTimer
         /// When false, only timers matching the specified class (or Global) are returned.
         /// </summary>
         public bool ShowAllClasses { get; set; } = true;
+
+        /// <summary>
+        /// When true, only active timers (ActiveYn == 1) are shown in the grid.
+        /// When false, all timers are shown regardless of Active status.
+        /// </summary>
+        public bool ShowActiveOnly { get; set; } = false;
 
         /// <summary>
         /// Get a snapshot of all timer states (for grid refresh, persistence, etc.).
@@ -762,7 +803,7 @@ namespace ThorneTimer
 
         // --- Event firing helpers ---
 
-        private void FireStateChanged(TimerState ts, bool expired)
+        private void FireStateChanged(TimerState ts, bool expired, bool isTransition = false)
         {
             TimerStateChanged?.Invoke(this, new TimerStateChangedEventArgs
             {
@@ -771,7 +812,8 @@ namespace ThorneTimer
                 ButtonState = ts.ButtonState,
                 Count = ts.Count,
                 TheType = GetTimerType(ts.Style),
-                Expired = expired
+                Expired = expired,
+                IsTransition = isTransition
             });
         }
 
@@ -801,8 +843,8 @@ namespace ThorneTimer
         // --- Character switch: scope-aware save / restore ---
 
         /// <summary>
-        /// Saves the outgoing character's timer state. Character-scope running
-        /// timers are stopped (their remaining time is frozen in TimerState).
+        /// Saves the outgoing character's timer state. Character and Character+
+        /// scope running timers are stopped (remaining time frozen in TimerState).
         /// World-scope timers keep running untouched.
         /// Returns a snapshot list suitable for Database.SaveTimerStates.
         /// </summary>
@@ -810,13 +852,17 @@ namespace ThorneTimer
         {
             lock (syncLock)
             {
-                // Stop Character-scope running timers and freeze their state
-                // for DB persistence so RestoreCharacterState can restart them.
-                // Include Ping timers — they have a live TimerPlus even though
-                // TimerRunning() excludes them from the "running" concept.
+                ThorneLog.Info($"SaveCharacterState: timerStates={timerStates.Count} runningTimers={runningTimers.Count}");
+                ThorneLog.DumpTimerStates("SaveCharacterState-before", timerStates);
+
+                // Stop Character / Character+ scope running timers and freeze
+                // their state for DB persistence so RestoreCharacterState can
+                // restart them.  Include Ping timers — they have a live
+                // TimerPlus even though TimerRunning() excludes them.
                 foreach (var ts in timerStates)
                 {
-                    if (ts.Scope == "Character" && (ts.IsRunning || Timers.PingTimer(ts.ButtonState)))
+                    if ((ts.Scope == "Character" || ts.Scope == "Character+")
+                        && (ts.IsRunning || Timers.PingTimer(ts.ButtonState)))
                     {
                         // Capture current remaining time BEFORE StopTimerInternal clears it
                         string remaining = "";
@@ -833,56 +879,222 @@ namespace ThorneTimer
                         // so these stale markers won't leak to the next character.
                         ts.Remaining = remaining;
                         ts.ButtonState = GetStyleButtonState(ts.Style);
-                    }
-                }
 
-                return timerStates.ToList();
+                            ThorneLog.Debug($"  FROZEN TID={ts.TimerID} \"{ts.Name}\" Scope={ts.Scope} Btn={ts.ButtonState} Rem={ts.Remaining} Act={ts.ActiveYn}");
+                            }
+                        }
+
+                        ThorneLog.DumpTimerStates("SaveCharacterState-after", timerStates);
+                        return timerStates.ToList();
             }
         }
 
         /// <summary>
         /// Restores an incoming character's timer state from previously saved data.
         /// Restores per-character ActiveYn preferences for all timers.
-        /// Character-scope timers that were running are restarted with their saved
-        /// remaining time. World-scope timers are left alone (still running).
+        /// Character-scope timers are restarted with their saved remaining time.
+        /// Character+ scope timers are restarted with remaining adjusted for
+        /// elapsed offline time (server-tracked cooldowns).
+        /// World-scope timers are left alone (still running).
         /// </summary>
         public void RestoreCharacterState(Dictionary<long, TimerState> savedStates)
         {
             lock (syncLock)
             {
+                ThorneLog.Info($"RestoreCharacterState: timerStates={timerStates.Count} savedStates={savedStates.Count}");
+                ThorneLog.DumpSavedStates("RestoreCharacterState-input", savedStates);
+
                 foreach (var ts in timerStates)
                 {
-                    if (!savedStates.TryGetValue(ts.TimerID, out TimerState saved))
+                    // World-scope timers keep running across character switches —
+                    // never touch their state here.  World restore happens only
+                    // once at app startup via RestoreWorldTimersOnStartup.
+                    if (ts.Scope == "World")
+                    {
+                        ThorneLog.Debug($"  RESTORE TID={ts.TimerID} \"{ts.Name}\" Scope=World: SKIPPED (world)");
                         continue;
+                    }
+
+                    if (!savedStates.TryGetValue(ts.TimerID, out TimerState saved))
+                    {
+                        // Character / Character+ timers with no per-character saved
+                        // state default to inactive.  The global timers.ActiveYn must
+                        // not leak to characters that never explicitly activated them.
+                        if (ts.Scope == "Character" || ts.Scope == "Character+")
+                        {
+                            ts.ActiveYn = 0;
+                        }
+                        ThorneLog.Debug($"  RESTORE TID={ts.TimerID} \"{ts.Name}\" Scope={ts.Scope}: NO saved state -> ActiveYn={ts.ActiveYn}");
+                        continue;
+                    }
 
                     // Always restore count and per-character ActiveYn preference
                     ts.Count = saved.Count;
                     ts.ActiveYn = saved.ActiveYn;
 
-                    // Only restore running state for Character-scope timers
-                    if (ts.Scope != "Character") continue;
-
                     // Was this timer running when the character was last active?
                     // Include Ping timers — they have style-based ButtonState markers too.
-                    if ((Timers.TimerRunning(saved.ButtonState) || Timers.PingTimer(saved.ButtonState))
-                        && !string.IsNullOrEmpty(saved.Remaining))
+                    bool wasRunning = Timers.TimerRunning(saved.ButtonState) || Timers.PingTimer(saved.ButtonState);
+                    bool hasRemaining = !string.IsNullOrEmpty(saved.Remaining);
+
+                    ThorneLog.Debug($"  RESTORE TID={ts.TimerID} \"{ts.Name}\" Scope={ts.Scope} savedBtn={saved.ButtonState} savedRem={saved.Remaining} savedAct={saved.ActiveYn} wasRunning={wasRunning} hasRemaining={hasRemaining}");
+
+                    if (wasRunning && hasRemaining)
                     {
                         if (!ValidDuration(saved.Remaining)) continue;
-                        if (TimerPlus.GetMilliseconds(saved.Remaining) <= 0) continue;
 
-                        // Restart the timer with the saved remaining time
-                        RestartTimerFromRemaining(ts, saved.Remaining, saved.ButtonState);
+                        string effectiveRemaining = saved.Remaining;
+
+                        // Character+ timers continue on the server while offline.
+                        // Subtract elapsed time since the state was saved.
+                        if (ts.Scope == "Character+" && saved.SavedAtUtc.HasValue)
+                        {
+                            double savedRemainingMS = TimerPlus.GetMilliseconds(saved.Remaining);
+                            double elapsedOfflineMS = (DateTime.UtcNow - saved.SavedAtUtc.Value).TotalMilliseconds;
+                            double adjustedMS = savedRemainingMS - elapsedOfflineMS;
+
+                            ThorneLog.Debug($"  CHAR+ TID={ts.TimerID} \"{ts.Name}\": savedRem={saved.Remaining} elapsedOffline={TimeSpan.FromMilliseconds(elapsedOfflineMS):hh\\:mm\\:ss} adjustedMS={adjustedMS:F0}");
+
+                            if (adjustedMS <= 0)
+                            {
+                                // Timer expired while offline — mark as stopped
+                                ts.ButtonState = Timers.btnStart;
+                                ts.Remaining = "00:00:00";
+                                ts.Count = Math.Max(0, saved.Count - 1);
+                                ThorneLog.Debug($"  CHAR+ TID={ts.TimerID} \"{ts.Name}\": EXPIRED offline");
+                                FireStateChanged(ts, false, isTransition: true);
+                                continue;
+                            }
+
+                            TimeSpan adjusted = TimeSpan.FromMilliseconds(adjustedMS);
+                            if (adjusted.Days > 0)
+                                effectiveRemaining = string.Format("{0}d {1:00}:{2:00}:{3:00}", adjusted.Days, adjusted.Hours, adjusted.Minutes, adjusted.Seconds);
+                            else
+                                effectiveRemaining = string.Format("{0:00}:{1:00}:{2:00}", adjusted.Hours, adjusted.Minutes, adjusted.Seconds);
+                        }
+                        else if (ts.Scope == "Character+" && !saved.SavedAtUtc.HasValue)
+                        {
+                            ThorneLog.Warn($"  CHAR+ TID={ts.TimerID} \"{ts.Name}\": no SavedAtUtc, cannot compute offline elapsed, using raw remaining={saved.Remaining}");
+                        }
+
+                        if (TimerPlus.GetMilliseconds(effectiveRemaining) <= 0)
+                        {
+                            ThorneLog.Debug($"  RESTORE TID={ts.TimerID} \"{ts.Name}\": effectiveRemaining={effectiveRemaining} resolved to 0ms, skipping restart");
+                            continue;
+                        }
+
+                        // Restart the timer with the (possibly adjusted) remaining time
+                        ThorneLog.Debug($"  RESTORE TID={ts.TimerID} \"{ts.Name}\" Scope={ts.Scope}: RESTARTING with remaining={effectiveRemaining} (saved={saved.Remaining})");
+                        RestartTimerFromRemaining(ts, effectiveRemaining, saved.ButtonState);
                     }
                 }
+
+                ThorneLog.Info($"RestoreCharacterState complete: {runningTimers.Count} running");
+                ThorneLog.DumpTimerStates("RestoreCharacterState-end", timerStates);
+            }
+        }
+
+        /// <summary>
+        /// Restores World-scope timers that were running when the app last closed.
+        /// Computes elapsed offline time from SavedAtUtc and adjusts remaining.
+        /// Call once during app startup, after LoadTimers + RestoreCharacterState.
+        /// </summary>
+        public void RestoreWorldTimersOnStartup(Dictionary<long, TimerState> savedStates)
+        {
+            lock (syncLock)
+            {
+                ThorneLog.Info($"RestoreWorldTimersOnStartup: timerStates={timerStates.Count} savedStates={savedStates.Count}");
+                ThorneLog.DumpSavedStates("RestoreWorldTimers-input", savedStates);
+
+                foreach (var ts in timerStates)
+                {
+                    if (ts.Scope != "World") continue;
+                    if (!savedStates.TryGetValue(ts.TimerID, out TimerState saved))
+                    {
+                        ThorneLog.Debug($"  WORLD TID={ts.TimerID} \"{ts.Name}\": no saved state");
+                        continue;
+                    }
+
+                    // Restore count
+                    ts.Count = saved.Count;
+
+                    bool wasRunning = Timers.TimerRunning(saved.ButtonState) || Timers.PingTimer(saved.ButtonState);
+                    if (!wasRunning)
+                    {
+                        ThorneLog.Debug($"  WORLD TID={ts.TimerID} \"{ts.Name}\": saved but not running (Btn={saved.ButtonState})");
+                        continue;
+                    }
+                    if (string.IsNullOrEmpty(saved.Remaining))
+                    {
+                        ThorneLog.Debug($"  WORLD TID={ts.TimerID} \"{ts.Name}\": running but no remaining");
+                        continue;
+                    }
+                    if (!ValidDuration(saved.Remaining))
+                    {
+                        ThorneLog.Warn($"  WORLD TID={ts.TimerID} \"{ts.Name}\": invalid remaining={saved.Remaining}");
+                        continue;
+                    }
+
+                    string effectiveRemaining = saved.Remaining;
+
+                    // Adjust for elapsed offline time
+                    if (saved.SavedAtUtc.HasValue)
+                    {
+                        double savedRemainingMS = TimerPlus.GetMilliseconds(saved.Remaining);
+                        double elapsedOfflineMS = (DateTime.UtcNow - saved.SavedAtUtc.Value).TotalMilliseconds;
+                        double adjustedMS = savedRemainingMS - elapsedOfflineMS;
+
+                        ThorneLog.Debug($"  WORLD TID={ts.TimerID} \"{ts.Name}\": savedRem={saved.Remaining} elapsedOffline={TimeSpan.FromMilliseconds(elapsedOfflineMS):hh\\:mm\\:ss} adjustedMS={adjustedMS:F0}");
+
+                        if (adjustedMS <= 0)
+                        {
+                            ts.ButtonState = Timers.btnStart;
+                            ts.Remaining = "00:00:00";
+                            ts.Count = Math.Max(0, saved.Count - 1);
+                            ThorneLog.Debug($"  WORLD TID={ts.TimerID} \"{ts.Name}\": EXPIRED offline");
+                            FireStateChanged(ts, false, isTransition: true);
+                            continue;
+                        }
+
+                        TimeSpan adjusted = TimeSpan.FromMilliseconds(adjustedMS);
+                        if (adjusted.Days > 0)
+                            effectiveRemaining = string.Format("{0}d {1:00}:{2:00}:{3:00}", adjusted.Days, adjusted.Hours, adjusted.Minutes, adjusted.Seconds);
+                        else
+                            effectiveRemaining = string.Format("{0:00}:{1:00}:{2:00}", adjusted.Hours, adjusted.Minutes, adjusted.Seconds);
+                    }
+
+                    if (TimerPlus.GetMilliseconds(effectiveRemaining) <= 0) continue;
+
+                    ThorneLog.Debug($"  WORLD TID={ts.TimerID} \"{ts.Name}\": RESTARTING with remaining={effectiveRemaining}");
+                    RestartTimerFromRemaining(ts, effectiveRemaining, saved.ButtonState);
+                }
+
+                ThorneLog.Info($"RestoreWorldTimersOnStartup complete: {runningTimers.Count} running");
+                ThorneLog.DumpTimerStates("RestoreWorldTimers-end", timerStates);
             }
         }
 
         /// <summary>
         /// Restarts a timer with a specific remaining time and button state.
-        /// Used when restoring Character-scope timers after a character switch.
+        /// Used when restoring Character/Character+ scope timers after a
+        /// character switch, or World timers after app restart.
         /// </summary>
         private void RestartTimerFromRemaining(TimerState ts, string remaining, string buttonState)
         {
+            // Defense: stop any existing TimerPlus for this timer ID first.
+            // Prevents duplicate running instances if RestoreCharacterState
+            // is called more than once (e.g. during initialization).
+            for (int i = runningTimers.Count - 1; i >= 0; i--)
+            {
+                if (runningTimers[i].TimerID == ts.TimerID)
+                {
+                    ThorneLog.Debug($"RestartTimerFromRemaining TID={ts.TimerID}: stopping existing TimerPlus before restart");
+                    runningTimers[i].Timer.Stop();
+                    runningTimers[i].Timer.Dispose();
+                    runningTimers.RemoveAt(i);
+                }
+            }
+
             ts.ButtonState = buttonState;
             ts.Remaining = remaining;
 
