@@ -119,6 +119,12 @@ namespace ThorneTimer
         Bitmap iconAllClasses;
         Bitmap iconActiveOnly;
         Bitmap iconCompactView;
+        Bitmap iconDefaultSort;
+        Bitmap iconNewTome;
+        Bitmap iconOpenTome;
+        Bitmap iconSaveAs;
+        Bitmap iconRefreshSort;
+        Bitmap iconAbout;
 
         private void CreateToolbarIcons()
         {
@@ -230,6 +236,118 @@ namespace ThorneTimer
                 }
             }
 
+            // Default Sort icon — three horizontal bars descending in length with down arrow
+            iconDefaultSort = new Bitmap(16, 16);
+            using (var g = Graphics.FromImage(iconDefaultSort))
+            {
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                var blue = Color.FromArgb(0, 100, 180);
+                using (var pen = new Pen(blue, 1.8f))
+                {
+                    g.DrawLine(pen, 1, 3, 9, 3);
+                    g.DrawLine(pen, 1, 7, 7, 7);
+                    g.DrawLine(pen, 1, 11, 5, 11);
+                }
+                using (var brush = new SolidBrush(blue))
+                    g.FillPolygon(brush, new[] { new Point(11, 5), new Point(14, 12), new Point(8, 12) });
+            }
+
+            // New Tome icon — page with a plus sign
+            iconNewTome = new Bitmap(16, 16);
+            using (var g = Graphics.FromImage(iconNewTome))
+            {
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (var pen = new Pen(Color.FromArgb(80, 80, 80), 1.2f))
+                {
+                    g.DrawLine(pen, 3, 1, 3, 14);
+                    g.DrawLine(pen, 3, 14, 10, 14);
+                    g.DrawLine(pen, 10, 14, 10, 4);
+                    g.DrawLine(pen, 10, 4, 7, 1);
+                    g.DrawLine(pen, 7, 1, 3, 1);
+                    g.DrawLine(pen, 7, 1, 7, 4);
+                    g.DrawLine(pen, 7, 4, 10, 4);
+                }
+                var green = Color.FromArgb(40, 160, 40);
+                using (var pen = new Pen(green, 1.8f))
+                {
+                    g.DrawLine(pen, 5, 9, 9, 9);
+                    g.DrawLine(pen, 7, 7, 7, 11);
+                }
+            }
+
+            // Open Tome icon — open folder
+            iconOpenTome = new Bitmap(16, 16);
+            using (var g = Graphics.FromImage(iconOpenTome))
+            {
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                var folderYellow = Color.FromArgb(220, 180, 50);
+                using (var brush = new SolidBrush(folderYellow))
+                {
+                    g.FillRectangle(brush, 1, 4, 12, 10);
+                    g.FillRectangle(brush, 1, 3, 5, 2);
+                }
+                var folderFront = Color.FromArgb(240, 200, 80);
+                using (var brush = new SolidBrush(folderFront))
+                {
+                    g.FillPolygon(brush, new[] {
+                        new Point(1, 7), new Point(4, 14),
+                        new Point(14, 14), new Point(14, 7)
+                    });
+                }
+                using (var pen = new Pen(Color.FromArgb(160, 120, 20), 1f))
+                    g.DrawRectangle(pen, 1, 4, 12, 10);
+            }
+
+            // Save As icon — floppy disk
+            iconSaveAs = new Bitmap(16, 16);
+            using (var g = Graphics.FromImage(iconSaveAs))
+            {
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                var diskBlue = Color.FromArgb(60, 100, 170);
+                using (var brush = new SolidBrush(diskBlue))
+                    g.FillRectangle(brush, 2, 1, 12, 14);
+                using (var brush = new SolidBrush(Color.White))
+                    g.FillRectangle(brush, 4, 1, 7, 5);
+                using (var brush = new SolidBrush(Color.FromArgb(220, 220, 220)))
+                    g.FillRectangle(brush, 4, 9, 8, 5);
+                using (var pen = new Pen(Color.FromArgb(40, 70, 120), 1f))
+                    g.DrawRectangle(pen, 2, 1, 12, 14);
+            }
+
+            // Refresh Sort icon — circular arrow
+            iconRefreshSort = new Bitmap(16, 16);
+            using (var g = Graphics.FromImage(iconRefreshSort))
+            {
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                var green = Color.FromArgb(0, 140, 60);
+                using (var pen = new Pen(green, 1.8f))
+                    g.DrawArc(pen, 2, 2, 11, 11, -60, 300);
+                using (var brush = new SolidBrush(green))
+                    g.FillPolygon(brush, new[] { new Point(10, 1), new Point(14, 5), new Point(10, 5) });
+            }
+
+            // About icon — "i" in a circle
+            iconAbout = new Bitmap(16, 16);
+            using (var g = Graphics.FromImage(iconAbout))
+            {
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                var blue = Color.FromArgb(0, 100, 180);
+                using (var pen = new Pen(blue, 1.4f))
+                    g.DrawEllipse(pen, 1, 1, 13, 13);
+                using (var font = new Font("Segoe UI", 9f, FontStyle.Bold))
+                using (var brush = new SolidBrush(blue))
+                {
+                    var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                    g.DrawString("i", font, brush, new RectangleF(0, 0, 16, 16), sf);
+                }
+            }
+
             // Set initial images
             tsbStartStopWatching.Image = iconPlay;
             startStopWatchingToolStripMenuItem.Image = iconPlay;
@@ -243,6 +361,13 @@ namespace ThorneTimer
             showActiveOnlyToolStripMenuItem.Image = iconActiveOnly;
             tsbCompactView.Image = iconCompactView;
             compactViewToolStripMenuItem.Image = iconCompactView;
+            tsbDefaultSort.Image = iconDefaultSort;
+            defaultSortToolStripMenuItem.Image = iconDefaultSort;
+            newDatabaseToolStripMenuItem.Image = iconNewTome;
+            openDatabaseToolStripMenuItem.Image = iconOpenTome;
+            saveDatabaseAsToolStripMenuItem.Image = iconSaveAs;
+            refreshTimersToolStripMenuItem.Image = iconRefreshSort;
+            aboutToolStripMenuItem.Image = iconAbout;
         }
 
         private void FormMain_Load(object sender, EventArgs e)

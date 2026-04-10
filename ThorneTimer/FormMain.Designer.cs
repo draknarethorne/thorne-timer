@@ -34,6 +34,7 @@
             this.tsSepCharacter = new System.Windows.Forms.ToolStripSeparator();
             this.tsbStartStopWatching = new System.Windows.Forms.ToolStripButton();
             this.tsSepWatch = new System.Windows.Forms.ToolStripSeparator();
+            this.tsSepSort = new System.Windows.Forms.ToolStripSeparator();
             this.tsbMiniViews = new System.Windows.Forms.ToolStripButton();
             this.tsbAutoSwitch = new System.Windows.Forms.ToolStripButton();
             this.tsbShowAllClasses = new System.Windows.Forms.ToolStripButton();
@@ -152,12 +153,13 @@
             this.tsbStartStopWatching,
             this.tsbAutoSwitch,
             this.tsSepWatch,
-            this.tsbMiniViews,
-            this.tsbCompactView,
             this.tsbDefaultSort,
-            this.tsSepView,
+            this.tsSepSort,
             this.tsbShowAllClasses,
-            this.tsbShowActiveOnly});
+            this.tsbShowActiveOnly,
+            this.tsSepView,
+            this.tsbCompactView,
+            this.tsbMiniViews});
             this.toolStrip.Location = new System.Drawing.Point(0, 24);
             this.toolStrip.Name = "toolStrip";
             this.toolStrip.Size = new System.Drawing.Size(1400, 25);
@@ -189,6 +191,11 @@
             // 
             this.tsSepWatch.Name = "tsSepWatch";
             this.tsSepWatch.Size = new System.Drawing.Size(6, 25);
+            // 
+            // tsSepSort
+            // 
+            this.tsSepSort.Name = "tsSepSort";
+            this.tsSepSort.Size = new System.Drawing.Size(6, 25);
             // 
             // tsbMiniViews
             // 
@@ -1186,6 +1193,7 @@
         private System.Windows.Forms.ToolStripButton tsbDefaultSort;
         private System.Windows.Forms.ToolStripMenuItem defaultSortToolStripMenuItem;
         private System.Windows.Forms.ToolStripSeparator tsSepView;
+        private System.Windows.Forms.ToolStripSeparator tsSepSort;
         private System.Windows.Forms.TabPage tabCategories;
         private System.Windows.Forms.Button btnAddCategory;
         private System.Windows.Forms.Button btnDeleteCategory;
