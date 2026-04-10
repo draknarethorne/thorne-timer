@@ -17,6 +17,7 @@
 *.cache
 *.pdb
 *.dbmdl
+UpgradeLog*.htm
 *.dbproj.schemaview
 *.dbproj.user
 *.dbproj.vspscc

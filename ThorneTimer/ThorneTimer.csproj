@@ -212,15 +212,29 @@
     <Content Include="Resources\ThorneTimer.ico" />
     <Content Include="Resources\ThorneTimer.png" />
     <Content Include="Resources\ThorneTimerLogo.png" />
-    <Content Include="Sounds\ring.wav" />
-    <Content Include="Sounds\tada.wav" />
-    <Content Include="Sounds\alert.wav" />
-    <Content Include="Sounds\beep.wav" />
-    <Content Include="Sounds\cashregister.wav" />
-    <Content Include="Sounds\chimes.wav" />
-    <Content Include="Sounds\ding.wav" />
+    <Content Include="Sounds\ring.wav">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Sounds\tada.wav">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Sounds\alert.wav">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Sounds\beep.wav">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Sounds\cashregister.wav">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Sounds\chimes.wav">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Sounds\ding.wav">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="Sounds\pluck.wav">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="ThorneTimer_gold.ico" />
     <Content Include="Data\ThorneTimer.tdb">

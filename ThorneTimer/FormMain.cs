@@ -1816,10 +1816,18 @@ namespace ThorneTimer
 
             grdCharacters.Columns["LOG"].Width = 30;
             grdCharacters.Columns["LOG"].MinimumWidth = 30;
-            grdCharacters.Columns["LOG"].DisplayIndex = grdCharacters.Columns["LogFile"].Index + 1;
+            grdCharacters.Columns["LOG"].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
 
-            // Position Class column after Name
-            grdCharacters.Columns["ClassID"].DisplayIndex = 2;
+            // Explicit column display order: Name, Class, LogFile, LOG(...)
+            // Hidden: ID, MiniViewX, MiniViewY
+            int ci = 0;
+            grdCharacters.Columns["ID"].DisplayIndex = ci++;
+            grdCharacters.Columns["Name"].DisplayIndex = ci++;
+            grdCharacters.Columns["ClassID"].DisplayIndex = ci++;
+            grdCharacters.Columns["LogFile"].DisplayIndex = ci++;
+            grdCharacters.Columns["LOG"].DisplayIndex = ci++;
+            grdCharacters.Columns["MiniViewX"].DisplayIndex = ci++;
+            grdCharacters.Columns["MiniViewY"].DisplayIndex = ci++;
 
             grdCharacters.DataSource = Database.GetCharacters(con);
 
@@ -1853,8 +1861,9 @@ namespace ThorneTimer
             };
             grdCategories.Columns.Add(chkActiveYn);
             grdCategories.Columns[4].DataPropertyName = grdCategories.Columns[4].Name;
-            grdCategories.Columns[4].Width = 50;
-            grdCategories.Columns[4].MinimumWidth = 50;
+            grdCategories.Columns[4].Width = 70;
+            grdCategories.Columns[4].MinimumWidth = 70;
+            grdCategories.Columns[4].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
 
             grdCategories.DataSource = Database.GetCategories(con);
 
@@ -1886,6 +1895,7 @@ namespace ThorneTimer
             grdViews.Columns.Add(cboStyle);
             grdViews.Columns["StyleFilter"].Width = 85;
             grdViews.Columns["StyleFilter"].MinimumWidth = 60;
+            grdViews.Columns["StyleFilter"].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
 
             DataGridViewCheckBoxColumn chkActive = new DataGridViewCheckBoxColumn
             {
@@ -1898,6 +1908,7 @@ namespace ThorneTimer
             grdViews.Columns.Add(chkActive);
             grdViews.Columns["ActiveYn"].Width = 50;
             grdViews.Columns["ActiveYn"].MinimumWidth = 50;
+            grdViews.Columns["ActiveYn"].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
 
             // Hide position/sort columns — managed internally
             grdViews.Columns.Add("PositionX", "PositionX");
@@ -1909,6 +1920,17 @@ namespace ThorneTimer
             grdViews.Columns.Add("SortOrder", "SortOrder");
             grdViews.Columns["SortOrder"].DataPropertyName = "SortOrder";
             grdViews.Columns["SortOrder"].Visible = false;
+
+            // Explicit column display order: Active, Name, Style
+            // Hidden: ID, PositionX, PositionY, SortOrder
+            int vi = 0;
+            grdViews.Columns["ID"].DisplayIndex = vi++;
+            grdViews.Columns["ActiveYn"].DisplayIndex = vi++;
+            grdViews.Columns["Name"].DisplayIndex = vi++;
+            grdViews.Columns["StyleFilter"].DisplayIndex = vi++;
+            grdViews.Columns["PositionX"].DisplayIndex = vi++;
+            grdViews.Columns["PositionY"].DisplayIndex = vi++;
+            grdViews.Columns["SortOrder"].DisplayIndex = vi++;
 
             grdViews.DataSource = Database.GetViews(con);
 

@@ -504,9 +504,9 @@
             // 
             // btnResetCounts
             // 
-            this.btnResetCounts.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.btnResetCounts.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.btnResetCounts.BackColor = System.Drawing.SystemColors.Control;
-            this.btnResetCounts.Location = new System.Drawing.Point(87, 554);
+            this.btnResetCounts.Location = new System.Drawing.Point(1206, 554);
             this.btnResetCounts.Name = "btnResetCounts";
             this.btnResetCounts.Size = new System.Drawing.Size(75, 23);
             this.btnResetCounts.TabIndex = 18;
@@ -518,7 +518,7 @@
             // 
             this.buttonStopAll.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.buttonStopAll.BackColor = System.Drawing.SystemColors.Control;
-            this.buttonStopAll.Location = new System.Drawing.Point(1206, 554);
+            this.buttonStopAll.Location = new System.Drawing.Point(1287, 554);
             this.buttonStopAll.Name = "buttonStopAll";
             this.buttonStopAll.Size = new System.Drawing.Size(75, 23);
             this.buttonStopAll.TabIndex = 17;
@@ -528,9 +528,9 @@
             // 
             // btnAddTimer
             // 
-            this.btnAddTimer.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnAddTimer.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
             this.btnAddTimer.BackColor = System.Drawing.SystemColors.Control;
-            this.btnAddTimer.Location = new System.Drawing.Point(1287, 554);
+            this.btnAddTimer.Location = new System.Drawing.Point(6, 554);
             this.btnAddTimer.Name = "btnAddTimer";
             this.btnAddTimer.Size = new System.Drawing.Size(75, 23);
             this.btnAddTimer.TabIndex = 4;
@@ -542,7 +542,7 @@
             // 
             this.btnDeleteTimer.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
             this.btnDeleteTimer.BackColor = System.Drawing.SystemColors.Control;
-            this.btnDeleteTimer.Location = new System.Drawing.Point(6, 554);
+            this.btnDeleteTimer.Location = new System.Drawing.Point(87, 554);
             this.btnDeleteTimer.Name = "btnDeleteTimer";
             this.btnDeleteTimer.Size = new System.Drawing.Size(75, 23);
             this.btnDeleteTimer.TabIndex = 3;
@@ -582,8 +582,8 @@
             // 
             // btnAddCharacter
             // 
-            this.btnAddCharacter.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnAddCharacter.Location = new System.Drawing.Point(1245, 544);
+            this.btnAddCharacter.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.btnAddCharacter.Location = new System.Drawing.Point(6, 544);
             this.btnAddCharacter.Name = "btnAddCharacter";
             this.btnAddCharacter.Size = new System.Drawing.Size(75, 23);
             this.btnAddCharacter.TabIndex = 5;
@@ -594,7 +594,7 @@
             // btnDeleteCharacter
             // 
             this.btnDeleteCharacter.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.btnDeleteCharacter.Location = new System.Drawing.Point(6, 544);
+            this.btnDeleteCharacter.Location = new System.Drawing.Point(87, 544);
             this.btnDeleteCharacter.Name = "btnDeleteCharacter";
             this.btnDeleteCharacter.Size = new System.Drawing.Size(75, 23);
             this.btnDeleteCharacter.TabIndex = 4;
@@ -629,8 +629,8 @@
             // 
             // btnAddCategory
             // 
-            this.btnAddCategory.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnAddCategory.Location = new System.Drawing.Point(1245, 544);
+            this.btnAddCategory.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.btnAddCategory.Location = new System.Drawing.Point(6, 544);
             this.btnAddCategory.Name = "btnAddCategory";
             this.btnAddCategory.Size = new System.Drawing.Size(75, 23);
             this.btnAddCategory.TabIndex = 6;
@@ -641,7 +641,7 @@
             // btnDeleteCategory
             // 
             this.btnDeleteCategory.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.btnDeleteCategory.Location = new System.Drawing.Point(6, 544);
+            this.btnDeleteCategory.Location = new System.Drawing.Point(87, 544);
             this.btnDeleteCategory.Name = "btnDeleteCategory";
             this.btnDeleteCategory.Size = new System.Drawing.Size(75, 23);
             this.btnDeleteCategory.TabIndex = 5;
@@ -677,7 +677,7 @@
             // btnDeleteView
             // 
             this.btnDeleteView.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.btnDeleteView.Location = new System.Drawing.Point(6, 544);
+            this.btnDeleteView.Location = new System.Drawing.Point(87, 544);
             this.btnDeleteView.Name = "btnDeleteView";
             this.btnDeleteView.Size = new System.Drawing.Size(75, 23);
             this.btnDeleteView.TabIndex = 8;
@@ -689,8 +689,8 @@
             // 
             // btnAddView
             // 
-            this.btnAddView.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnAddView.Location = new System.Drawing.Point(1245, 544);
+            this.btnAddView.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.btnAddView.Location = new System.Drawing.Point(6, 544);
             this.btnAddView.Name = "btnAddView";
             this.btnAddView.Size = new System.Drawing.Size(75, 23);
             this.btnAddView.TabIndex = 7;
