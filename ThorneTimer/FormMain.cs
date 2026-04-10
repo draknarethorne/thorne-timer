@@ -1817,8 +1817,12 @@ namespace ThorneTimer
             grdCharacters.Columns["LOG"].Width = 30;
             grdCharacters.Columns["LOG"].MinimumWidth = 30;
             grdCharacters.Columns["LOG"].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+            grdCharacters.Columns["LOG"].Resizable = DataGridViewTriState.False;
 
-            // Explicit column display order: Name, Class, LogFile, LOG(...)
+            grdCharacters.DataSource = Database.GetCharacters(con);
+
+            // Explicit column display order (set after DataSource binding):
+            // Visible: Name, Class, LogFile, LOG(...)
             // Hidden: ID, MiniViewX, MiniViewY
             int ci = 0;
             grdCharacters.Columns["ID"].DisplayIndex = ci++;
@@ -1826,10 +1830,6 @@ namespace ThorneTimer
             grdCharacters.Columns["ClassID"].DisplayIndex = ci++;
             grdCharacters.Columns["LogFile"].DisplayIndex = ci++;
             grdCharacters.Columns["LOG"].DisplayIndex = ci++;
-            grdCharacters.Columns["MiniViewX"].DisplayIndex = ci++;
-            grdCharacters.Columns["MiniViewY"].DisplayIndex = ci++;
-
-            grdCharacters.DataSource = Database.GetCharacters(con);
 
             grdCharacters.CellClick += new DataGridViewCellEventHandler(grdCharacters_CellClick);
         }
@@ -1935,6 +1935,8 @@ namespace ThorneTimer
             grdViews.DataSource = Database.GetViews(con);
 
             grdViews.RowValidating += ValidateRowViews;
+            grdViews.CurrentCellDirtyStateChanged += grdViews_CurrentCellDirtyStateChanged;
+            grdViews.CellValueChanged += grdViews_CellValueChanged;
         }
 
         void ValidateRowViews(object sender, DataGridViewCellCancelEventArgs data)
@@ -1942,6 +1944,22 @@ namespace ThorneTimer
             SaveDataViews();
             miniViews.RefreshMiniViews(con, activeCharacterID);
             UpdateMiniView();
+        }
+
+        void grdViews_CurrentCellDirtyStateChanged(object sender, EventArgs e)
+        {
+            if (grdViews.IsCurrentCellDirty && grdViews.CurrentCell?.OwningColumn?.Name == "ActiveYn")
+                grdViews.CommitEdit(DataGridViewDataErrorContexts.Commit);
+        }
+
+        void grdViews_CellValueChanged(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex >= 0 && e.ColumnIndex == grdViews.Columns["ActiveYn"].Index)
+            {
+                SaveDataViews();
+                miniViews.RefreshMiniViews(con, activeCharacterID);
+                UpdateMiniView();
+            }
         }
 
         void SaveDataViews()
@@ -2822,6 +2840,8 @@ namespace ThorneTimer
                 row.DefaultCellStyle.BackColor = bgColor;
                 remainingCell.Style.BackColor = bgColor;
             }
+
+            grdTimers.InvalidateRow(row.Index);
         }
 
         /// <summary>
@@ -2880,7 +2900,7 @@ namespace ThorneTimer
                 }
 
                 RepaintTimerGrid();
-                UpdateMiniView(false);
+                UpdateMiniView(e.IsTransition);
 
                 // Persist on meaningful state transitions (start, stop, expire,
                 // keyword-stop, deactivate-stop, offline-expire).  This is the
