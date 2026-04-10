@@ -435,6 +435,13 @@ namespace ThorneTimer
             // AutoSizeColumnsMode=Fill is set before initial layout).
             grdTimers.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
             grdTimers.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+
+            // Re-apply persisted column widths.  The Fill recalc above
+            // uses FillWeights (already restored by LoadColumnWidths in
+            // FormMain_Load), so Fill columns keep their proportions.
+            // Non-Fill columns (AutoSizeMode=None, AllCellsExceptHeader,
+            // etc.) need their pixel widths re-applied explicitly.
+            LoadColumnWidths("Timers", grdTimers);
         }
 
         private void UpdateTitleBar(string dbPath)
@@ -1017,9 +1024,10 @@ namespace ThorneTimer
 
         /// <summary>
         /// Applies saved column widths from the database to a grid.
-        /// For visible columns, sets Width (which adjusts FillWeight in Fill mode).
-        /// For hidden columns, sets FillWeight directly so the proportion is
-        /// correct when the column becomes visible.
+        /// Restores FillWeight for ALL columns so that Fill-mode
+        /// recalculations (EndGridUpdate, Shown toggle) preserve the
+        /// proportions the user had.  Also sets pixel Width for visible
+        /// columns so non-Fill columns get their exact saved size.
         /// Silently skips columns that no longer exist.
         /// </summary>
         private void LoadColumnWidths(string gridName, DataGridView grid)
@@ -1029,6 +1037,23 @@ namespace ThorneTimer
                 Dictionary<string, int> widths = Database.GetColumnWidths(con, gridName);
                 Dictionary<string, float> fillWeights = Database.GetColumnFillWeights(con, gridName);
 
+                // Restore FillWeights for ALL columns (visible and hidden)
+                // so that Fill-mode recalculations use the saved proportions.
+                foreach (var kvp in fillWeights)
+                {
+                    if (grid.Columns.Contains(kvp.Key))
+                    {
+                        DataGridViewColumn col = grid.Columns[kvp.Key];
+                        if (kvp.Value > 0)
+                        {
+                            col.FillWeight = kvp.Value;
+                        }
+                    }
+                }
+
+                // Set pixel Width for visible columns — this is the
+                // authoritative size for non-Fill columns (AutoSizeMode
+                // = None, AllCellsExceptHeader, ColumnHeader).
                 foreach (var kvp in widths)
                 {
                     if (grid.Columns.Contains(kvp.Key))
@@ -1037,20 +1062,6 @@ namespace ThorneTimer
                         if (col.Visible && kvp.Value >= col.MinimumWidth)
                         {
                             col.Width = kvp.Value;
-                        }
-                    }
-                }
-
-                // Restore FillWeights for hidden columns so they display
-                // correctly when toggled back to visible in Fill mode.
-                foreach (var kvp in fillWeights)
-                {
-                    if (grid.Columns.Contains(kvp.Key))
-                    {
-                        DataGridViewColumn col = grid.Columns[kvp.Key];
-                        if (!col.Visible && kvp.Value > 0)
-                        {
-                            col.FillWeight = kvp.Value;
                         }
                     }
                 }
@@ -1419,6 +1430,7 @@ namespace ThorneTimer
             grdTimers.Columns.Add(cboRole);
             grdTimers.Columns["Style"].Width = 80;
             grdTimers.Columns["Style"].MinimumWidth = 60;
+            grdTimers.Columns["Style"].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
 
             DataGridViewComboBoxColumn cboClass = new DataGridViewComboBoxColumn
             {
@@ -1446,6 +1458,7 @@ namespace ThorneTimer
             grdTimers.Columns.Add(cboScope);
             grdTimers.Columns["Scope"].Width = 90;
             grdTimers.Columns["Scope"].MinimumWidth = 70;
+            grdTimers.Columns["Scope"].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
 
             grdTimers.Columns.Add("DependsOnTimer", "Depends On");
             grdTimers.Columns["DependsOnTimer"].DataPropertyName = "DependsOnTimer";
@@ -1457,6 +1470,7 @@ namespace ThorneTimer
             grdTimers.Columns["DependsOnDelay"].Width = 55;
             grdTimers.Columns["DependsOnDelay"].MinimumWidth = 40;
             grdTimers.Columns["DependsOnDelay"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            grdTimers.Columns["DependsOnDelay"].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
 
             DataGridViewButtonColumn buttonWAV = new DataGridViewButtonColumn
             {
@@ -1481,6 +1495,7 @@ namespace ThorneTimer
             grdTimers.Columns.Add(buttonColumn);
             grdTimers.Columns["StartStop"].Width = 50;
             grdTimers.Columns["StartStop"].MinimumWidth = 50;
+            grdTimers.Columns["StartStop"].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
 
             grdTimers.Columns.Add("Count", "Count");
             //grdTimers.Columns["Count"].DataPropertyName = grdTimers.Columns["Count"].Name;
