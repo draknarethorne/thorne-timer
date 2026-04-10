@@ -35,13 +35,9 @@
             this.tsbStartStopWatching = new System.Windows.Forms.ToolStripButton();
             this.tsSepWatch = new System.Windows.Forms.ToolStripSeparator();
             this.tsbMiniViews = new System.Windows.Forms.ToolStripButton();
-            this.tsSepMiniViews = new System.Windows.Forms.ToolStripSeparator();
             this.tsbAutoSwitch = new System.Windows.Forms.ToolStripButton();
-            this.tsSepAutoSwitch = new System.Windows.Forms.ToolStripSeparator();
             this.tsbShowAllClasses = new System.Windows.Forms.ToolStripButton();
-            this.tsSepAllClasses = new System.Windows.Forms.ToolStripSeparator();
             this.tsbShowActiveOnly = new System.Windows.Forms.ToolStripButton();
-            this.tsSepActiveOnly = new System.Windows.Forms.ToolStripSeparator();
             this.tsbCompactView = new System.Windows.Forms.ToolStripButton();
             this.menuStripMain = new System.Windows.Forms.MenuStrip();
             this.fileToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -115,9 +111,13 @@
             this.showAllClassesToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.showActiveOnlyToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.compactViewToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.defaultSortToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.refreshTimersToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.viewSepCompactFilters = new System.Windows.Forms.ToolStripSeparator();
             this.viewSepFiltersRefresh = new System.Windows.Forms.ToolStripSeparator();
+            this.viewSepSortRefresh = new System.Windows.Forms.ToolStripSeparator();
+            this.tsbDefaultSort = new System.Windows.Forms.ToolStripButton();
+            this.tsSepView = new System.Windows.Forms.ToolStripSeparator();
             this.watchSeparator = new System.Windows.Forms.ToolStripSeparator();
             this.colorDialogPicker = new System.Windows.Forms.ColorDialog();
             this.statusStrip = new System.Windows.Forms.StatusStrip();
@@ -150,16 +150,14 @@
             this.tscActiveCharacter,
             this.tsSepCharacter,
             this.tsbStartStopWatching,
+            this.tsbAutoSwitch,
             this.tsSepWatch,
             this.tsbMiniViews,
-            this.tsSepMiniViews,
-            this.tsbAutoSwitch,
-            this.tsSepAutoSwitch,
+            this.tsbCompactView,
+            this.tsbDefaultSort,
+            this.tsSepView,
             this.tsbShowAllClasses,
-            this.tsSepAllClasses,
-            this.tsbShowActiveOnly,
-            this.tsSepActiveOnly,
-            this.tsbCompactView});
+            this.tsbShowActiveOnly});
             this.toolStrip.Location = new System.Drawing.Point(0, 24);
             this.toolStrip.Name = "toolStrip";
             this.toolStrip.Size = new System.Drawing.Size(1400, 25);
@@ -198,13 +196,8 @@
             this.tsbMiniViews.Name = "tsbMiniViews";
             this.tsbMiniViews.Size = new System.Drawing.Size(70, 22);
             this.tsbMiniViews.Text = "Mini Views";
-            this.tsbMiniViews.ToolTipText = "Toggle Mini Views";
+            this.tsbMiniViews.ToolTipText = "Toggle mini view overlay windows for at-a-glance timer monitoring";
             this.tsbMiniViews.Click += new System.EventHandler(this.tsbMiniViews_Click);
-            // 
-            // tsSepMiniViews
-            // 
-            this.tsSepMiniViews.Name = "tsSepMiniViews";
-            this.tsSepMiniViews.Size = new System.Drawing.Size(6, 25);
             // 
             // tsbAutoSwitch
             // 
@@ -218,11 +211,6 @@
             this.tsbAutoSwitch.ToolTipText = "Automatically switch to the character whose log file is actively being written";
             this.tsbAutoSwitch.Click += new System.EventHandler(this.tsbAutoSwitch_Click);
             // 
-            // tsSepAutoSwitch
-            // 
-            this.tsSepAutoSwitch.Name = "tsSepAutoSwitch";
-            this.tsSepAutoSwitch.Size = new System.Drawing.Size(6, 25);
-            // 
             // tsbShowAllClasses
             // 
             this.tsbShowAllClasses.CheckOnClick = true;
@@ -235,11 +223,6 @@
             this.tsbShowAllClasses.ToolTipText = "Show timers for all classes. When unchecked, only timers matching the active character\u0027s class are shown.";
             this.tsbShowAllClasses.Click += new System.EventHandler(this.tsbShowAllClasses_Click);
             // 
-            // tsSepAllClasses
-            // 
-            this.tsSepAllClasses.Name = "tsSepAllClasses";
-            this.tsSepAllClasses.Size = new System.Drawing.Size(6, 25);
-            // 
             // tsbShowActiveOnly
             // 
             this.tsbShowActiveOnly.CheckOnClick = true;
@@ -250,11 +233,6 @@
             this.tsbShowActiveOnly.ToolTipText = "Show only active timers. When unchecked, all timers are shown.";
             this.tsbShowActiveOnly.Click += new System.EventHandler(this.tsbShowActiveOnly_Click);
             // 
-            // tsSepActiveOnly
-            // 
-            this.tsSepActiveOnly.Name = "tsSepActiveOnly";
-            this.tsSepActiveOnly.Size = new System.Drawing.Size(6, 25);
-            // 
             // tsbCompactView
             // 
             this.tsbCompactView.CheckOnClick = true;
@@ -262,8 +240,22 @@
             this.tsbCompactView.Name = "tsbCompactView";
             this.tsbCompactView.Size = new System.Drawing.Size(92, 22);
             this.tsbCompactView.Text = "Compact";
-            this.tsbCompactView.ToolTipText = "Toggle compact view. Hides configuration columns and shows only runtime columns.";
+            this.tsbCompactView.ToolTipText = "Toggle compact view. Hides configuration columns and makes classification columns read-only for safe gameplay.";
             this.tsbCompactView.Click += new System.EventHandler(this.tsbCompactView_Click);
+            // 
+            // tsbDefaultSort
+            // 
+            this.tsbDefaultSort.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.ImageAndText;
+            this.tsbDefaultSort.Name = "tsbDefaultSort";
+            this.tsbDefaultSort.Size = new System.Drawing.Size(80, 22);
+            this.tsbDefaultSort.Text = "Default Sort";
+            this.tsbDefaultSort.ToolTipText = "Sort timers by Class, then Style, then Name (default view)";
+            this.tsbDefaultSort.Click += new System.EventHandler(this.tsbDefaultSort_Click);
+            // 
+            // tsSepView
+            // 
+            this.tsSepView.Name = "tsSepView";
+            this.tsSepView.Size = new System.Drawing.Size(6, 25);
             // 
             // menuStripMain
             // 
@@ -362,6 +354,7 @@
             this.showAllClassesToolStripMenuItem,
             this.showActiveOnlyToolStripMenuItem,
             this.viewSepFiltersRefresh,
+            this.defaultSortToolStripMenuItem,
             this.refreshTimersToolStripMenuItem});
             this.viewToolStripMenuItem.Name = "viewToolStripMenuItem";
             this.viewToolStripMenuItem.Size = new System.Drawing.Size(44, 20);
@@ -372,7 +365,7 @@
             this.miniViewsToolStripMenuItem.Name = "miniViewsToolStripMenuItem";
             this.miniViewsToolStripMenuItem.Size = new System.Drawing.Size(134, 22);
             this.miniViewsToolStripMenuItem.Text = "&Mini Views";
-            this.miniViewsToolStripMenuItem.ToolTipText = "Toggle Mini Views";
+            this.miniViewsToolStripMenuItem.ToolTipText = "Toggle mini view overlay windows for at-a-glance timer monitoring";
             this.miniViewsToolStripMenuItem.Click += new System.EventHandler(this.tsbMiniViews_Click);
             // 
             // compactViewToolStripMenuItem
@@ -381,7 +374,7 @@
             this.compactViewToolStripMenuItem.Name = "compactViewToolStripMenuItem";
             this.compactViewToolStripMenuItem.Size = new System.Drawing.Size(160, 22);
             this.compactViewToolStripMenuItem.Text = "&Compact View";
-            this.compactViewToolStripMenuItem.ToolTipText = "Toggle compact view. Hides configuration columns and shows only runtime columns.";
+            this.compactViewToolStripMenuItem.ToolTipText = "Toggle compact view. Hides configuration columns and makes classification columns read-only for safe gameplay.";
             this.compactViewToolStripMenuItem.Click += new System.EventHandler(this.compactViewToolStripMenuItem_Click);
             // 
             // refreshTimersToolStripMenuItem
@@ -392,6 +385,19 @@
             this.refreshTimersToolStripMenuItem.Text = "&Refresh Sort";
             this.refreshTimersToolStripMenuItem.ToolTipText = "Re-apply the current sort order to the timer grid (F5).";
             this.refreshTimersToolStripMenuItem.Click += new System.EventHandler(this.refreshTimersToolStripMenuItem_Click);
+            // 
+            // defaultSortToolStripMenuItem
+            // 
+            this.defaultSortToolStripMenuItem.Name = "defaultSortToolStripMenuItem";
+            this.defaultSortToolStripMenuItem.Size = new System.Drawing.Size(160, 22);
+            this.defaultSortToolStripMenuItem.Text = "&Default Sort";
+            this.defaultSortToolStripMenuItem.ToolTipText = "Sort timers by Class, then Style, then Name (default view)";
+            this.defaultSortToolStripMenuItem.Click += new System.EventHandler(this.tsbDefaultSort_Click);
+            // 
+            // viewSepSortRefresh
+            // 
+            this.viewSepSortRefresh.Name = "viewSepSortRefresh";
+            this.viewSepSortRefresh.Size = new System.Drawing.Size(157, 6);
             // 
             // watchToolStripMenuItem
             // 
@@ -1148,13 +1154,9 @@
         private System.Windows.Forms.ToolStripButton tsbStartStopWatching;
         private System.Windows.Forms.ToolStripSeparator tsSepWatch;
         private System.Windows.Forms.ToolStripButton tsbMiniViews;
-        private System.Windows.Forms.ToolStripSeparator tsSepMiniViews;
         private System.Windows.Forms.ToolStripButton tsbAutoSwitch;
         private System.Windows.Forms.ToolStripButton tsbShowAllClasses;
-        private System.Windows.Forms.ToolStripSeparator tsSepAllClasses;
         private System.Windows.Forms.ToolStripButton tsbShowActiveOnly;
-        private System.Windows.Forms.ToolStripSeparator tsSepAutoSwitch;
-        private System.Windows.Forms.ToolStripSeparator tsSepActiveOnly;
         private System.Windows.Forms.ToolStripButton tsbCompactView;
         private System.Windows.Forms.MenuStrip menuStripMain;
         private System.Windows.Forms.ToolStripMenuItem fileToolStripMenuItem;
@@ -1179,7 +1181,11 @@
         private System.Windows.Forms.ToolStripMenuItem showActiveOnlyToolStripMenuItem;
         private System.Windows.Forms.ToolStripSeparator viewSepCompactFilters;
         private System.Windows.Forms.ToolStripSeparator viewSepFiltersRefresh;
+        private System.Windows.Forms.ToolStripSeparator viewSepSortRefresh;
         private System.Windows.Forms.ToolStripSeparator watchSeparator;
+        private System.Windows.Forms.ToolStripButton tsbDefaultSort;
+        private System.Windows.Forms.ToolStripMenuItem defaultSortToolStripMenuItem;
+        private System.Windows.Forms.ToolStripSeparator tsSepView;
         private System.Windows.Forms.TabPage tabCategories;
         private System.Windows.Forms.Button btnAddCategory;
         private System.Windows.Forms.Button btnDeleteCategory;

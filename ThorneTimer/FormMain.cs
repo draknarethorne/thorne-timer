@@ -1190,22 +1190,22 @@ namespace ThorneTimer
             int i = 1;
             grdTimers.Columns["ActiveYn"].DisplayIndex = i++;
             grdTimers.Columns["Name"].DisplayIndex = i++;
-            grdTimers.Columns["Count"].DisplayIndex = i++;
-            grdTimers.Columns["CategoryID"].DisplayIndex = i++;
-            grdTimers.Columns["Style"].DisplayIndex = i++;
             grdTimers.Columns["ClassID"].DisplayIndex = i++;
+            grdTimers.Columns["Style"].DisplayIndex = i++;
             grdTimers.Columns["Scope"].DisplayIndex = i++;
+            grdTimers.Columns["CategoryID"].DisplayIndex = i++;
             grdTimers.Columns["StartKeyword"].DisplayIndex = i++;
             grdTimers.Columns["EndKeyword"].DisplayIndex = i++;
-            grdTimers.Columns["DependsOnTimer"].DisplayIndex = i++;
-            grdTimers.Columns["DependsOnDelay"].DisplayIndex = i++;
             grdTimers.Columns["Speech"].DisplayIndex = i++;
-            grdTimers.Columns["WAV"].DisplayIndex = i++;
             grdTimers.Columns["WAVFile"].DisplayIndex = i++;
-            grdTimers.Columns["Duration"].DisplayIndex = i++;
-            grdTimers.Columns["Remaining"].DisplayIndex = i++;
+            grdTimers.Columns["WAV"].DisplayIndex = i++;
             grdTimers.Columns["CaseYn"].DisplayIndex = i++;
             grdTimers.Columns["EndlessYn"].DisplayIndex = i++;
+            grdTimers.Columns["DependsOnTimer"].DisplayIndex = i++;
+            grdTimers.Columns["DependsOnDelay"].DisplayIndex = i++;
+            grdTimers.Columns["Duration"].DisplayIndex = i++;
+            grdTimers.Columns["Remaining"].DisplayIndex = i++;
+            grdTimers.Columns["Count"].DisplayIndex = i++;
             grdTimers.Columns["StartStop"].DisplayIndex = i++;
 
             grdTimers.Columns["ActiveYn"].SortMode = DataGridViewColumnSortMode.Programmatic;
@@ -2142,20 +2142,32 @@ namespace ThorneTimer
         }
 
         /// <summary>
-        /// Columns hidden in compact mode — configuration-only columns
-        /// that aren't needed during active play.
+        /// Columns hidden in compact mode — trigger, notification, and
+        /// seldom-used configuration columns that aren't needed during
+        /// active play.
         /// </summary>
         private static readonly string[] CompactHiddenColumns = new[]
         {
-            "StartKeyword", "EndKeyword", "WAVFile", "Speech",
+            "StartKeyword", "EndKeyword", "Speech", "WAVFile", "WAV",
             "CaseYn", "EndlessYn",
-            "DependsOnTimer", "DependsOnDelay", "WAV"
+            "DependsOnTimer", "DependsOnDelay"
+        };
+
+        /// <summary>
+        /// Columns made read-only in compact mode to prevent accidental
+        /// edits during gameplay. These remain visible for sorting and
+        /// at-a-glance identification.
+        /// </summary>
+        private static readonly string[] CompactReadOnlyColumns = new[]
+        {
+            "Name", "CategoryID", "Style", "ClassID", "Scope", "Duration"
         };
 
         /// <summary>
         /// Toggles visibility of configuration columns on the timer grid.
-        /// Compact mode shows only: Active, Name, Category, Duration,
-        /// Remaining, Start/Stop, Count.
+        /// Compact mode shows: Active, Name, Class, Style, Scope, Category,
+        /// Duration, Remaining, Count, Start/Stop — with classification
+        /// columns made read-only to prevent accidental edits during play.
         /// When switching to full view, auto-widens the window if it is
         /// too narrow for all columns, clamped to the current screen.
         /// Saves and restores per-view FillWeights so column proportions
@@ -2170,9 +2182,9 @@ namespace ThorneTimer
                 foreach (DataGridViewColumn col in grdTimers.Columns)
                     weights[col.Name] = col.FillWeight;
 
-                if (compact) // leaving advanced ? save advanced weights
+                if (compact) // leaving advanced → save advanced weights
                     _advancedFillWeights = weights;
-                else         // leaving compact  ? save compact weights
+                else         // leaving compact  → save compact weights
                     _compactFillWeights = weights;
             }
 
@@ -2184,6 +2196,16 @@ namespace ThorneTimer
                     if (grdTimers.Columns.Contains(colName))
                     {
                         grdTimers.Columns[colName].Visible = !compact;
+                    }
+                }
+
+                // Make classification columns read-only in compact mode
+                // to prevent accidental edits while playing.
+                foreach (string colName in CompactReadOnlyColumns)
+                {
+                    if (grdTimers.Columns.Contains(colName))
+                    {
+                        grdTimers.Columns[colName].ReadOnly = compact;
                     }
                 }
             }
@@ -3280,7 +3302,7 @@ namespace ThorneTimer
 
         /// <summary>
         /// Re-applies the current sort order to the timer grid without reloading data.
-        /// Triggered by View ? Refresh Sort (F5).
+        /// Triggered by View → Refresh Sort (F5).
         /// </summary>
         private void refreshTimersToolStripMenuItem_Click(object sender, EventArgs e)
         {
@@ -3288,6 +3310,24 @@ namespace ThorneTimer
             if (list == null) return;
 
             list.ReapplySort();
+            RefreshGridAfterSort();
+        }
+
+        /// <summary>
+        /// Applies the default multi-column sort: Class → Style → Name (all ascending).
+        /// Groups timers by class, then by behavior style, then alphabetically —
+        /// the most common view for both gameplay and maintenance.
+        /// </summary>
+        private void tsbDefaultSort_Click(object sender, EventArgs e)
+        {
+            var list = grdTimers.DataSource as SortableBindingList<Timers.GridData>;
+            if (list == null) return;
+
+            list.ApplyMultiSort(
+                ("ClassID", ListSortDirection.Ascending),
+                ("Style", ListSortDirection.Ascending),
+                ("Name", ListSortDirection.Ascending));
+
             RefreshGridAfterSort();
         }
 
