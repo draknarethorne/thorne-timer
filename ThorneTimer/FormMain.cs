@@ -125,6 +125,8 @@ namespace ThorneTimer
         Bitmap iconSaveAs;
         Bitmap iconRefreshSort;
         Bitmap iconAbout;
+        Bitmap iconOpenRecent;
+        Bitmap iconExit;
 
         private void CreateToolbarIcons()
         {
@@ -348,6 +350,43 @@ namespace ThorneTimer
                 }
             }
 
+            // Open Recent icon — clock with circular arrow (history)
+            iconOpenRecent = new Bitmap(16, 16);
+            using (var g = Graphics.FromImage(iconOpenRecent))
+            {
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                var gray = Color.FromArgb(90, 90, 90);
+                using (var pen = new Pen(gray, 1.4f))
+                    g.DrawEllipse(pen, 1, 1, 13, 13);
+                using (var pen = new Pen(gray, 1.6f))
+                {
+                    g.DrawLine(pen, 7, 3, 7, 8);
+                    g.DrawLine(pen, 7, 8, 11, 8);
+                }
+                using (var brush = new SolidBrush(gray))
+                    g.FillPolygon(brush, new[] { new Point(2, 2), new Point(5, 0), new Point(5, 4) });
+            }
+
+            // Exit icon — door with right arrow
+            iconExit = new Bitmap(16, 16);
+            using (var g = Graphics.FromImage(iconExit))
+            {
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                var dark = Color.FromArgb(100, 100, 100);
+                using (var pen = new Pen(dark, 1.2f))
+                {
+                    g.DrawRectangle(pen, 1, 1, 8, 13);
+                    g.DrawLine(pen, 5, 4, 5, 11);
+                }
+                var red = Color.FromArgb(190, 40, 40);
+                using (var pen = new Pen(red, 1.8f))
+                    g.DrawLine(pen, 9, 7, 15, 7);
+                using (var brush = new SolidBrush(red))
+                    g.FillPolygon(brush, new[] { new Point(12, 4), new Point(15, 7), new Point(12, 10) });
+            }
+
             // Set initial images
             tsbStartStopWatching.Image = iconPlay;
             startStopWatchingToolStripMenuItem.Image = iconPlay;
@@ -368,6 +407,8 @@ namespace ThorneTimer
             saveDatabaseAsToolStripMenuItem.Image = iconSaveAs;
             refreshTimersToolStripMenuItem.Image = iconRefreshSort;
             aboutToolStripMenuItem.Image = iconAbout;
+            openRecentToolStripMenuItem.Image = iconOpenRecent;
+            exitToolStripMenuItem.Image = iconExit;
         }
 
         private void FormMain_Load(object sender, EventArgs e)
