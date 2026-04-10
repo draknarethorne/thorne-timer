@@ -252,7 +252,6 @@
             // 
             // tsbDefaultSort
             // 
-            this.tsbDefaultSort.CheckOnClick = true;
             this.tsbDefaultSort.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.ImageAndText;
             this.tsbDefaultSort.Name = "tsbDefaultSort";
             this.tsbDefaultSort.Size = new System.Drawing.Size(80, 22);

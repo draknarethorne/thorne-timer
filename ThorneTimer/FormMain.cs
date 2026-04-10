@@ -107,6 +107,10 @@ namespace ThorneTimer
         // Reference count for nested BeginGridUpdate/EndGridUpdate calls
         private int _gridUpdateDepth = 0;
 
+        // Sort state captured before applying Group Sort, so we can restore it
+        // when the user toggles Group Sort off.  Null means no prior state saved.
+        private (string, ListSortDirection)[] _preGroupSortState;
+
         readonly MiniViews miniViews = new MiniViews();
         readonly TimerRuntime timerRuntime = new TimerRuntime();
         readonly LogMonitor logMonitor = new LogMonitor();
@@ -3560,7 +3564,37 @@ namespace ThorneTimer
 
         private void tsbDefaultSort_Click(object sender, EventArgs e)
         {
-            ApplyDefaultSort();
+            if (IsGroupSortActive())
+            {
+                // Toggle OFF — restore previous sort or fall back to Name ascending
+                var list = grdTimers.DataSource as SortableBindingList<Timers.GridData>;
+                if (list != null && _preGroupSortState != null && _preGroupSortState.Length > 0)
+                {
+                    list.ApplyMultiSort(_preGroupSortState);
+                }
+                else if (list != null)
+                {
+                    list.ApplyMultiSort(("Name", ListSortDirection.Ascending));
+                }
+
+                _preGroupSortState = null;
+                RefreshGridAfterSort();
+                UpdateGroupSortCheckedState();
+            }
+            else
+            {
+                // Toggle ON — save current sort, then apply group sort
+                var list = grdTimers.DataSource as SortableBindingList<Timers.GridData>;
+                if (list != null)
+                {
+                    var descs = list.SortDescriptions;
+                    _preGroupSortState = new (string, ListSortDirection)[descs.Count];
+                    for (int i = 0; i < descs.Count; i++)
+                        _preGroupSortState[i] = (descs[i].PropertyDescriptor.Name, descs[i].SortDirection);
+                }
+
+                ApplyDefaultSort();
+            }
         }
 
         private void lblBuffPickFore_Click(object sender, EventArgs e)
