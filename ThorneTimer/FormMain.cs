@@ -119,7 +119,7 @@ namespace ThorneTimer
         Bitmap iconAllClasses;
         Bitmap iconActiveOnly;
         Bitmap iconCompactView;
-        Bitmap iconDefaultSort;
+        Bitmap iconGroupSort;
         Bitmap iconNewTome;
         Bitmap iconOpenTome;
         Bitmap iconSaveAs;
@@ -238,9 +238,9 @@ namespace ThorneTimer
                 }
             }
 
-            // Default Sort icon — three horizontal bars descending in length with down arrow
-            iconDefaultSort = new Bitmap(16, 16);
-            using (var g = Graphics.FromImage(iconDefaultSort))
+            // Group Sort icon — three horizontal bars descending in length with down arrow
+            iconGroupSort = new Bitmap(16, 16);
+            using (var g = Graphics.FromImage(iconGroupSort))
             {
                 g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
                 g.Clear(Color.Transparent);
@@ -400,8 +400,8 @@ namespace ThorneTimer
             showActiveOnlyToolStripMenuItem.Image = iconActiveOnly;
             tsbCompactView.Image = iconCompactView;
             compactViewToolStripMenuItem.Image = iconCompactView;
-            tsbDefaultSort.Image = iconDefaultSort;
-            defaultSortToolStripMenuItem.Image = iconDefaultSort;
+            tsbDefaultSort.Image = iconGroupSort;
+            defaultSortToolStripMenuItem.Image = iconGroupSort;
             newDatabaseToolStripMenuItem.Image = iconNewTome;
             openDatabaseToolStripMenuItem.Image = iconOpenTome;
             saveDatabaseAsToolStripMenuItem.Image = iconSaveAs;
@@ -1279,6 +1279,7 @@ namespace ThorneTimer
                             .ToArray();
                         list.ApplyMultiSort(tuples);
                         UpdateSortGlyphs();
+                        UpdateGroupSortCheckedState();
                         return;
                     }
                 }
@@ -2213,8 +2214,10 @@ namespace ThorneTimer
             {
                 tsbStartStopWatching.Text = stopWatchingText;
                 tsbStartStopWatching.Image = iconStop;
+                tsbStartStopWatching.Checked = true;
                 startStopWatchingToolStripMenuItem.Text = "&Stop Watching";
                 startStopWatchingToolStripMenuItem.Image = iconStop;
+                startStopWatchingToolStripMenuItem.Checked = true;
                 statusParsing.Text = "Watching: " + (activeFilePath != null ? Path.GetFileName(activeFilePath) : "all characters");
 
                 logMonitor.LogChunkReceived -= OnLogChunkReceived;
@@ -2227,8 +2230,10 @@ namespace ThorneTimer
         {
             tsbStartStopWatching.Text = startWatchingText;
             tsbStartStopWatching.Image = iconPlay;
+            tsbStartStopWatching.Checked = false;
             startStopWatchingToolStripMenuItem.Text = "&Start Watching";
             startStopWatchingToolStripMenuItem.Image = iconPlay;
+            startStopWatchingToolStripMenuItem.Checked = false;
             statusParsing.Text = "Idle";
 
             // Clear temporary suppression — no log monitoring means nothing to suppress
@@ -3379,6 +3384,7 @@ namespace ThorneTimer
                 }
 
                 UpdateSortGlyphs();
+                UpdateGroupSortCheckedState();
             }
 
             RefreshGridAfterSort();
@@ -3506,9 +3512,9 @@ namespace ThorneTimer
         }
 
         /// <summary>
-        /// Applies the default multi-column sort: Class → Style → Name (all ascending).
+        /// Applies the group sort: Class → Style → Name (all ascending).
         /// Groups timers by class, then by behavior style, then alphabetically —
-        /// the most common view for both gameplay and maintenance.
+        /// the most natural view for both gameplay and maintenance.
         /// </summary>
         private void ApplyDefaultSort()
         {
@@ -3521,6 +3527,35 @@ namespace ThorneTimer
                 ("Name", ListSortDirection.Ascending));
 
             RefreshGridAfterSort();
+            UpdateGroupSortCheckedState();
+        }
+
+        /// <summary>
+        /// Returns true when the current sort order matches the Group Sort
+        /// (ClassID Asc → Style Asc → Name Asc).
+        /// </summary>
+        private bool IsGroupSortActive()
+        {
+            var list = grdTimers.DataSource as SortableBindingList<Timers.GridData>;
+            if (list == null) return false;
+
+            var descs = list.SortDescriptions;
+            if (descs == null || descs.Count != 3) return false;
+
+            return descs[0].PropertyDescriptor.Name == "ClassID" && descs[0].SortDirection == ListSortDirection.Ascending
+                && descs[1].PropertyDescriptor.Name == "Style" && descs[1].SortDirection == ListSortDirection.Ascending
+                && descs[2].PropertyDescriptor.Name == "Name" && descs[2].SortDirection == ListSortDirection.Ascending;
+        }
+
+        /// <summary>
+        /// Syncs the Group Sort toolbar button and menu item checked state
+        /// to reflect whether the current sort order matches the group sort.
+        /// </summary>
+        private void UpdateGroupSortCheckedState()
+        {
+            bool active = IsGroupSortActive();
+            tsbDefaultSort.Checked = active;
+            defaultSortToolStripMenuItem.Checked = active;
         }
 
         private void tsbDefaultSort_Click(object sender, EventArgs e)

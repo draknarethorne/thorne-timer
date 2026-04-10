@@ -252,11 +252,12 @@
             // 
             // tsbDefaultSort
             // 
+            this.tsbDefaultSort.CheckOnClick = true;
             this.tsbDefaultSort.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.ImageAndText;
             this.tsbDefaultSort.Name = "tsbDefaultSort";
             this.tsbDefaultSort.Size = new System.Drawing.Size(80, 22);
-            this.tsbDefaultSort.Text = "Default Sort";
-            this.tsbDefaultSort.ToolTipText = "Sort timers by Class, then Style, then Name (default view)";
+            this.tsbDefaultSort.Text = "Group Sort";
+            this.tsbDefaultSort.ToolTipText = "Sort timers by Class → Style → Name. Groups timers hierarchically for the most natural view.";
             this.tsbDefaultSort.Click += new System.EventHandler(this.tsbDefaultSort_Click);
             // 
             // tsSepView
@@ -389,16 +390,16 @@
             this.refreshTimersToolStripMenuItem.Name = "refreshTimersToolStripMenuItem";
             this.refreshTimersToolStripMenuItem.ShortcutKeys = System.Windows.Forms.Keys.F5;
             this.refreshTimersToolStripMenuItem.Size = new System.Drawing.Size(160, 22);
-            this.refreshTimersToolStripMenuItem.Text = "&Refresh Sort";
-            this.refreshTimersToolStripMenuItem.ToolTipText = "Re-apply the current sort order to the timer grid (F5).";
+            this.refreshTimersToolStripMenuItem.Text = "&Refresh";
+            this.refreshTimersToolStripMenuItem.ToolTipText = "Refresh the timer grid — re-applies sorting, painting, and layout (F5).";
             this.refreshTimersToolStripMenuItem.Click += new System.EventHandler(this.refreshTimersToolStripMenuItem_Click);
             // 
             // defaultSortToolStripMenuItem
             // 
             this.defaultSortToolStripMenuItem.Name = "defaultSortToolStripMenuItem";
             this.defaultSortToolStripMenuItem.Size = new System.Drawing.Size(160, 22);
-            this.defaultSortToolStripMenuItem.Text = "&Default Sort";
-            this.defaultSortToolStripMenuItem.ToolTipText = "Sort timers by Class, then Style, then Name (default view)";
+            this.defaultSortToolStripMenuItem.Text = "&Group Sort";
+            this.defaultSortToolStripMenuItem.ToolTipText = "Sort timers by Class → Style → Name. Groups timers hierarchically for the most natural view.";
             this.defaultSortToolStripMenuItem.Click += new System.EventHandler(this.tsbDefaultSort_Click);
             // 
             // viewSepSortRefresh
