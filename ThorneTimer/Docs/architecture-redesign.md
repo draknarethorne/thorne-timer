@@ -32,9 +32,9 @@ The main form (`FormMain.cs`, ~2,244 lines) still manages timer runtime, setting
 
 ```
 File                View                Watch              Help
-├─ New Tome...      ├─ Compact View     ├─ Start/Stop      ├─ About
-├─ Open Tome...     └─ Mini Views       │  Watching
-├─ Save Tome As...                      ├─ Auto-Switch
+├─ New Tome...      ├─ Compact View     ├─ Start/Stop      ├─ Tome Info...
+├─ Open Tome...     └─ Mini Views       │  Watching        ├─ ──────────────
+├─ Save Tome As...                      ├─ Auto-Switch     └─ About
 ├─ ──────────────                       │  Character
 ├─ Open Recent  ▸                       └─ Show All
 ├─ ──────────────                          Classes
@@ -121,9 +121,9 @@ The main form becomes a **runtime-only timer dashboard**. No tabs. No entity man
 
 ```
 File                Edit                  View               Watch              Help
-├─ New Tome...      ├─ Timers...          ├─ Compact View     ├─ Start/Stop      ├─ About
-├─ Open Tome...     ├─ Characters...      └─ Mini Views       │  Watching
-├─ Save Tome As...  ├─ Categories...                         ├─ Auto-Switch
+├─ New Tome...      ├─ Timers...          ├─ Compact View     ├─ Start/Stop      ├─ Tome Info...
+├─ Open Tome...     ├─ Characters...      └─ Mini Views       │  Watching        ├─ ─────────────
+├─ Save Tome As...  ├─ Categories...                         ├─ Auto-Switch     └─ About
 ├─ ─────────────    ├─ Classes...                            │  Character
 ├─ Open Recent  ▸   ├─ Views...                              └─ Show All
 ├─ ─────────────    ├─ Styles...                                Classes

@@ -194,6 +194,11 @@ For detailed phase breakdowns, see the [Roadmap](Docs/ROADMAP.md).
 - ✅ Column width persistence and window state management
 - ✅ Parameterized SQL throughout all database operations
 - ✅ Comprehensive architecture documentation
+- ✅ Multi-column sort with Shift+Click and Ctrl+Click support
+- ✅ Group Sort toggle (Class → Style → Name) with previous-sort restore
+- ✅ Programmatic toolbar icons for all buttons and menu items
+- ✅ Polished About dialog with version, features, runtime info, and GitHub link
+- ✅ Help → Tome Info dialog showing database statistics and file information
 
 **v0.1.0 – v0.4.0** (2025) _archived_
 

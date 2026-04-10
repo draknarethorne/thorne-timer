@@ -129,6 +129,7 @@ namespace ThorneTimer
         Bitmap iconSaveAs;
         Bitmap iconRefreshSort;
         Bitmap iconAbout;
+        Bitmap iconTomeInfo;
         Bitmap iconOpenRecent;
         Bitmap iconExit;
 
@@ -391,6 +392,36 @@ namespace ThorneTimer
                     g.FillPolygon(brush, new[] { new Point(12, 4), new Point(15, 7), new Point(12, 10) });
             }
 
+            // Tome Info icon — open book with "i"
+            iconTomeInfo = new Bitmap(16, 16);
+            using (var g = Graphics.FromImage(iconTomeInfo))
+            {
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                var brown = Color.FromArgb(140, 100, 50);
+                using (var pen = new Pen(brown, 1.2f))
+                {
+                    // Left page
+                    g.DrawLine(pen, 1, 2, 1, 13);
+                    g.DrawLine(pen, 1, 2, 7, 3);
+                    g.DrawLine(pen, 1, 13, 7, 14);
+                    // Right page
+                    g.DrawLine(pen, 14, 2, 14, 13);
+                    g.DrawLine(pen, 14, 2, 8, 3);
+                    g.DrawLine(pen, 14, 13, 8, 14);
+                    // Spine
+                    g.DrawLine(pen, 7, 3, 7, 14);
+                    g.DrawLine(pen, 8, 3, 8, 14);
+                }
+                var blue = Color.FromArgb(0, 100, 180);
+                using (var font = new Font("Segoe UI", 7f, FontStyle.Bold))
+                using (var brush = new SolidBrush(blue))
+                {
+                    var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                    g.DrawString("i", font, brush, new RectangleF(7, 3, 8, 11), sf);
+                }
+            }
+
             // Set initial images
             tsbStartStopWatching.Image = iconPlay;
             startStopWatchingToolStripMenuItem.Image = iconPlay;
@@ -411,6 +442,7 @@ namespace ThorneTimer
             saveDatabaseAsToolStripMenuItem.Image = iconSaveAs;
             refreshTimersToolStripMenuItem.Image = iconRefreshSort;
             aboutToolStripMenuItem.Image = iconAbout;
+            tomeInfoToolStripMenuItem.Image = iconTomeInfo;
             openRecentToolStripMenuItem.Image = iconOpenRecent;
             exitToolStripMenuItem.Image = iconExit;
         }
@@ -3303,6 +3335,16 @@ namespace ThorneTimer
             miniViews.mvNormBackColor = lblNormPickBack.BackColor.ToArgb();
             Database.SetSetting(con, "MiniViewNormBack", miniViews.mvNormBackColor);
             UpdateMiniAppearance();
+        }
+
+        private void tomeInfoToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            string dbPath = Properties.Settings.Default.DatabasePath ?? Database.GetDefaultDatabasePath();
+            var infoForm = new FormTomeInfo(con, dbPath)
+            {
+                StartPosition = FormStartPosition.CenterParent
+            };
+            infoForm.ShowDialog(this);
         }
 
         private void aboutToolStripMenuItem_Click(object sender, EventArgs e)

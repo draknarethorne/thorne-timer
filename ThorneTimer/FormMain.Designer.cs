@@ -50,6 +50,8 @@
             this.fileSepRecentExit = new System.Windows.Forms.ToolStripSeparator();
             this.exitToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.helpToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.tomeInfoToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.helpSepTomeAbout = new System.Windows.Forms.ToolStripSeparator();
             this.aboutToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.tabCtrlMain = new System.Windows.Forms.TabControl();
             this.tabTimers = new System.Windows.Forms.TabPage();
@@ -340,15 +342,29 @@
             // helpToolStripMenuItem
             // 
             this.helpToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.tomeInfoToolStripMenuItem,
+            this.helpSepTomeAbout,
             this.aboutToolStripMenuItem});
             this.helpToolStripMenuItem.Name = "helpToolStripMenuItem";
             this.helpToolStripMenuItem.Size = new System.Drawing.Size(44, 20);
             this.helpToolStripMenuItem.Text = "&Help";
             // 
+            // tomeInfoToolStripMenuItem
+            // 
+            this.tomeInfoToolStripMenuItem.Name = "tomeInfoToolStripMenuItem";
+            this.tomeInfoToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.tomeInfoToolStripMenuItem.Text = "Tome &Info...";
+            this.tomeInfoToolStripMenuItem.Click += new System.EventHandler(this.tomeInfoToolStripMenuItem_Click);
+            // 
+            // helpSepTomeAbout
+            // 
+            this.helpSepTomeAbout.Name = "helpSepTomeAbout";
+            this.helpSepTomeAbout.Size = new System.Drawing.Size(177, 6);
+            // 
             // aboutToolStripMenuItem
             // 
             this.aboutToolStripMenuItem.Name = "aboutToolStripMenuItem";
-            this.aboutToolStripMenuItem.Size = new System.Drawing.Size(107, 22);
+            this.aboutToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
             this.aboutToolStripMenuItem.Text = "&About";
             this.aboutToolStripMenuItem.Click += new System.EventHandler(this.aboutToolStripMenuItem_Click);
             // 
@@ -1222,6 +1238,8 @@
         private System.Windows.Forms.Label lblNormPickFore;
         private System.Windows.Forms.Label lblNormalColors;
         private System.Windows.Forms.ToolStripMenuItem helpToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem tomeInfoToolStripMenuItem;
+        private System.Windows.Forms.ToolStripSeparator helpSepTomeAbout;
         private System.Windows.Forms.ToolStripMenuItem aboutToolStripMenuItem;
         private System.Windows.Forms.Label lblPingColors;
         private System.Windows.Forms.Label lblPingPickBack;

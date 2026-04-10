@@ -2067,5 +2067,85 @@ namespace ThorneTimer
 
             cmd.ExecuteNonQuery();
         }
+
+        /// <summary>
+        /// Returns summary statistics about the current Tome database.
+        /// </summary>
+        static public TomeStatistics GetTomeStatistics(SQLiteConnection con)
+        {
+            var stats = new TomeStatistics();
+
+            try
+            {
+                using (var cmd = new SQLiteCommand(con))
+                {
+                    cmd.CommandText = "SELECT COUNT(*) FROM timers";
+                    stats.TimerCount = Convert.ToInt32(cmd.ExecuteScalar());
+
+                    cmd.CommandText = "SELECT COUNT(*) FROM timers WHERE ActiveYn = 1";
+                    stats.ActiveTimerCount = Convert.ToInt32(cmd.ExecuteScalar());
+
+                    cmd.CommandText = "SELECT COUNT(*) FROM characters";
+                    stats.CharacterCount = Convert.ToInt32(cmd.ExecuteScalar());
+
+                    cmd.CommandText = "SELECT COUNT(*) FROM categories";
+                    stats.CategoryCount = Convert.ToInt32(cmd.ExecuteScalar());
+
+                    cmd.CommandText = "SELECT COUNT(*) FROM views";
+                    stats.ViewCount = Convert.ToInt32(cmd.ExecuteScalar());
+
+                    cmd.CommandText = "SELECT COUNT(*) FROM classes";
+                    stats.ClassCount = Convert.ToInt32(cmd.ExecuteScalar());
+
+                    // Count timers by style
+                    cmd.CommandText = "SELECT Style, COUNT(*) FROM timers GROUP BY Style";
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            string style = reader.GetString(0);
+                            int count = reader.GetInt32(1);
+                            stats.TimersByStyle[style] = count;
+                        }
+                    }
+
+                    // Count timers by scope
+                    cmd.CommandText = "SELECT Scope, COUNT(*) FROM timers GROUP BY Scope";
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            string scope = reader.IsDBNull(0) ? "Character" : reader.GetString(0);
+                            int count = reader.GetInt32(1);
+                            if (stats.TimersByScope.ContainsKey(scope))
+                                stats.TimersByScope[scope] += count;
+                            else
+                                stats.TimersByScope[scope] = count;
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Tables may not exist in older databases; return partial stats
+            }
+
+            return stats;
+        }
+    }
+
+    /// <summary>
+    /// Summary statistics about a Tome database.
+    /// </summary>
+    class TomeStatistics
+    {
+        public int TimerCount { get; set; }
+        public int ActiveTimerCount { get; set; }
+        public int CharacterCount { get; set; }
+        public int CategoryCount { get; set; }
+        public int ViewCount { get; set; }
+        public int ClassCount { get; set; }
+        public Dictionary<string, int> TimersByStyle { get; set; } = new Dictionary<string, int>();
+        public Dictionary<string, int> TimersByScope { get; set; } = new Dictionary<string, int>();
     }
 }

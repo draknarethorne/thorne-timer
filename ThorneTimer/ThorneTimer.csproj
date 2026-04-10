@@ -122,6 +122,12 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Categories.cs" />
+    <Compile Include="FormTomeInfo.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="FormTomeInfo.Designer.cs">
+      <DependentUpon>FormTomeInfo.cs</DependentUpon>
+    </Compile>
     <Compile Include="LogMonitor.cs" />
     <Compile Include="ThorneLog.cs" />
     <Compile Include="TimerRuntime.cs" />
