@@ -863,8 +863,29 @@ namespace ThorneTimer
             {
                 LoadTimerRuntime();
 
+                // Restore compact/full view widths from the new database
+                compactViewWidth = SafeParseInt(Database.GetSetting(con, "CompactWidth"), this.Width < DefaultFullViewWidth ? this.Width : DefaultCompactViewWidth);
+                fullViewWidth = SafeParseInt(Database.GetSetting(con, "FullWidth"), Math.Max(this.Width, DefaultFullViewWidth));
+
                 // Re-apply compact view after grid rebuild
                 ApplyCompactView(tsbCompactView.Checked);
+
+                // Restore persisted column widths from the new database
+                LoadColumnWidths("Timers", grdTimers);
+                LoadColumnWidths("Characters", grdCharacters);
+                LoadColumnWidths("Categories", grdCategories);
+
+                // Seed per-view FillWeight caches so the first compact/advanced
+                // toggle after a database switch has weights to restore.
+                var initialWeights = new Dictionary<string, float>();
+                foreach (DataGridViewColumn col in grdTimers.Columns)
+                    initialWeights[col.Name] = col.FillWeight;
+                _compactFillWeights = new Dictionary<string, float>(initialWeights);
+                _advancedFillWeights = new Dictionary<string, float>(initialWeights);
+
+                // Restore persisted sort state (falls back to Default Sort
+                // if the new database has no saved sort state).
+                LoadSortState("Timers", grdTimers);
 
                 RefreshGridAfterSort();
             }
@@ -1240,7 +1261,8 @@ namespace ThorneTimer
 
         /// <summary>
         /// Applies saved multi-column sort state from the database to the timer grid.
-        /// Falls back to Properties.Settings SortColumn if no database sort state exists.
+        /// Falls back to the default sort (Class → Style → Name) when no saved
+        /// sort state exists in the database.
         /// </summary>
         private void LoadSortState(string gridName, DataGridView grid)
         {
@@ -1266,19 +1288,8 @@ namespace ThorneTimer
                 // Database may not have the table yet; fall through to default
             }
 
-            // Fallback: single-column sort from Properties.Settings
-            try
-            {
-                string sortCol = Properties.Settings.Default.SortColumn;
-                if (!string.IsNullOrEmpty(sortCol) && grid.Columns.Contains(sortCol))
-                {
-                    grid.Sort(grid.Columns[sortCol], ListSortDirection.Ascending);
-                }
-            }
-            catch (Exception)
-            {
-                // Ignore
-            }
+            // No saved sort state — apply the default sort
+            ApplyDefaultSort();
         }
 
         void GrdTimers_DataError(object sender, DataGridViewDataErrorEventArgs e)
@@ -3499,7 +3510,7 @@ namespace ThorneTimer
         /// Groups timers by class, then by behavior style, then alphabetically —
         /// the most common view for both gameplay and maintenance.
         /// </summary>
-        private void tsbDefaultSort_Click(object sender, EventArgs e)
+        private void ApplyDefaultSort()
         {
             var list = grdTimers.DataSource as SortableBindingList<Timers.GridData>;
             if (list == null) return;
@@ -3510,6 +3521,11 @@ namespace ThorneTimer
                 ("Name", ListSortDirection.Ascending));
 
             RefreshGridAfterSort();
+        }
+
+        private void tsbDefaultSort_Click(object sender, EventArgs e)
+        {
+            ApplyDefaultSort();
         }
 
         private void lblBuffPickFore_Click(object sender, EventArgs e)
