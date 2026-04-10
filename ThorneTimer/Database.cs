@@ -2075,62 +2075,69 @@ namespace ThorneTimer
         {
             var stats = new TomeStatistics();
 
+            stats.TimerCount = SafeCount(con, "SELECT COUNT(*) FROM timers");
+            stats.ActiveTimerCount = SafeCount(con, "SELECT COUNT(*) FROM timers WHERE ActiveYn = 1");
+            stats.CharacterCount = SafeCount(con, "SELECT COUNT(*) FROM characters");
+            stats.CategoryCount = SafeCount(con, "SELECT COUNT(*) FROM categories");
+            stats.ViewCount = SafeCount(con, "SELECT COUNT(*) FROM miniviews");
+            stats.ClassCount = SafeCount(con, "SELECT COUNT(*) FROM classes");
+
+            // Count timers by style
             try
             {
-                using (var cmd = new SQLiteCommand(con))
+                using (var cmd = new SQLiteCommand("SELECT Style, COUNT(*) FROM timers GROUP BY Style", con))
+                using (var reader = cmd.ExecuteReader())
                 {
-                    cmd.CommandText = "SELECT COUNT(*) FROM timers";
-                    stats.TimerCount = Convert.ToInt32(cmd.ExecuteScalar());
-
-                    cmd.CommandText = "SELECT COUNT(*) FROM timers WHERE ActiveYn = 1";
-                    stats.ActiveTimerCount = Convert.ToInt32(cmd.ExecuteScalar());
-
-                    cmd.CommandText = "SELECT COUNT(*) FROM characters";
-                    stats.CharacterCount = Convert.ToInt32(cmd.ExecuteScalar());
-
-                    cmd.CommandText = "SELECT COUNT(*) FROM categories";
-                    stats.CategoryCount = Convert.ToInt32(cmd.ExecuteScalar());
-
-                    cmd.CommandText = "SELECT COUNT(*) FROM views";
-                    stats.ViewCount = Convert.ToInt32(cmd.ExecuteScalar());
-
-                    cmd.CommandText = "SELECT COUNT(*) FROM classes";
-                    stats.ClassCount = Convert.ToInt32(cmd.ExecuteScalar());
-
-                    // Count timers by style
-                    cmd.CommandText = "SELECT Style, COUNT(*) FROM timers GROUP BY Style";
-                    using (var reader = cmd.ExecuteReader())
+                    while (reader.Read())
                     {
-                        while (reader.Read())
-                        {
-                            string style = reader.GetString(0);
-                            int count = reader.GetInt32(1);
+                        string style = reader.IsDBNull(0) ? "Normal" : reader.GetString(0);
+                        int count = reader.GetInt32(1);
+                        if (stats.TimersByStyle.ContainsKey(style))
+                            stats.TimersByStyle[style] += count;
+                        else
                             stats.TimersByStyle[style] = count;
-                        }
-                    }
-
-                    // Count timers by scope
-                    cmd.CommandText = "SELECT Scope, COUNT(*) FROM timers GROUP BY Scope";
-                    using (var reader = cmd.ExecuteReader())
-                    {
-                        while (reader.Read())
-                        {
-                            string scope = reader.IsDBNull(0) ? "Character" : reader.GetString(0);
-                            int count = reader.GetInt32(1);
-                            if (stats.TimersByScope.ContainsKey(scope))
-                                stats.TimersByScope[scope] += count;
-                            else
-                                stats.TimersByScope[scope] = count;
-                        }
                     }
                 }
             }
-            catch
+            catch { }
+
+            // Count timers by scope
+            try
             {
-                // Tables may not exist in older databases; return partial stats
+                using (var cmd = new SQLiteCommand("SELECT Scope, COUNT(*) FROM timers GROUP BY Scope", con))
+                using (var reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        string scope = reader.IsDBNull(0) ? "Character" : reader.GetString(0);
+                        int count = reader.GetInt32(1);
+                        if (stats.TimersByScope.ContainsKey(scope))
+                            stats.TimersByScope[scope] += count;
+                        else
+                            stats.TimersByScope[scope] = count;
+                    }
+                }
             }
+            catch { }
 
             return stats;
+        }
+
+        /// <summary>
+        /// Runs a scalar COUNT query, returning 0 if the table doesn't exist
+        /// or any other error occurs.
+        /// </summary>
+        static private int SafeCount(SQLiteConnection con, string sql)
+        {
+            try
+            {
+                using (var cmd = new SQLiteCommand(sql, con))
+                    return Convert.ToInt32(cmd.ExecuteScalar());
+            }
+            catch
+            {
+                return 0;
+            }
         }
     }
 
