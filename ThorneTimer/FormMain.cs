@@ -577,7 +577,9 @@ namespace ThorneTimer
                 _advancedFillWeights = new Dictionary<string, float>(initialWeights);
 
                 // Restore persisted multi-column sort state
-                LoadSortState("Timers", grdTimers);
+                // (also restores the pre-Group Sort fallback so toggling
+                // Group Sort off after a restart works correctly).
+                LoadSortStateWithPreGroupSort("Timers", grdTimers);
 
                 // Sorting fires ListChanged(Reset) which rebuilds grid rows,
                 // clearing custom cell styles and row visibility.
@@ -887,9 +889,9 @@ namespace ThorneTimer
                 _compactFillWeights = new Dictionary<string, float>(initialWeights);
                 _advancedFillWeights = new Dictionary<string, float>(initialWeights);
 
-                // Restore persisted sort state (falls back to Default Sort
+                // Restore persisted sort state (falls back to Group Sort
                 // if the new database has no saved sort state).
-                LoadSortState("Timers", grdTimers);
+                LoadSortStateWithPreGroupSort("Timers", grdTimers);
 
                 RefreshGridAfterSort();
             }
@@ -1090,6 +1092,10 @@ namespace ThorneTimer
             var timerList = grdTimers.DataSource as SortableBindingList<Timers.GridData>;
             if (timerList != null)
                 Database.SaveSortState(con, "Timers", timerList.SortDescriptions);
+
+            // Persist the pre-Group Sort fallback so toggling Group Sort
+            // off after a restart restores the user's previous sort order.
+            SavePreGroupSortState();
 
             SaveDataTimers();
             SaveDataCharacters();
@@ -1295,6 +1301,16 @@ namespace ThorneTimer
 
             // No saved sort state — apply the default sort
             ApplyDefaultSort();
+        }
+
+        /// <summary>
+        /// Loads both the main sort state and the pre-Group Sort fallback
+        /// state from the database.  Called during startup and database switch.
+        /// </summary>
+        private void LoadSortStateWithPreGroupSort(string gridName, DataGridView grid)
+        {
+            LoadSortState(gridName, grid);
+            LoadPreGroupSortState();
         }
 
         void GrdTimers_DataError(object sender, DataGridViewDataErrorEventArgs e)
@@ -3562,6 +3578,63 @@ namespace ThorneTimer
             defaultSortToolStripMenuItem.Checked = active;
         }
 
+        /// <summary>
+        /// Persists the pre-Group Sort state to the database so it survives
+        /// app restarts.  Uses the existing grid_sort_state table with a
+        /// dedicated GridName so no schema changes are needed.
+        /// </summary>
+        private void SavePreGroupSortState()
+        {
+            const string gridName = "Timers_PreGroupSort";
+
+            // Clear any existing pre-group sort rows
+            Database.SaveSortState(con, gridName, null);
+
+            if (_preGroupSortState == null || _preGroupSortState.Length == 0)
+                return;
+
+            // Re-use SaveSortState by building a temporary list and applying it
+            // so we get a real ListSortDescriptionCollection.  Simpler: just
+            // write the rows directly.
+            var cmd = new SQLiteCommand(con);
+            for (int i = 0; i < _preGroupSortState.Length; i++)
+            {
+                cmd.CommandText = "INSERT INTO grid_sort_state (GridName, ColumnName, SortDirection, SortOrder) VALUES (@grid, @col, @dir, @order)";
+                cmd.Parameters.Clear();
+                cmd.Parameters.AddWithValue("@grid", gridName);
+                cmd.Parameters.AddWithValue("@col", _preGroupSortState[i].Item1);
+                cmd.Parameters.AddWithValue("@dir", _preGroupSortState[i].Item2 == ListSortDirection.Ascending ? 0 : 1);
+                cmd.Parameters.AddWithValue("@order", i);
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        /// <summary>
+        /// Restores the pre-Group Sort state from the database so the toggle-off
+        /// action can return to the user's previous sort after an app restart.
+        /// </summary>
+        private void LoadPreGroupSortState()
+        {
+            try
+            {
+                var sorts = Database.GetSortState(con, "Timers_PreGroupSort");
+                if (sorts.Count > 0)
+                {
+                    _preGroupSortState = sorts
+                        .Select(s => (s.Item1, s.Item2))
+                        .ToArray();
+                }
+                else
+                {
+                    _preGroupSortState = null;
+                }
+            }
+            catch
+            {
+                _preGroupSortState = null;
+            }
+        }
+
         private void tsbDefaultSort_Click(object sender, EventArgs e)
         {
             if (IsGroupSortActive())
@@ -3578,6 +3651,7 @@ namespace ThorneTimer
                 }
 
                 _preGroupSortState = null;
+                SavePreGroupSortState();
                 RefreshGridAfterSort();
                 UpdateGroupSortCheckedState();
             }
@@ -3593,6 +3667,7 @@ namespace ThorneTimer
                         _preGroupSortState[i] = (descs[i].PropertyDescriptor.Name, descs[i].SortDirection);
                 }
 
+                SavePreGroupSortState();
                 ApplyDefaultSort();
             }
         }
