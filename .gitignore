@@ -25,6 +25,7 @@ UpgradeLog*.htm
 *.vspscc
 # NuGet
 packages/
+.nuget/
 # Resharper
 _ReSharper*/
 *.[Rr]e[Ss]harper
