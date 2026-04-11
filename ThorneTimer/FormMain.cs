@@ -2145,7 +2145,7 @@ namespace ThorneTimer
             {
                 Multiselect = false,
                 Filter = "WAV files (*.wav)|*.wav|All files (*.*)|*.*",
-                InitialDirectory = Application.StartupPath + "\\Sounds",
+                InitialDirectory = SoundResolver.SoundsRoot,
                 DereferenceLinks = false,
                 AutoUpgradeEnabled = true
             };
@@ -2154,11 +2154,14 @@ namespace ThorneTimer
             {
                 DataGridViewCell wavCell = (DataGridViewCell)grdTimers.Rows[rowIndex].Cells[grdTimers.Columns["WAVFile"].Index];
 
-                foreach (string filename in openFileDialog.FileNames)
-                {
-                    wavCell.Value = Path.GetFileName(filename);
-                    break;
-                }
+                string selected = openFileDialog.FileName;
+                string relative = SoundResolver.GetRelativePath(selected);
+                wavCell.Value = relative;
+
+                // Persist to DB and sync to TimerRuntime immediately so
+                // the active runtime state reflects the newly chosen sound.
+                SaveDataTimers();
+                SoundResolver.ClearCache();
             }
         }
 
@@ -2943,8 +2946,24 @@ namespace ThorneTimer
 
             if (e.WAVFile.Length > 0)
             {
-                SoundPlayer sp = new SoundPlayer(Application.StartupPath + "\\Sounds\\" + e.WAVFile);
-                sp.Play();
+                try
+                {
+                    string resolvedPath = SoundResolver.Resolve(e.WAVFile);
+                    if (resolvedPath != null)
+                    {
+                        ThorneLog.Info($"Playing sound: \"{e.WAVFile}\" → {resolvedPath}");
+                        SoundPlayer sp = new SoundPlayer(resolvedPath);
+                        sp.Play();
+                    }
+                    else
+                    {
+                        ThorneLog.Warn($"Sound not found: \"{e.WAVFile}\"");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    ThorneLog.Error($"Sound playback error for \"{e.WAVFile}\": {ex.Message}");
+                }
             }
 
             if ((e.Speech.Length > 0) && (voiceEnabled == 1))

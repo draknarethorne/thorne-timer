@@ -59,6 +59,7 @@ jobs:
         copy ThorneTimer\bin\Release\ThorneTimer.exe release-package\
         copy ThorneTimer\bin\Release\*.dll release-package\
         copy ThorneTimer\bin\Release\ThorneTimer.exe.config release-package\
+        copy ThorneTimer\bin\Release\ThorneTimer.ini release-package\
         copy README.md release-package\
         xcopy ThorneTimer\bin\Release\x64 release-package\x64\ /E /I /Y
         xcopy ThorneTimer\bin\Release\x86 release-package\x86\ /E /I /Y
