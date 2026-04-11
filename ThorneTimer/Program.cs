@@ -52,11 +52,7 @@ namespace ThorneTimer
             if (string.IsNullOrEmpty(dbPath) || !File.Exists(dbPath))
                 dbPath = Database.GetDefaultDatabasePath();
 
-            if (!backupsEnabled)
-            {
-                // Backup explicitly disabled — skip entirely
-            }
-            else if (File.Exists(dbPath))
+            if (backupsEnabled && File.Exists(dbPath))
             {
                 string backupPath = Database.BackupDatabase(dbPath, backupPolicy);
                 if (backupPath != null)
@@ -64,10 +60,11 @@ namespace ThorneTimer
                 else
                     ThorneLog.Warn("Database backup failed or skipped");
             }
-            else
+            else if (backupsEnabled)
             {
                 ThorneLog.Info("No existing database to backup (new install)");
             }
+            // else: backup disabled — already logged above
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
