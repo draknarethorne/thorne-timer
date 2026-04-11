@@ -93,9 +93,9 @@ jobs:
         body: |
           ## ⚔️ Thorne Timer ${{ github.ref_name }}
 
-          **A tactical overlay timer and log event notification system for [Project Quarm](https://www.projectquarm.com/).**
+          **Your EverQuest companion — real-time log parsing, overlay timers, and voice alerts crafted for the way you play.**
 
-          Thorne Timer watches your EverQuest log files in real-time and gives you always-on-top timer overlays, voice alerts, and event-driven notifications — the tactical edge you can't get from UI files alone.
+          Thorne Timer watches your log files and turns game events into overlay timers, voice alerts, and notifications — giving you the situational awareness that UI files alone can't provide. Whether you're raiding, soloing, or multi-boxing, it keeps the information you need visible and on screen.
 
           ---
 
@@ -114,7 +114,7 @@ jobs:
           ### 🔗 Links
           - 📖 [README & Documentation](https://github.com/draknarethorne/thorne-timer#readme)
           - 🐛 [Report an Issue](https://github.com/draknarethorne/thorne-timer/issues)
-          - 🎨 [Thorne-UI](https://github.com/draknarethorne/thorne-ui) — the companion in-game UI overhaul
+          - 🎨 [Thorne-UI](https://github.com/draknarethorne/thorne-ui) — the companion in-game UI overhaul for TAKP
         generate_release_notes: true
         append_body: true
         files: ThorneTimer-${{ github.ref_name }}.zip

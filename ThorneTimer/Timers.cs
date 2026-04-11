@@ -23,6 +23,10 @@ namespace ThorneTimer
             public long CaseYn { get; set; }
             public long EndlessYn { get; set; }
             public string Style { get; set; }
+            public string Scope { get; set; }
+            public string DependsOnTimer { get; set; }
+            public long DependsOnDelay { get; set; }
+            public long ClassID { get; set; }
         }
 
         static public string btnStart = "Start";

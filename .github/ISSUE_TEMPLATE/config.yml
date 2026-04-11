@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Thorne Timer Documentation
+    url: https://github.com/draknarethorne/thorne-timer#readme
+    about: Review the README for features, installation, and usage information.
+  - name: Development Roadmap
+    url: https://github.com/draknarethorne/thorne-timer/blob/main/Docs/ROADMAP.md
+    about: Check the roadmap for planned features and current development status.

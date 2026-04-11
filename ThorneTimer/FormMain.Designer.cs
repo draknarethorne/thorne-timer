@@ -31,20 +31,27 @@
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(FormMain));
             this.toolStrip = new System.Windows.Forms.ToolStrip();
             this.tscActiveCharacter = new System.Windows.Forms.ToolStripComboBox();
-            this.toolStripSeparator3 = new System.Windows.Forms.ToolStripSeparator();
+            this.tsSepCharacter = new System.Windows.Forms.ToolStripSeparator();
             this.tsbStartStopWatching = new System.Windows.Forms.ToolStripButton();
-            this.toolStripSeparator4 = new System.Windows.Forms.ToolStripSeparator();
+            this.tsSepWatch = new System.Windows.Forms.ToolStripSeparator();
+            this.tsSepSort = new System.Windows.Forms.ToolStripSeparator();
             this.tsbMiniViews = new System.Windows.Forms.ToolStripButton();
-            this.menuStrip1 = new System.Windows.Forms.MenuStrip();
+            this.tsbAutoSwitch = new System.Windows.Forms.ToolStripButton();
+            this.tsbShowAllClasses = new System.Windows.Forms.ToolStripButton();
+            this.tsbShowActiveOnly = new System.Windows.Forms.ToolStripButton();
+            this.tsbCompactView = new System.Windows.Forms.ToolStripButton();
+            this.menuStripMain = new System.Windows.Forms.MenuStrip();
             this.fileToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.newDatabaseToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.openDatabaseToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.saveDatabaseAsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.openRecentToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
-            this.toolStripSeparator2 = new System.Windows.Forms.ToolStripSeparator();
+            this.fileSepSaveRecent = new System.Windows.Forms.ToolStripSeparator();
+            this.fileSepRecentExit = new System.Windows.Forms.ToolStripSeparator();
             this.exitToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.helpToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.tomeInfoToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.helpSepTomeAbout = new System.Windows.Forms.ToolStripSeparator();
             this.aboutToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.tabCtrlMain = new System.Windows.Forms.TabControl();
             this.tabTimers = new System.Windows.Forms.TabPage();
@@ -103,12 +110,25 @@
             this.miniViewsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.watchToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.startStopWatchingToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.colorDialog1 = new System.Windows.Forms.ColorDialog();
+            this.autoSwitchToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.showAllClassesToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.showActiveOnlyToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.compactViewToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.defaultSortToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.refreshTimersToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.viewSepCompactFilters = new System.Windows.Forms.ToolStripSeparator();
+            this.viewSepFiltersRefresh = new System.Windows.Forms.ToolStripSeparator();
+            this.viewSepSortRefresh = new System.Windows.Forms.ToolStripSeparator();
+            this.tsbDefaultSort = new System.Windows.Forms.ToolStripButton();
+            this.tsSepView = new System.Windows.Forms.ToolStripSeparator();
+            this.watchSeparator = new System.Windows.Forms.ToolStripSeparator();
+            this.colorDialogPicker = new System.Windows.Forms.ColorDialog();
             this.statusStrip = new System.Windows.Forms.StatusStrip();
             this.statusTomePath = new System.Windows.Forms.ToolStripStatusLabel();
             this.statusParsing = new System.Windows.Forms.ToolStripStatusLabel();
             this.statusTimerStats = new System.Windows.Forms.ToolStripStatusLabel();
-            this.menuStrip1.SuspendLayout();
+            this.statusSortInfo = new System.Windows.Forms.ToolStripStatusLabel();
+            this.menuStripMain.SuspendLayout();
             this.tabCtrlMain.SuspendLayout();
             this.tabTimers.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.grdTimers)).BeginInit();
@@ -131,13 +151,20 @@
             // 
             this.toolStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.tscActiveCharacter,
-            this.toolStripSeparator3,
+            this.tsSepCharacter,
             this.tsbStartStopWatching,
-            this.toolStripSeparator4,
+            this.tsbAutoSwitch,
+            this.tsSepWatch,
+            this.tsbDefaultSort,
+            this.tsSepSort,
+            this.tsbShowAllClasses,
+            this.tsbShowActiveOnly,
+            this.tsSepView,
+            this.tsbCompactView,
             this.tsbMiniViews});
             this.toolStrip.Location = new System.Drawing.Point(0, 24);
             this.toolStrip.Name = "toolStrip";
-            this.toolStrip.Size = new System.Drawing.Size(1152, 25);
+            this.toolStrip.Size = new System.Drawing.Size(1400, 25);
             this.toolStrip.TabIndex = 21;
             // 
             // tscActiveCharacter
@@ -148,10 +175,10 @@
             this.tscActiveCharacter.ToolTipText = "Active Character";
             this.tscActiveCharacter.SelectedIndexChanged += new System.EventHandler(this.tscActiveCharacter_SelectedIndexChanged);
             // 
-            // toolStripSeparator3
+            // tsSepCharacter
             // 
-            this.toolStripSeparator3.Name = "toolStripSeparator3";
-            this.toolStripSeparator3.Size = new System.Drawing.Size(6, 25);
+            this.tsSepCharacter.Name = "tsSepCharacter";
+            this.tsSepCharacter.Size = new System.Drawing.Size(6, 25);
             // 
             // tsbStartStopWatching
             // 
@@ -159,12 +186,18 @@
             this.tsbStartStopWatching.Name = "tsbStartStopWatching";
             this.tsbStartStopWatching.Size = new System.Drawing.Size(90, 22);
             this.tsbStartStopWatching.Text = "Start Watching";
+            this.tsbStartStopWatching.ToolTipText = "Start or stop watching log files for timer trigger keywords";
             this.tsbStartStopWatching.Click += new System.EventHandler(this.tsbStartStopWatching_Click);
             // 
-            // toolStripSeparator4
+            // tsSepWatch
             // 
-            this.toolStripSeparator4.Name = "toolStripSeparator4";
-            this.toolStripSeparator4.Size = new System.Drawing.Size(6, 25);
+            this.tsSepWatch.Name = "tsSepWatch";
+            this.tsSepWatch.Size = new System.Drawing.Size(6, 25);
+            // 
+            // tsSepSort
+            // 
+            this.tsSepSort.Name = "tsSepSort";
+            this.tsSepSort.Size = new System.Drawing.Size(6, 25);
             // 
             // tsbMiniViews
             // 
@@ -172,22 +205,81 @@
             this.tsbMiniViews.Name = "tsbMiniViews";
             this.tsbMiniViews.Size = new System.Drawing.Size(70, 22);
             this.tsbMiniViews.Text = "Mini Views";
-            this.tsbMiniViews.ToolTipText = "Toggle Mini Views";
+            this.tsbMiniViews.ToolTipText = "Toggle mini view overlay windows for at-a-glance timer monitoring";
             this.tsbMiniViews.Click += new System.EventHandler(this.tsbMiniViews_Click);
             // 
-            // menuStrip1
+            // tsbAutoSwitch
             // 
-            this.menuStrip1.BackColor = System.Drawing.SystemColors.MenuBar;
-            this.menuStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.tsbAutoSwitch.CheckOnClick = true;
+            this.tsbAutoSwitch.Checked = true;
+            this.tsbAutoSwitch.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.tsbAutoSwitch.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.ImageAndText;
+            this.tsbAutoSwitch.Name = "tsbAutoSwitch";
+            this.tsbAutoSwitch.Size = new System.Drawing.Size(84, 22);
+            this.tsbAutoSwitch.Text = "Auto-Switch";
+            this.tsbAutoSwitch.ToolTipText = "Automatically switch to the character whose log file is actively being written";
+            this.tsbAutoSwitch.Click += new System.EventHandler(this.tsbAutoSwitch_Click);
+            // 
+            // tsbShowAllClasses
+            // 
+            this.tsbShowAllClasses.CheckOnClick = true;
+            this.tsbShowAllClasses.Checked = true;
+            this.tsbShowAllClasses.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.tsbShowAllClasses.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.ImageAndText;
+            this.tsbShowAllClasses.Name = "tsbShowAllClasses";
+            this.tsbShowAllClasses.Size = new System.Drawing.Size(92, 22);
+            this.tsbShowAllClasses.Text = "All Classes";
+            this.tsbShowAllClasses.ToolTipText = "Show timers for all classes. When unchecked, only timers matching the active character\u0027s class are shown.";
+            this.tsbShowAllClasses.Click += new System.EventHandler(this.tsbShowAllClasses_Click);
+            // 
+            // tsbShowActiveOnly
+            // 
+            this.tsbShowActiveOnly.CheckOnClick = true;
+            this.tsbShowActiveOnly.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.ImageAndText;
+            this.tsbShowActiveOnly.Name = "tsbShowActiveOnly";
+            this.tsbShowActiveOnly.Size = new System.Drawing.Size(84, 22);
+            this.tsbShowActiveOnly.Text = "Active Only";
+            this.tsbShowActiveOnly.ToolTipText = "Show only active timers. When unchecked, all timers are shown.";
+            this.tsbShowActiveOnly.Click += new System.EventHandler(this.tsbShowActiveOnly_Click);
+            // 
+            // tsbCompactView
+            // 
+            this.tsbCompactView.CheckOnClick = true;
+            this.tsbCompactView.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.ImageAndText;
+            this.tsbCompactView.Name = "tsbCompactView";
+            this.tsbCompactView.Size = new System.Drawing.Size(92, 22);
+            this.tsbCompactView.Text = "Compact";
+            this.tsbCompactView.ToolTipText = "Toggle compact view. Hides configuration columns and makes classification columns read-only for safe gameplay.";
+            this.tsbCompactView.Click += new System.EventHandler(this.tsbCompactView_Click);
+            // 
+            // tsbDefaultSort
+            // 
+            this.tsbDefaultSort.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.ImageAndText;
+            this.tsbDefaultSort.Name = "tsbDefaultSort";
+            this.tsbDefaultSort.Size = new System.Drawing.Size(80, 22);
+            this.tsbDefaultSort.Text = "Group Sort";
+            this.tsbDefaultSort.ToolTipText = "Sort timers by Class → Style → Name. Groups timers hierarchically for the most natural view.";
+            this.tsbDefaultSort.Click += new System.EventHandler(this.tsbDefaultSort_Click);
+            // 
+            // tsSepView
+            // 
+            this.tsSepView.Name = "tsSepView";
+            this.tsSepView.Size = new System.Drawing.Size(6, 25);
+            // 
+            // menuStripMain
+            // 
+            this.menuStripMain.BackColor = System.Drawing.SystemColors.MenuBar;
+            this.menuStripMain.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.fileToolStripMenuItem,
             this.viewToolStripMenuItem,
             this.watchToolStripMenuItem,
             this.helpToolStripMenuItem});
-            this.menuStrip1.Location = new System.Drawing.Point(0, 0);
-            this.menuStrip1.Name = "menuStrip1";
-            this.menuStrip1.Size = new System.Drawing.Size(1152, 24);
-            this.menuStrip1.TabIndex = 8;
-            this.menuStrip1.Text = "menuStrip1";
+            this.menuStripMain.Location = new System.Drawing.Point(0, 0);
+            this.menuStripMain.Name = "menuStripMain";
+            this.menuStripMain.ShowItemToolTips = true;
+            this.menuStripMain.Size = new System.Drawing.Size(1400, 24);
+            this.menuStripMain.TabIndex = 8;
+            this.menuStripMain.Text = "menuStripMain";
             // 
             // fileToolStripMenuItem
             // 
@@ -195,9 +287,9 @@
             this.newDatabaseToolStripMenuItem,
             this.openDatabaseToolStripMenuItem,
             this.saveDatabaseAsToolStripMenuItem,
-            this.toolStripSeparator1,
+            this.fileSepSaveRecent,
             this.openRecentToolStripMenuItem,
-            this.toolStripSeparator2,
+            this.fileSepRecentExit,
             this.exitToolStripMenuItem});
             this.fileToolStripMenuItem.Name = "fileToolStripMenuItem";
             this.fileToolStripMenuItem.Size = new System.Drawing.Size(37, 20);
@@ -230,15 +322,15 @@
             this.saveDatabaseAsToolStripMenuItem.Text = "&Save Tome As...";
             this.saveDatabaseAsToolStripMenuItem.Click += new System.EventHandler(this.saveDatabaseAsToolStripMenuItem_Click);
             // 
-            // toolStripSeparator1
+            // fileSepSaveRecent
             // 
-            this.toolStripSeparator1.Name = "toolStripSeparator1";
-            this.toolStripSeparator1.Size = new System.Drawing.Size(182, 6);
+            this.fileSepSaveRecent.Name = "fileSepSaveRecent";
+            this.fileSepSaveRecent.Size = new System.Drawing.Size(182, 6);
             // 
-            // toolStripSeparator2
+            // fileSepRecentExit
             // 
-            this.toolStripSeparator2.Name = "toolStripSeparator2";
-            this.toolStripSeparator2.Size = new System.Drawing.Size(182, 6);
+            this.fileSepRecentExit.Name = "fileSepRecentExit";
+            this.fileSepRecentExit.Size = new System.Drawing.Size(182, 6);
             // 
             // exitToolStripMenuItem
             // 
@@ -250,22 +342,43 @@
             // helpToolStripMenuItem
             // 
             this.helpToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.tomeInfoToolStripMenuItem,
+            this.helpSepTomeAbout,
             this.aboutToolStripMenuItem});
             this.helpToolStripMenuItem.Name = "helpToolStripMenuItem";
             this.helpToolStripMenuItem.Size = new System.Drawing.Size(44, 20);
             this.helpToolStripMenuItem.Text = "&Help";
             // 
+            // tomeInfoToolStripMenuItem
+            // 
+            this.tomeInfoToolStripMenuItem.Name = "tomeInfoToolStripMenuItem";
+            this.tomeInfoToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.tomeInfoToolStripMenuItem.Text = "Tome &Info...";
+            this.tomeInfoToolStripMenuItem.Click += new System.EventHandler(this.tomeInfoToolStripMenuItem_Click);
+            // 
+            // helpSepTomeAbout
+            // 
+            this.helpSepTomeAbout.Name = "helpSepTomeAbout";
+            this.helpSepTomeAbout.Size = new System.Drawing.Size(177, 6);
+            // 
             // aboutToolStripMenuItem
             // 
             this.aboutToolStripMenuItem.Name = "aboutToolStripMenuItem";
-            this.aboutToolStripMenuItem.Size = new System.Drawing.Size(107, 22);
+            this.aboutToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
             this.aboutToolStripMenuItem.Text = "&About";
             this.aboutToolStripMenuItem.Click += new System.EventHandler(this.aboutToolStripMenuItem_Click);
             // 
             // viewToolStripMenuItem
             // 
             this.viewToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.miniViewsToolStripMenuItem});
+            this.miniViewsToolStripMenuItem,
+            this.compactViewToolStripMenuItem,
+            this.viewSepCompactFilters,
+            this.showAllClassesToolStripMenuItem,
+            this.showActiveOnlyToolStripMenuItem,
+            this.viewSepFiltersRefresh,
+            this.defaultSortToolStripMenuItem,
+            this.refreshTimersToolStripMenuItem});
             this.viewToolStripMenuItem.Name = "viewToolStripMenuItem";
             this.viewToolStripMenuItem.Size = new System.Drawing.Size(44, 20);
             this.viewToolStripMenuItem.Text = "&View";
@@ -275,12 +388,46 @@
             this.miniViewsToolStripMenuItem.Name = "miniViewsToolStripMenuItem";
             this.miniViewsToolStripMenuItem.Size = new System.Drawing.Size(134, 22);
             this.miniViewsToolStripMenuItem.Text = "&Mini Views";
+            this.miniViewsToolStripMenuItem.ToolTipText = "Toggle mini view overlay windows for at-a-glance timer monitoring";
             this.miniViewsToolStripMenuItem.Click += new System.EventHandler(this.tsbMiniViews_Click);
+            // 
+            // compactViewToolStripMenuItem
+            // 
+            this.compactViewToolStripMenuItem.CheckOnClick = true;
+            this.compactViewToolStripMenuItem.Name = "compactViewToolStripMenuItem";
+            this.compactViewToolStripMenuItem.Size = new System.Drawing.Size(160, 22);
+            this.compactViewToolStripMenuItem.Text = "&Compact View";
+            this.compactViewToolStripMenuItem.ToolTipText = "Toggle compact view. Hides configuration columns and makes classification columns read-only for safe gameplay.";
+            this.compactViewToolStripMenuItem.Click += new System.EventHandler(this.compactViewToolStripMenuItem_Click);
+            // 
+            // refreshTimersToolStripMenuItem
+            // 
+            this.refreshTimersToolStripMenuItem.Name = "refreshTimersToolStripMenuItem";
+            this.refreshTimersToolStripMenuItem.ShortcutKeys = System.Windows.Forms.Keys.F5;
+            this.refreshTimersToolStripMenuItem.Size = new System.Drawing.Size(160, 22);
+            this.refreshTimersToolStripMenuItem.Text = "&Refresh";
+            this.refreshTimersToolStripMenuItem.ToolTipText = "Refresh the timer grid — re-applies sorting, painting, and layout (F5).";
+            this.refreshTimersToolStripMenuItem.Click += new System.EventHandler(this.refreshTimersToolStripMenuItem_Click);
+            // 
+            // defaultSortToolStripMenuItem
+            // 
+            this.defaultSortToolStripMenuItem.Name = "defaultSortToolStripMenuItem";
+            this.defaultSortToolStripMenuItem.Size = new System.Drawing.Size(160, 22);
+            this.defaultSortToolStripMenuItem.Text = "&Group Sort";
+            this.defaultSortToolStripMenuItem.ToolTipText = "Sort timers by Class → Style → Name. Groups timers hierarchically for the most natural view.";
+            this.defaultSortToolStripMenuItem.Click += new System.EventHandler(this.tsbDefaultSort_Click);
+            // 
+            // viewSepSortRefresh
+            // 
+            this.viewSepSortRefresh.Name = "viewSepSortRefresh";
+            this.viewSepSortRefresh.Size = new System.Drawing.Size(157, 6);
             // 
             // watchToolStripMenuItem
             // 
             this.watchToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.startStopWatchingToolStripMenuItem});
+            this.startStopWatchingToolStripMenuItem,
+            this.watchSeparator,
+            this.autoSwitchToolStripMenuItem});
             this.watchToolStripMenuItem.Name = "watchToolStripMenuItem";
             this.watchToolStripMenuItem.Size = new System.Drawing.Size(54, 20);
             this.watchToolStripMenuItem.Text = "&Watch";
@@ -290,7 +437,39 @@
             this.startStopWatchingToolStripMenuItem.Name = "startStopWatchingToolStripMenuItem";
             this.startStopWatchingToolStripMenuItem.Size = new System.Drawing.Size(160, 22);
             this.startStopWatchingToolStripMenuItem.Text = "&Start Watching";
+            this.startStopWatchingToolStripMenuItem.ToolTipText = "Start or stop watching log files for timer trigger keywords";
             this.startStopWatchingToolStripMenuItem.Click += new System.EventHandler(this.tsbStartStopWatching_Click);
+            // 
+            // autoSwitchToolStripMenuItem
+            // 
+            this.autoSwitchToolStripMenuItem.CheckOnClick = true;
+            this.autoSwitchToolStripMenuItem.Checked = true;
+            this.autoSwitchToolStripMenuItem.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.autoSwitchToolStripMenuItem.Name = "autoSwitchToolStripMenuItem";
+            this.autoSwitchToolStripMenuItem.Size = new System.Drawing.Size(160, 22);
+            this.autoSwitchToolStripMenuItem.Text = "&Auto-Switch Character";
+            this.autoSwitchToolStripMenuItem.ToolTipText = "Automatically switch to the character whose log file is actively being written";
+            this.autoSwitchToolStripMenuItem.Click += new System.EventHandler(this.autoSwitchToolStripMenuItem_Click);
+            // 
+            // showAllClassesToolStripMenuItem
+            // 
+            this.showAllClassesToolStripMenuItem.CheckOnClick = true;
+            this.showAllClassesToolStripMenuItem.Checked = true;
+            this.showAllClassesToolStripMenuItem.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.showAllClassesToolStripMenuItem.Name = "showAllClassesToolStripMenuItem";
+            this.showAllClassesToolStripMenuItem.Size = new System.Drawing.Size(160, 22);
+            this.showAllClassesToolStripMenuItem.Text = "Show &All Classes";
+            this.showAllClassesToolStripMenuItem.ToolTipText = "Show timers for all classes. When unchecked, only timers matching the active character's class are shown.";
+            this.showAllClassesToolStripMenuItem.Click += new System.EventHandler(this.showAllClassesToolStripMenuItem_Click);
+            // 
+            // showActiveOnlyToolStripMenuItem
+            // 
+            this.showActiveOnlyToolStripMenuItem.CheckOnClick = true;
+            this.showActiveOnlyToolStripMenuItem.Name = "showActiveOnlyToolStripMenuItem";
+            this.showActiveOnlyToolStripMenuItem.Size = new System.Drawing.Size(160, 22);
+            this.showActiveOnlyToolStripMenuItem.Text = "Show Acti&ve Only";
+            this.showActiveOnlyToolStripMenuItem.ToolTipText = "Show only active timers. When unchecked, all timers are shown.";
+            this.showActiveOnlyToolStripMenuItem.Click += new System.EventHandler(this.showActiveOnlyToolStripMenuItem_Click);
             // 
             // tabCtrlMain
             // 
@@ -305,7 +484,7 @@
             this.tabCtrlMain.Location = new System.Drawing.Point(12, 52);
             this.tabCtrlMain.Name = "tabCtrlMain";
             this.tabCtrlMain.SelectedIndex = 0;
-            this.tabCtrlMain.Size = new System.Drawing.Size(1128, 433);
+            this.tabCtrlMain.Size = new System.Drawing.Size(1376, 609);
             this.tabCtrlMain.TabIndex = 9;
             // 
             // tabTimers
@@ -319,15 +498,15 @@
             this.tabTimers.Location = new System.Drawing.Point(4, 22);
             this.tabTimers.Name = "tabTimers";
             this.tabTimers.Padding = new System.Windows.Forms.Padding(3);
-            this.tabTimers.Size = new System.Drawing.Size(1120, 407);
+            this.tabTimers.Size = new System.Drawing.Size(1368, 583);
             this.tabTimers.TabIndex = 0;
             this.tabTimers.Text = "Timers";
             // 
             // btnResetCounts
             // 
-            this.btnResetCounts.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.btnResetCounts.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.btnResetCounts.BackColor = System.Drawing.SystemColors.Control;
-            this.btnResetCounts.Location = new System.Drawing.Point(87, 378);
+            this.btnResetCounts.Location = new System.Drawing.Point(1206, 554);
             this.btnResetCounts.Name = "btnResetCounts";
             this.btnResetCounts.Size = new System.Drawing.Size(75, 23);
             this.btnResetCounts.TabIndex = 18;
@@ -339,7 +518,7 @@
             // 
             this.buttonStopAll.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.buttonStopAll.BackColor = System.Drawing.SystemColors.Control;
-            this.buttonStopAll.Location = new System.Drawing.Point(958, 378);
+            this.buttonStopAll.Location = new System.Drawing.Point(1287, 554);
             this.buttonStopAll.Name = "buttonStopAll";
             this.buttonStopAll.Size = new System.Drawing.Size(75, 23);
             this.buttonStopAll.TabIndex = 17;
@@ -349,9 +528,9 @@
             // 
             // btnAddTimer
             // 
-            this.btnAddTimer.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnAddTimer.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
             this.btnAddTimer.BackColor = System.Drawing.SystemColors.Control;
-            this.btnAddTimer.Location = new System.Drawing.Point(1039, 378);
+            this.btnAddTimer.Location = new System.Drawing.Point(6, 554);
             this.btnAddTimer.Name = "btnAddTimer";
             this.btnAddTimer.Size = new System.Drawing.Size(75, 23);
             this.btnAddTimer.TabIndex = 4;
@@ -363,7 +542,7 @@
             // 
             this.btnDeleteTimer.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
             this.btnDeleteTimer.BackColor = System.Drawing.SystemColors.Control;
-            this.btnDeleteTimer.Location = new System.Drawing.Point(6, 378);
+            this.btnDeleteTimer.Location = new System.Drawing.Point(87, 554);
             this.btnDeleteTimer.Name = "btnDeleteTimer";
             this.btnDeleteTimer.Size = new System.Drawing.Size(75, 23);
             this.btnDeleteTimer.TabIndex = 3;
@@ -383,7 +562,7 @@
             this.grdTimers.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             this.grdTimers.Location = new System.Drawing.Point(6, 6);
             this.grdTimers.Name = "grdTimers";
-            this.grdTimers.Size = new System.Drawing.Size(1108, 366);
+            this.grdTimers.Size = new System.Drawing.Size(1356, 542);
             this.grdTimers.TabIndex = 1;
             this.grdTimers.CellClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.grdTimers_CellClick);
             this.grdTimers.ColumnHeaderMouseClick += new System.Windows.Forms.DataGridViewCellMouseEventHandler(this.grdTimers_ColumnHeaderMouseClick);
@@ -397,14 +576,14 @@
             this.tabCharacters.Location = new System.Drawing.Point(4, 22);
             this.tabCharacters.Name = "tabCharacters";
             this.tabCharacters.Padding = new System.Windows.Forms.Padding(3);
-            this.tabCharacters.Size = new System.Drawing.Size(1120, 407);
+            this.tabCharacters.Size = new System.Drawing.Size(1368, 583);
             this.tabCharacters.TabIndex = 1;
             this.tabCharacters.Text = "Characters";
             // 
             // btnAddCharacter
             // 
-            this.btnAddCharacter.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnAddCharacter.Location = new System.Drawing.Point(997, 368);
+            this.btnAddCharacter.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.btnAddCharacter.Location = new System.Drawing.Point(6, 544);
             this.btnAddCharacter.Name = "btnAddCharacter";
             this.btnAddCharacter.Size = new System.Drawing.Size(75, 23);
             this.btnAddCharacter.TabIndex = 5;
@@ -415,7 +594,7 @@
             // btnDeleteCharacter
             // 
             this.btnDeleteCharacter.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.btnDeleteCharacter.Location = new System.Drawing.Point(6, 368);
+            this.btnDeleteCharacter.Location = new System.Drawing.Point(87, 544);
             this.btnDeleteCharacter.Name = "btnDeleteCharacter";
             this.btnDeleteCharacter.Size = new System.Drawing.Size(75, 23);
             this.btnDeleteCharacter.TabIndex = 4;
@@ -432,7 +611,7 @@
             this.grdCharacters.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             this.grdCharacters.Location = new System.Drawing.Point(6, 6);
             this.grdCharacters.Name = "grdCharacters";
-            this.grdCharacters.Size = new System.Drawing.Size(1066, 356);
+            this.grdCharacters.Size = new System.Drawing.Size(1314, 532);
             this.grdCharacters.TabIndex = 0;
             // 
             // tabCategories
@@ -444,14 +623,14 @@
             this.tabCategories.Location = new System.Drawing.Point(4, 22);
             this.tabCategories.Name = "tabCategories";
             this.tabCategories.Padding = new System.Windows.Forms.Padding(3);
-            this.tabCategories.Size = new System.Drawing.Size(1120, 407);
+            this.tabCategories.Size = new System.Drawing.Size(1368, 583);
             this.tabCategories.TabIndex = 2;
             this.tabCategories.Text = "Categories";
             // 
             // btnAddCategory
             // 
-            this.btnAddCategory.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnAddCategory.Location = new System.Drawing.Point(997, 368);
+            this.btnAddCategory.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.btnAddCategory.Location = new System.Drawing.Point(6, 544);
             this.btnAddCategory.Name = "btnAddCategory";
             this.btnAddCategory.Size = new System.Drawing.Size(75, 23);
             this.btnAddCategory.TabIndex = 6;
@@ -462,7 +641,7 @@
             // btnDeleteCategory
             // 
             this.btnDeleteCategory.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.btnDeleteCategory.Location = new System.Drawing.Point(6, 368);
+            this.btnDeleteCategory.Location = new System.Drawing.Point(87, 544);
             this.btnDeleteCategory.Name = "btnDeleteCategory";
             this.btnDeleteCategory.Size = new System.Drawing.Size(75, 23);
             this.btnDeleteCategory.TabIndex = 5;
@@ -479,7 +658,7 @@
             this.grdCategories.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             this.grdCategories.Location = new System.Drawing.Point(6, 6);
             this.grdCategories.Name = "grdCategories";
-            this.grdCategories.Size = new System.Drawing.Size(1066, 356);
+            this.grdCategories.Size = new System.Drawing.Size(1314, 532);
             this.grdCategories.TabIndex = 1;
             // 
             // tabViews
@@ -491,30 +670,34 @@
             this.tabViews.Location = new System.Drawing.Point(4, 22);
             this.tabViews.Name = "tabViews";
             this.tabViews.Padding = new System.Windows.Forms.Padding(3);
-            this.tabViews.Size = new System.Drawing.Size(1120, 407);
+            this.tabViews.Size = new System.Drawing.Size(1368, 583);
             this.tabViews.TabIndex = 3;
             this.tabViews.Text = "Views";
             // 
             // btnDeleteView
             // 
             this.btnDeleteView.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.btnDeleteView.Location = new System.Drawing.Point(6, 368);
+            this.btnDeleteView.Location = new System.Drawing.Point(87, 544);
             this.btnDeleteView.Name = "btnDeleteView";
             this.btnDeleteView.Size = new System.Drawing.Size(75, 23);
             this.btnDeleteView.TabIndex = 8;
             this.btnDeleteView.Text = "Delete";
             this.btnDeleteView.UseVisualStyleBackColor = true;
+            this.btnDeleteView.Enabled = false;
+            this.btnDeleteView.Visible = false;
             this.btnDeleteView.Click += new System.EventHandler(this.btnDeleteView_Click);
             // 
             // btnAddView
             // 
-            this.btnAddView.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnAddView.Location = new System.Drawing.Point(997, 368);
+            this.btnAddView.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.btnAddView.Location = new System.Drawing.Point(6, 544);
             this.btnAddView.Name = "btnAddView";
             this.btnAddView.Size = new System.Drawing.Size(75, 23);
             this.btnAddView.TabIndex = 7;
             this.btnAddView.Text = "Add";
             this.btnAddView.UseVisualStyleBackColor = true;
+            this.btnAddView.Enabled = false;
+            this.btnAddView.Visible = false;
             this.btnAddView.Click += new System.EventHandler(this.btnAddView_Click);
             // 
             // grdViews
@@ -526,7 +709,7 @@
             this.grdViews.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             this.grdViews.Location = new System.Drawing.Point(6, 6);
             this.grdViews.Name = "grdViews";
-            this.grdViews.Size = new System.Drawing.Size(1066, 356);
+            this.grdViews.Size = new System.Drawing.Size(1314, 532);
             this.grdViews.TabIndex = 2;
             // 
             // tabSettings
@@ -537,7 +720,7 @@
             this.tabSettings.Location = new System.Drawing.Point(4, 22);
             this.tabSettings.Name = "tabSettings";
             this.tabSettings.Padding = new System.Windows.Forms.Padding(3);
-            this.tabSettings.Size = new System.Drawing.Size(1120, 407);
+            this.tabSettings.Size = new System.Drawing.Size(1368, 583);
             this.tabSettings.TabIndex = 4;
             this.tabSettings.Text = "Settings";
             // 
@@ -910,10 +1093,11 @@
             this.statusStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.statusTomePath,
             this.statusParsing,
+            this.statusSortInfo,
             this.statusTimerStats});
-            this.statusStrip.Location = new System.Drawing.Point(0, 502);
+            this.statusStrip.Location = new System.Drawing.Point(0, 678);
             this.statusStrip.Name = "statusStrip";
-            this.statusStrip.Size = new System.Drawing.Size(1152, 22);
+            this.statusStrip.Size = new System.Drawing.Size(1400, 22);
             this.statusStrip.TabIndex = 20;
             // 
             // statusTomePath
@@ -930,30 +1114,38 @@
             this.statusParsing.Size = new System.Drawing.Size(27, 17);
             this.statusParsing.Text = "Idle";
             // 
+            // statusSortInfo
+            // 
+            this.statusSortInfo.BorderSides = System.Windows.Forms.ToolStripStatusLabelBorderSides.Left;
+            this.statusSortInfo.Name = "statusSortInfo";
+            this.statusSortInfo.Size = new System.Drawing.Size(0, 17);
+            this.statusSortInfo.Visible = false;
+            // 
             // statusTimerStats
             // 
             this.statusTimerStats.BorderSides = System.Windows.Forms.ToolStripStatusLabelBorderSides.Left;
             this.statusTimerStats.Name = "statusTimerStats";
             this.statusTimerStats.Size = new System.Drawing.Size(162, 17);
-            this.statusTimerStats.Text = "Timers: 0   Active: 0   Running: 0";
+            this.statusTimerStats.Text = "Timers: 0/0   Active: 0   Running: 0";
             // 
             // FormMain
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.SystemColors.Window;
-            this.ClientSize = new System.Drawing.Size(1152, 524);
+            this.ClientSize = new System.Drawing.Size(1400, 700);
+            this.MinimumSize = new System.Drawing.Size(800, 550);
             this.Controls.Add(this.statusStrip);
             this.Controls.Add(this.tabCtrlMain);
             this.Controls.Add(this.toolStrip);
-            this.Controls.Add(this.menuStrip1);
+            this.Controls.Add(this.menuStripMain);
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
-            this.MainMenuStrip = this.menuStrip1;
+            this.MainMenuStrip = this.menuStripMain;
             this.Name = "FormMain";
             this.Text = "Thorne Timer";
             this.Load += new System.EventHandler(this.FormMain_Load);
-            this.menuStrip1.ResumeLayout(false);
-            this.menuStrip1.PerformLayout();
+            this.menuStripMain.ResumeLayout(false);
+            this.menuStripMain.PerformLayout();
             this.tabCtrlMain.ResumeLayout(false);
             this.tabTimers.ResumeLayout(false);
             this.tabTimers.PerformLayout();
@@ -981,11 +1173,15 @@
         #endregion
         private System.Windows.Forms.ToolStrip toolStrip;
         private System.Windows.Forms.ToolStripComboBox tscActiveCharacter;
-        private System.Windows.Forms.ToolStripSeparator toolStripSeparator3;
+        private System.Windows.Forms.ToolStripSeparator tsSepCharacter;
         private System.Windows.Forms.ToolStripButton tsbStartStopWatching;
-        private System.Windows.Forms.ToolStripSeparator toolStripSeparator4;
+        private System.Windows.Forms.ToolStripSeparator tsSepWatch;
         private System.Windows.Forms.ToolStripButton tsbMiniViews;
-        private System.Windows.Forms.MenuStrip menuStrip1;
+        private System.Windows.Forms.ToolStripButton tsbAutoSwitch;
+        private System.Windows.Forms.ToolStripButton tsbShowAllClasses;
+        private System.Windows.Forms.ToolStripButton tsbShowActiveOnly;
+        private System.Windows.Forms.ToolStripButton tsbCompactView;
+        private System.Windows.Forms.MenuStrip menuStripMain;
         private System.Windows.Forms.ToolStripMenuItem fileToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem exitToolStripMenuItem;
         private System.Windows.Forms.TabControl tabCtrlMain;
@@ -999,8 +1195,21 @@
         private System.Windows.Forms.Button btnDeleteCharacter;
         private System.Windows.Forms.ToolStripMenuItem viewToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem miniViewsToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem compactViewToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem refreshTimersToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem watchToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem startStopWatchingToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem autoSwitchToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem showAllClassesToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem showActiveOnlyToolStripMenuItem;
+        private System.Windows.Forms.ToolStripSeparator viewSepCompactFilters;
+        private System.Windows.Forms.ToolStripSeparator viewSepFiltersRefresh;
+        private System.Windows.Forms.ToolStripSeparator viewSepSortRefresh;
+        private System.Windows.Forms.ToolStripSeparator watchSeparator;
+        private System.Windows.Forms.ToolStripButton tsbDefaultSort;
+        private System.Windows.Forms.ToolStripMenuItem defaultSortToolStripMenuItem;
+        private System.Windows.Forms.ToolStripSeparator tsSepView;
+        private System.Windows.Forms.ToolStripSeparator tsSepSort;
         private System.Windows.Forms.TabPage tabCategories;
         private System.Windows.Forms.Button btnAddCategory;
         private System.Windows.Forms.Button btnDeleteCategory;
@@ -1014,7 +1223,7 @@
         private System.Windows.Forms.GroupBox gbVoice;
         private System.Windows.Forms.Label lblWarnPickFore;
         private System.Windows.Forms.Label lblWarningColors;
-        private System.Windows.Forms.ColorDialog colorDialog1;
+        private System.Windows.Forms.ColorDialog colorDialogPicker;
         private System.Windows.Forms.TextBox txtWarningTime;
         private System.Windows.Forms.Label lblWarningTime;
         private System.Windows.Forms.Label lblWarnPickBack;
@@ -1029,6 +1238,8 @@
         private System.Windows.Forms.Label lblNormPickFore;
         private System.Windows.Forms.Label lblNormalColors;
         private System.Windows.Forms.ToolStripMenuItem helpToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem tomeInfoToolStripMenuItem;
+        private System.Windows.Forms.ToolStripSeparator helpSepTomeAbout;
         private System.Windows.Forms.ToolStripMenuItem aboutToolStripMenuItem;
         private System.Windows.Forms.Label lblPingColors;
         private System.Windows.Forms.Label lblPingPickBack;
@@ -1052,12 +1263,13 @@
         private System.Windows.Forms.ToolStripMenuItem openDatabaseToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem saveDatabaseAsToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem openRecentToolStripMenuItem;
-        private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
-        private System.Windows.Forms.ToolStripSeparator toolStripSeparator2;
+        private System.Windows.Forms.ToolStripSeparator fileSepSaveRecent;
+        private System.Windows.Forms.ToolStripSeparator fileSepRecentExit;
         private System.Windows.Forms.StatusStrip statusStrip;
         private System.Windows.Forms.ToolStripStatusLabel statusTomePath;
         private System.Windows.Forms.ToolStripStatusLabel statusParsing;
         private System.Windows.Forms.ToolStripStatusLabel statusTimerStats;
+        private System.Windows.Forms.ToolStripStatusLabel statusSortInfo;
     }
 }
 

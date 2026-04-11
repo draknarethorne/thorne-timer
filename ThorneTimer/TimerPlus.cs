@@ -17,14 +17,14 @@ namespace ThorneTimer
             Normal
         }
 
-        public int RowIndex = 0;
+        public long TimerID = 0;
         public double ElapsedTime = 0;
         public double DurationTime = 0;
         public TimerType TheType = TimerType.Normal;
 
         public class TimerPlusEventArgs : EventArgs
         {
-            public int RowIndex = 0;
+            public long TimerID = 0;
             public double ElapsedTime = 0;
             public double Duration = 0;
         }
@@ -45,7 +45,7 @@ namespace ThorneTimer
 
                 TimerPlus ea = new TimerPlus
                 {
-                    RowIndex = this.RowIndex,
+                    TimerID = this.TimerID,
                     ElapsedTime = this.ElapsedTime,
                     DurationTime = this.DurationTime,
                     TheType = this.TheType
@@ -66,27 +66,52 @@ namespace ThorneTimer
         {
             TimeSpan t = TimeSpan.FromMilliseconds(this.DurationTime - this.ElapsedTime);
 
-            return String.Format("{0:00}:{1:00}:{2:00}", t.Hours, t.Minutes, t.Seconds);
+            if (t.Days > 0)
+                return string.Format("{0}d {1:00}:{2:00}:{3:00}", t.Days, t.Hours, t.Minutes, t.Seconds);
+
+            return string.Format("{0:00}:{1:00}:{2:00}", t.Hours, t.Minutes, t.Seconds);
         }
 
         static public double GetMilliseconds(string timeValue)
         {
-            double ms = 0;
+            if (string.IsNullOrEmpty(timeValue)) return 0;
 
             try
             {
-                int hours = Convert.ToInt32(timeValue.Substring(0, 2));
-                int minutes = Convert.ToInt32(timeValue.Substring(3, 2));
-                int seconds = Convert.ToInt32(timeValue.Substring(6, 2));
+                // Strip optional 'd' suffix so both "30 10:30:00" (input)
+                // and "30d 10:30:00" (display) are handled uniformly.
+                string normalized = timeValue.Replace("d ", " ");
 
-                DateTime dt1 = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, hours, minutes, seconds);
-                DateTime dt2 = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 0, 0, 0);
-
-                ms = (dt1 - dt2).TotalMilliseconds;
+                int spaceIdx = normalized.IndexOf(' ');
+                if (spaceIdx > 0)
+                {
+                    // DD HH:MM:SS
+                    int d = Convert.ToInt32(normalized.Substring(0, spaceIdx));
+                    string[] parts = normalized.Substring(spaceIdx + 1).Split(':');
+                    if (parts.Length == 3)
+                    {
+                        int h = Convert.ToInt32(parts[0]);
+                        int m = Convert.ToInt32(parts[1]);
+                        int s = Convert.ToInt32(parts[2]);
+                        return new TimeSpan(d, h, m, s).TotalMilliseconds;
+                    }
+                }
+                else
+                {
+                    // HH:MM:SS
+                    string[] parts = normalized.Split(':');
+                    if (parts.Length == 3)
+                    {
+                        int h = Convert.ToInt32(parts[0]);
+                        int m = Convert.ToInt32(parts[1]);
+                        int s = Convert.ToInt32(parts[2]);
+                        return new TimeSpan(h, m, s).TotalMilliseconds;
+                    }
+                }
             }
             catch { }
 
-            return ms;
+            return 0;
         }
     }
 }

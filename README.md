@@ -5,7 +5,7 @@
 <h1 align="center">Thorne Timer</h1>
 
 <p align="center">
-  <strong>A tactical overlay timer and log event notification system for TAKP / Project Quarm</strong>
+  <strong>Your EverQuest companion — real-time log parsing, overlay timers, and voice alerts<br/>crafted for the way you play.</strong>
 </p>
 
 <p align="center">
@@ -14,21 +14,24 @@
   <a href="#getting-started">Getting Started</a> •
   <a href="#how-it-works">How It Works</a> •
   <a href="#roadmap">Roadmap</a> •
+  <a href="#version-history">Versions</a> •
   <a href="#building-from-source">Building</a> •
-  <a href="#related-projects">Related Projects</a>
+  <a href="#contributing">Contributing</a>
 </p>
 
 ---
 
 ## About
 
-**Thorne Timer** is a companion desktop application designed to enhance your gameplay experience on [Project Quarm](https://www.projectquarm.com/), [The Al'Kabor Project (TAKP)](https://www.takproject.net/), and any EverQuest server that produces log files.
+**Thorne Timer** is a desktop companion built for EverQuest players who want to play smarter. It watches your log files in real-time and turns raw game events into overlay timers, voice alerts, and instant notifications — giving you the situational awareness that UI files alone simply cannot provide.
 
-It watches your EverQuest log files in real-time and gives you always-on-top timer overlays, voice alerts, and event-driven notifications — the tactical information edge that UI files alone simply cannot provide. While it's built and tested with the Project Quarm community in mind, the log parsing engine works with any text-based log output, so it can be adapted to other servers or use cases.
+Whether you're tracking buff durations on a raid, timing respawns while multi-boxing, or catching auction messages across characters, Thorne Timer keeps the information you need visible and organized on screen — always on top, always up to date.
+
+Built and tested with the [Project Quarm](https://www.projectquarm.com/) and [TAKP](https://www.takproject.net/) communities, but the log parsing engine works with **any EverQuest server** (or any application) that writes text-based log files.
 
 ### Why Thorne Timer?
 
-The native TAKP UI files can only go so far. While [**Thorne-UI**](https://github.com/draknarethorne/thorne-ui) transforms your in-game interface with enhanced windows, better layouts, and quality-of-life improvements, there are things you simply *cannot* do with XML UI files alone:
+EverQuest's native UI files can only go so far. While [**Thorne-UI**](https://github.com/draknarethorne/thorne-ui) transforms your in-game interface with enhanced windows, better layouts, and quality-of-life improvements, there are things you simply *cannot* do with XML UI files alone:
 
 - **Always-visible timers** that persist across zone transitions and game restarts
 - **Log-triggered automation** that responds to game events in real-time
@@ -36,9 +39,9 @@ The native TAKP UI files can only go so far. While [**Thorne-UI**](https://githu
 - **Multi-character tracking** across boxing sessions
 - **Separate overlay windows** for different timer types so you see what matters
 
-Thorne Timer fills that gap — it's the overlay companion that lives *outside* the game, watching your log files and giving you the information you need, when you need it.
+Thorne Timer fills that gap. It lives *outside* the game, quietly reading your logs and surfacing the information that helps you play better — whether that's knowing exactly when your charm will break, catching a tell while alt-tabbed, or tracking four characters' buff timers at a glance.
 
-> 🎯 This is a community side project — built by a player, for players. Feedback, ideas, and contributions are always welcome!
+> 🎯 Built by a player, for players. This is a community project — feedback, ideas, and contributions are always welcome.
 
 ---
 
@@ -154,13 +157,13 @@ EverQuest Log File
                      └──────────────┘     └─────────────────┘
 ```
 
-Thorne Timer reads your EQ log file line by line as new entries appear. When a line matches a timer's **start keyword**, the timer begins counting down. When it matches an **end keyword** (or the duration expires), the timer fires its alert. The overlay windows update in real-time so you always know what's active.
+Thorne Timer reads your EQ log file line by line as new entries appear. When a line matches a timer's **start keyword**, the timer begins counting down. When it matches an **end keyword** (or the duration expires), the timer fires its alert. The overlay windows update in real-time — so whether you're watching one character or four, you always know what's happening.
 
 ---
 
 ## Roadmap
 
-Thorne Timer is evolving into a **tactical HUD** for serious multi-boxing and raid gameplay:
+Thorne Timer is evolving into a **complete tactical HUD** for serious multi-boxing, raiding, and everyday EverQuest gameplay:
 
 | Phase | Description |
 |-------|-------------|
@@ -170,6 +173,43 @@ Thorne Timer is evolving into a **tactical HUD** for serious multi-boxing and ra
 | **Future** | Full spell/ability management per class with smart timer automation |
 
 The goal: the **ultimate timer and notification system** tailored to how *you* play.
+
+For detailed phase breakdowns, see the [Roadmap](Docs/ROADMAP.md).
+
+---
+
+## Version History
+
+**v0.5.0** (June 2025)
+
+- ✅ Per-character timer state persistence (save/restore across character switches)
+- ✅ Auto character switching via log file detection
+- ✅ Timer Styles system (Normal, Buff, Pet, Ping) with style-driven mini views
+- ✅ Mini view overlays — four always-on-top overlay windows with real-time countdown
+- ✅ Compact view mode for the main timer grid
+- ✅ Class system with 16 EQ class seed data and class filtering
+- ✅ Scope system (World vs Character) replacing legacy categories
+- ✅ DependsOn timer chaining (DependsOnTimer + DependsOnDelay)
+- ✅ Row painting with style-driven colors across grid and mini views
+- ✅ Column width persistence and window state management
+- ✅ Parameterized SQL throughout all database operations
+- ✅ Comprehensive architecture documentation
+- ✅ Multi-column sort with Shift+Click and Ctrl+Click support
+- ✅ Group Sort toggle (Class → Style → Name) with previous-sort restore
+- ✅ Programmatic toolbar icons for all buttons and menu items
+- ✅ Polished About dialog with version, features, runtime info, and GitHub link
+- ✅ Help → Tome Info dialog showing database statistics and file information
+
+**v0.1.0 – v0.4.0** (2025) _archived_
+
+- ✅ Core timer engine with start/end keyword matching
+- ✅ Real-time EQ log file parsing (LogMonitor)
+- ✅ Text-to-speech and WAV audio alerts
+- ✅ SQLite database (tome) for timer and settings persistence
+- ✅ Always-on-top overlay windows
+- ✅ CI/CD pipeline with GitHub Actions (build + release workflows)
+- ✅ Code signing support in release workflow
+- ✅ Auto-version injection from git tags into AssemblyInfo.cs
 
 ---
 
@@ -202,6 +242,21 @@ msbuild "Thorne-Timer.sln" /t:Rebuild /p:Configuration=Debug /p:Platform="Any CP
 3. Right-click **ThorneTimer** in Solution Explorer → **Set as Startup Project**
 4. Press **F5** to build and run
 
+### Development Tools
+
+This project uses **two IDEs** for different purposes — each chosen for what it does best:
+
+| Tool | When to Use | What It's Best At |
+|------|-------------|-------------------|
+| **Visual Studio** | Active development, debugging, building | IntelliSense for C#/.NET, WinForms designer, NuGet management, breakpoint debugging, profiling |
+| **VS Code** | Documentation, code review, git workflow, AI-assisted analysis | Markdown editing, Copilot agents, multi-file search, lightweight browsing, PR reviews |
+
+**Visual Studio** is the primary IDE for writing C# code, designing WinForms, and debugging the application. Open `Thorne-Timer.sln` for full project support.
+
+**VS Code** is the companion workspace for documentation, architecture analysis, and AI-powered code review via GitHub Copilot agents. Open `thorne-timer.code-workspace` for the configured workspace with recommended extensions and settings.
+
+> 💡 **Tip:** Both can be open simultaneously — Visual Studio for building and debugging, VS Code for documentation edits, Copilot chat, and git operations.
+
 ---
 
 ## Troubleshooting
@@ -216,7 +271,7 @@ msbuild "Thorne-Timer.sln" /t:Rebuild /p:Configuration=Debug /p:Platform="Any CP
 
 ## Contributing
 
-This is a community side project built to help fellow Project Quarm players. Contributions, ideas, and feedback are all welcome!
+Thorne Timer is a community project — built to help fellow EverQuest players get more out of the game they love. Contributions, ideas, and feedback are all welcome!
 
 - 🐛 **Found a bug?** [Open an issue](https://github.com/draknarethorne/thorne-timer/issues)
 - 💡 **Have an idea?** Start a discussion or submit a feature request
@@ -238,29 +293,34 @@ This project uses GitHub Actions for continuous integration and release automati
 ```bash
 # Merge your work to main
 git checkout main
-git merge working-on-views
+git merge miniview-enhancements
 
 # Tag a new version
-git tag v1.0.0
+git tag -a v0.5.0 -m "Release v0.5.0: Per-character state, auto-switch, timer styles"
 git push origin main --tags
 ```
 
 The release workflow will automatically:
-1. **Extract version from tag** (`v0.1.0` → `0.1.0.0`)
+1. **Extract version from tag** (`v0.5.0` → `0.5.0.0`)
 2. **Inject into AssemblyInfo.cs** — the built EXE has the correct version embedded
 3. Build the Release configuration
-4. Package all required files into a ZIP
-5. Create a GitHub Release with download links and **auto-generated changelog** from commits since the previous tag
+4. **Sign the executable** (if signing certificate is configured)
+5. Package all required files into a ZIP
+6. Create a GitHub Release with download links and **auto-generated changelog** from commits since the previous tag
 
-**Versioning:** Use semantic versioning (e.g., `v0.1.0`, `v1.0.0`, `v2.0.0-beta`). Pre-release tags containing `-` are automatically marked as pre-release.
+**Versioning:** Use semantic versioning (e.g., `v0.5.0`, `v1.0.0`, `v2.0.0-beta`). Pre-release tags containing `-` are automatically marked as pre-release.
 
 > 💡 **Note:** You don't need to manually update `AssemblyInfo.cs` before releases — the workflow handles it automatically!
+
+For the complete release process, see [Docs/releases/PUBLISHING.md](Docs/releases/PUBLISHING.md). For version management details, see [Docs/VERSION-MANAGEMENT.md](Docs/VERSION-MANAGEMENT.md).
 
 ---
 
 ## License
 
-*License information coming soon.*
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+
+Free to use, modify, and share. Built for the EverQuest community, useful anywhere there are log files to parse.
 
 ---
 

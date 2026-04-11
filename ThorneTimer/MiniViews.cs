@@ -30,10 +30,16 @@ namespace ThorneTimer
         public int mvBuffForeColor = Color.Orange.ToArgb();
         public int mvBuffBackColor = Color.Black.ToArgb();
 
-        private MiniView miniView = null;
-        private MiniView petView = null;
-        private MiniView buffView = null;
-        private MiniView pingView = null;
+        /// <summary>
+        /// Pairs a database view record with its live MiniView form.
+        /// </summary>
+        private class ViewEntry
+        {
+            public Database.ViewPositionData Data { get; set; }
+            public MiniView Form { get; set; }
+        }
+
+        private List<ViewEntry> activeViews = new List<ViewEntry>();
 
         private DateTime lastTime = DateTime.MinValue;
 
@@ -41,39 +47,58 @@ namespace ThorneTimer
         {
             public long ID { get; set; }
             public string Name { get; set; }
+            public long ActiveYn { get; set; }
+            public string StyleFilter { get; set; }
+            public int PositionX { get; set; }
+            public int PositionY { get; set; }
+            public int SortOrder { get; set; }
         }
 
         public bool MiniViewsActive()
         {
-            return (bool)(miniView != null);
+            return activeViews.Count > 0;
+        }
+
+        /// <summary>
+        /// Saves current positions, destroys all mini views, and recreates
+        /// them from the database.  Used when the user activates or
+        /// deactivates a view while mini views are visible.
+        /// </summary>
+        public void RefreshMiniViews(SQLiteConnection con, string activeCharacterID)
+        {
+            if (activeViews.Count == 0) return;
+
+            // Persist current positions before tearing down
+            Dictionary<int, Point> positions = GetCurrentViewPositions();
+            Database.SaveViewPositions(con, positions);
+
+            DestroyMiniViews();
+            CreateMiniViews(con, activeCharacterID);
         }
 
         public bool MiniViewsHidden()
         {
-            return (bool)(miniView == null);
+            return activeViews.Count == 0;
         }
 
         public MiniView MV()
         {
-            return miniView;
+            return activeViews.Count > 0 ? activeViews[0].Form : null;
         }
 
         /// <summary>
         /// Gets the current positions of all views.
-        /// Returns a dictionary keyed by ViewType (Normal, Pet, Buff, Ping).
+        /// Returns a dictionary keyed by database ID.
         /// </summary>
-        public Dictionary<string, Point> GetCurrentViewPositions()
+        public Dictionary<int, Point> GetCurrentViewPositions()
         {
-            Dictionary<string, Point> positions = new Dictionary<string, Point>();
+            Dictionary<int, Point> positions = new Dictionary<int, Point>();
 
-            if (miniView != null)
-                positions["Normal"] = miniView.Location;
-            if (petView != null)
-                positions["Pet"] = petView.Location;
-            if (buffView != null)
-                positions["Buff"] = buffView.Location;
-            if (pingView != null)
-                positions["Ping"] = pingView.Location;
+            foreach (var entry in activeViews)
+            {
+                if (entry.Form != null)
+                    positions[entry.Data.ID] = entry.Form.Location;
+            }
 
             return positions;
         }
@@ -148,50 +173,26 @@ namespace ThorneTimer
         {
             bool result = false;
 
-            if (miniView == null)
+            if (activeViews.Count == 0)
             {
-                // Load positions from database (falls back to defaults if not found)
-                Dictionary<string, Database.ViewPositionData> positions = Database.GetViewPositions(con);
+                // Load view definitions from database
+                List<Database.ViewPositionData> views = Database.GetViewPositions(con);
 
-                // Get positions and names for each view type, with fallbacks
-                int normalX = 100, normalY = 100;
-                int petX = 300, petY = 100;
-                int buffX = 500, buffY = 100;
-                int pingX = 1100, pingY = 100;
-                string normalName = "Normal Timers";
-                string petName = "Pet Timers";
-                string buffName = "Buff Timers";
-                string pingName = "Ping Timers";
+                foreach (var viewData in views)
+                {
+                    // Skip inactive views
+                    if (viewData.ActiveYn != 1)
+                        continue;
 
-                if (positions.ContainsKey("Normal"))
-                {
-                    normalX = positions["Normal"].PositionX;
-                    normalY = positions["Normal"].PositionY;
-                    if (!string.IsNullOrEmpty(positions["Normal"].Name)) normalName = positions["Normal"].Name;
-                }
-                if (positions.ContainsKey("Pet"))
-                {
-                    petX = positions["Pet"].PositionX;
-                    petY = positions["Pet"].PositionY;
-                    if (!string.IsNullOrEmpty(positions["Pet"].Name)) petName = positions["Pet"].Name;
-                }
-                if (positions.ContainsKey("Buff"))
-                {
-                    buffX = positions["Buff"].PositionX;
-                    buffY = positions["Buff"].PositionY;
-                    if (!string.IsNullOrEmpty(positions["Buff"].Name)) buffName = positions["Buff"].Name;
-                }
-                if (positions.ContainsKey("Ping"))
-                {
-                    pingX = positions["Ping"].PositionX;
-                    pingY = positions["Ping"].PositionY;
-                    if (!string.IsNullOrEmpty(positions["Ping"].Name)) pingName = positions["Ping"].Name;
-                }
+                    bool showView = true;
+                    if (viewData.StyleFilter == "Ping")
+                        showView = ShowPing();
 
-                miniView = CreateMiniView(normalX, normalY, true, normalName);
-                petView = CreateMiniView(petX, petY, true, petName);
-                buffView = CreateMiniView(buffX, buffY, true, buffName);
-                pingView = CreateMiniView(pingX, pingY, ShowPing(), pingName);
+                    string title = string.IsNullOrEmpty(viewData.Name) ? viewData.StyleFilter + " Timers" : viewData.Name;
+                    MiniView form = CreateMiniView(viewData.PositionX, viewData.PositionY, showView, title);
+
+                    activeViews.Add(new ViewEntry { Data = viewData, Form = form });
+                }
 
                 UpdateMiniAppearance();
 
@@ -205,24 +206,63 @@ namespace ThorneTimer
         {
             bool result = true;
 
-            SetMiniAppearance(miniView, "No Timers");
-            SetMiniAppearance(petView, "No Pet");
-            SetMiniAppearance(buffView, "No Buffs");
-            SetMiniAppearance(pingView, "...", ShowPing());
+            foreach (var entry in activeViews)
+            {
+                int viewFore, viewBack;
+                string emptyLabel;
+                bool showView = true;
+                GetStyleColors(entry.Data.StyleFilter, out viewFore, out viewBack, out emptyLabel);
+
+                if (entry.Data.StyleFilter == "Ping")
+                    showView = ShowPing();
+
+                SetMiniAppearance(entry.Form, emptyLabel, showView, viewFore, viewBack);
+            }
 
             return result;
+        }
+
+        /// <summary>
+        /// Returns the fore/back colors and empty label text for a given style.
+        /// </summary>
+        private void GetStyleColors(string style, out int foreColor, out int backColor, out string emptyLabel)
+        {
+            switch (style)
+            {
+                case "Pet":
+                    foreColor = mvBuffForeColor;
+                    backColor = mvBuffBackColor;
+                    emptyLabel = "Pet";
+                    break;
+                case "Buff":
+                    foreColor = mvBuffForeColor;
+                    backColor = mvBuffBackColor;
+                    emptyLabel = "Buffs";
+                    break;
+                case "Ping":
+                    foreColor = mvPingForeColor;
+                    backColor = mvPingBackColor;
+                    emptyLabel = "Ping";
+                    break;
+                default:
+                    foreColor = mvNormForeColor;
+                    backColor = mvNormBackColor;
+                    emptyLabel = "Timers";
+                    break;
+            }
         }
 
         public bool DestroyMiniViews()
         {
             bool result = false;
 
-            if (miniView != null)
+            if (activeViews.Count > 0)
             {
-                miniView = DestroyMiniView(miniView);
-                buffView = DestroyMiniView(buffView);
-                petView = DestroyMiniView(petView);
-                pingView = DestroyMiniView(pingView);
+                foreach (var entry in activeViews)
+                {
+                    DestroyMiniView(entry.Form);
+                }
+                activeViews.Clear();
 
                 result = true;
             }
@@ -241,7 +281,7 @@ namespace ThorneTimer
             return null;
         }
 
-        private void SetMiniAppearance(MiniView view, String timerText, bool showView = true)
+        private void SetMiniAppearance(MiniView view, String timerText, bool showView, int viewForeColor, int viewBackColor)
         {
             if (view != null)
             {
@@ -249,7 +289,8 @@ namespace ThorneTimer
                              Color.FromArgb(mvWarnForeColor), Color.FromArgb(mvWarnBackColor), mvWarnTime,
                              Color.FromArgb(mvPingForeColor), Color.FromArgb(mvPingBackColor),
                              Color.FromArgb(mvBuffForeColor), Color.FromArgb(mvBuffBackColor),
-                             timerText);
+                             timerText,
+                             Color.FromArgb(viewForeColor), Color.FromArgb(viewBackColor));
                 if (showView)
                 {
                     view.Show();
@@ -273,24 +314,81 @@ namespace ThorneTimer
             return (mvShowPing == 1);
         }
 
-        public void UpdateMiniTimers(DataGridView grdTimers, bool bForce=true)
+        public void UpdateMiniTimers(List<MiniTimerData> timerData, bool bForce=true)
         {
-            // Check current time vs. last time to prevent excessive updates to the mini view since it scans all rows in the grid every time
-            // This could use more refactoring, but this works for now.
+            // Check current time vs. last time to prevent excessive updates
             DateTime currTime = DateTime.Now;
-            if ((((currTime.Subtract(lastTime).TotalMilliseconds) > 999) || bForce) && (miniView != null))
+            if ((((currTime.Subtract(lastTime).TotalMilliseconds) > 999) || bForce) && (activeViews.Count > 0))
             {
                 lastTime = currTime;
 
-                List<MiniView.MiniData> miniData = new List<MiniView.MiniData>();
-                List<MiniView.MiniData> petData = new List<MiniView.MiniData>();
-                List<MiniView.MiniData> buffData = new List<MiniView.MiniData>();
-                List<MiniView.MiniData> pingData = new List<MiniView.MiniData>();
+                // Build a data list for each active view keyed by StyleFilter
+                Dictionary<string, List<MiniView.MiniData>> viewData = new Dictionary<string, List<MiniView.MiniData>>();
+                foreach (var entry in activeViews)
+                {
+                    if (!viewData.ContainsKey(entry.Data.StyleFilter))
+                        viewData[entry.Data.StyleFilter] = new List<MiniView.MiniData>();
+                }
+
+                foreach (var td in timerData)
+                {
+                    if (!ShowMiniTimer(td.ButtonState)) continue;
+
+                    string timerStyle = string.IsNullOrEmpty(td.Style) ? "Normal" : td.Style;
+
+                    MiniView.MiniData.ColorType colorType;
+                    switch (timerStyle)
+                    {
+                        case "Pet": colorType = MiniView.MiniData.ColorType.Pet; break;
+                        case "Buff": colorType = MiniView.MiniData.ColorType.Buff; break;
+                        case "Ping": colorType = MiniView.MiniData.ColorType.Ping; break;
+                        default: colorType = MiniView.MiniData.ColorType.Normal; break;
+                    }
+
+                    MiniView.MiniData md = new MiniView.MiniData
+                    {
+                        Name = td.Name,
+                        Remaining = td.Remaining,
+                        TheColor = colorType
+                    };
+
+                    // Route to view(s) whose StyleFilter matches this timer's Style
+                    if (viewData.ContainsKey(timerStyle))
+                    {
+                        viewData[timerStyle].Add(md);
+                    }
+                }
+
+                // Push data to each view
+                foreach (var entry in activeViews)
+                {
+                    if (viewData.ContainsKey(entry.Data.StyleFilter))
+                        entry.Form.LoadData(viewData[entry.Data.StyleFilter]);
+                    else
+                        entry.Form.LoadData(new List<MiniView.MiniData>());
+                }
+            }
+        }
+
+        public void UpdateMiniTimers(DataGridView grdTimers, bool bForce=true)
+        {
+            // Check current time vs. last time to prevent excessive updates to the mini view since it scans all rows in the grid every time
+            DateTime currTime = DateTime.Now;
+            if ((((currTime.Subtract(lastTime).TotalMilliseconds) > 999) || bForce) && (activeViews.Count > 0))
+            {
+                lastTime = currTime;
+
+                // Build a data list for each active view keyed by StyleFilter
+                Dictionary<string, List<MiniView.MiniData>> viewData = new Dictionary<string, List<MiniView.MiniData>>();
+                foreach (var entry in activeViews)
+                {
+                    if (!viewData.ContainsKey(entry.Data.StyleFilter))
+                        viewData[entry.Data.StyleFilter] = new List<MiniView.MiniData>();
+                }
 
                 for (int r = 0; r < grdTimers.Rows.Count; r++)
                 {
                     DataGridViewRow row = grdTimers.Rows[r];
-
                     DataGridViewCell cellStartStop = row.Cells[grdTimers.Columns["StartStop"].Index];
 
                     if (ShowMiniTimer((string)cellStartStop.Value))
@@ -298,44 +396,41 @@ namespace ThorneTimer
                         DataGridViewCell cellName = row.Cells[grdTimers.Columns["Name"].Index];
                         DataGridViewCell cellRemaining = row.Cells[grdTimers.Columns["Remaining"].Index];
                         DataGridViewCell cellStyle = row.Cells[grdTimers.Columns["Style"].Index];
+                        string timerStyle = Convert.ToString(cellStyle.Value);
+                        if (string.IsNullOrEmpty(timerStyle)) timerStyle = "Normal";
 
-                        string style = Convert.ToString(cellStyle.Value);
-                        string styleTag = (style.Length > 0) ? style.Substring(0, 1) : "";
+                        MiniView.MiniData.ColorType colorType;
+                        switch (timerStyle)
+                        {
+                            case "Pet": colorType = MiniView.MiniData.ColorType.Pet; break;
+                            case "Buff": colorType = MiniView.MiniData.ColorType.Buff; break;
+                            case "Ping": colorType = MiniView.MiniData.ColorType.Ping; break;
+                            default: colorType = MiniView.MiniData.ColorType.Normal; break;
+                        }
 
                         MiniView.MiniData md = new MiniView.MiniData
                         {
                             Name = (string)cellName.Value,
                             Remaining = (string)cellRemaining.Value,
-                            Tag = styleTag
+                            TheColor = colorType
                         };
 
-                        if (Timers.PetTimer((string)cellStartStop.Value))
+                        // Route to view(s) whose StyleFilter matches this timer's Style
+                        if (viewData.ContainsKey(timerStyle))
                         {
-                            md.TheColor = MiniView.MiniData.ColorType.Pet;
-                            petData.Add(md);
-                        }
-                        else if (Timers.BuffTimer((string)cellStartStop.Value))
-                        {
-                            md.TheColor = MiniView.MiniData.ColorType.Buff;
-                            buffData.Add(md);
-                        }
-                        else if (Timers.PingTimer((string)cellStartStop.Value))
-                        {
-                            md.TheColor = MiniView.MiniData.ColorType.Ping;
-                            pingData.Add(md);
-                        }
-                        else
-                        {
-                            md.TheColor = MiniView.MiniData.ColorType.Normal;
-                            miniData.Add(md);
+                            viewData[timerStyle].Add(md);
                         }
                     }
                 }
 
-                miniView.LoadData(miniData);
-                petView.LoadData(petData);
-                buffView.LoadData(buffData);
-                pingView.LoadData(pingData);
+                // Push data to each view
+                foreach (var entry in activeViews)
+                {
+                    if (viewData.ContainsKey(entry.Data.StyleFilter))
+                        entry.Form.LoadData(viewData[entry.Data.StyleFilter]);
+                    else
+                        entry.Form.LoadData(new List<MiniView.MiniData>());
+                }
             }
         }
     }

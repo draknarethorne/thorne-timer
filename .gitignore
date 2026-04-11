@@ -17,6 +17,7 @@
 *.cache
 *.pdb
 *.dbmdl
+UpgradeLog*.htm
 *.dbproj.schemaview
 *.dbproj.user
 *.dbproj.vspscc
@@ -24,6 +25,7 @@
 *.vspscc
 # NuGet
 packages/
+.nuget/
 # Resharper
 _ReSharper*/
 *.[Rr]e[Ss]harper
@@ -53,6 +55,7 @@ Desktop.ini
 *.db
 # Allow the example database shipped with the project
 !ThorneTimer/Data/ThorneTimer.db
+ThorneTimer/Data/Backups/*
 *.bak
 *.backup
 *.tmp

@@ -37,7 +37,6 @@ namespace ThorneTimer
 
             public string Name { get; set; }
             public string Remaining { get; set; }
-            public string Tag { get; set; }
             public ColorType TheColor { get; set; }
         }
 
@@ -58,6 +57,9 @@ namespace ThorneTimer
         Color PingForeColor = Color.Green;
         Color PingBackColor = Color.Black;
 
+        Color ViewForeColor = Color.Yellow;
+        Color ViewBackColor = Color.Black;
+
         string TimerText = "No Timers";
 
         public void SetAppearance(int opacity, float fontSize, 
@@ -65,7 +67,8 @@ namespace ThorneTimer
                                   Color warnForeColor, Color warnBackColor, String warnTime, 
                                   Color pingForeColor, Color pingBackColor,
                                   Color buffForeColor, Color buffBackColor,
-                                  String timerText)
+                                  String timerText,
+                                  Color viewForeColor, Color viewBackColor)
         {
             FormOpacity = (double)opacity / 100.0f;
             FontSize = fontSize;
@@ -76,14 +79,19 @@ namespace ThorneTimer
             WarnForeColor = warnForeColor;
             WarnBackColor = warnBackColor;
             WarnTime = "00:" + warnTime;
-            
+
             PingForeColor = pingForeColor;
             PingBackColor = pingBackColor;
 
             BuffForeColor = buffForeColor;
             BuffBackColor = buffBackColor;
 
+            ViewForeColor = viewForeColor;
+            ViewBackColor = viewBackColor;
+
             TimerText = timerText;
+
+            this.BackColor = viewBackColor;
         }
 
         private void Control_MouseDown(object sender, System.Windows.Forms.MouseEventArgs e)
@@ -129,7 +137,7 @@ namespace ThorneTimer
 
                 tlpMain.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-                Label lblNoActive = new Label() { Text = TimerText, AutoSize = true, BackColor = Color.LightBlue };
+                Label lblNoActive = new Label() { Text = TimerText, AutoSize = true, BackColor = ViewBackColor, ForeColor = ViewForeColor };
                 lblNoActive.Font = new Font("Arial", FontSize, FontStyle.Bold);
                 lblNoActive.MouseDown += Control_MouseDown;
                 lblNoActive.Margin = new Padding(0);
@@ -144,7 +152,7 @@ namespace ThorneTimer
                 {
                     AutoSize = true,
                     AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                    ColumnCount = 3,
+                    ColumnCount = 2,
                     RowCount = 0,
                     Margin = new Padding(0)
                 };
@@ -172,13 +180,6 @@ namespace ThorneTimer
                     lblRemaining.MouseDown += Control_MouseDown;
                     tlpMain.Controls.Add(lblRemaining, 1, tlpMain.RowCount);
 
-                    Label lblTag = new Label() { Text = md.Tag, AutoSize = true };
-                    lblTag.Font = new Font("Arial", FontSize, FontStyle.Bold);
-                    lblTag.Margin = new Padding(0);
-                    lblTag.Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right | AnchorStyles.Bottom;
-                    lblTag.MouseDown += Control_MouseDown;
-                    tlpMain.Controls.Add(lblTag, 2, tlpMain.RowCount);
-
                     switch (md.TheColor)
                     {
                         case MiniData.ColorType.Pet:
@@ -186,24 +187,18 @@ namespace ThorneTimer
                             lblName.ForeColor = BuffForeColor;
                             lblRemaining.BackColor = BuffBackColor;
                             lblRemaining.ForeColor = BuffForeColor;
-                            lblTag.BackColor = BuffBackColor;
-                            lblTag.ForeColor = BuffForeColor;
                             break;
                         case MiniData.ColorType.Buff:
                             lblName.BackColor = BuffBackColor;
                             lblName.ForeColor = BuffForeColor;
                             lblRemaining.BackColor = BuffBackColor;
                             lblRemaining.ForeColor = BuffForeColor;
-                            lblTag.BackColor = BuffBackColor;
-                            lblTag.ForeColor = BuffForeColor;
                             break;
                         case MiniData.ColorType.Ping:
                             lblName.BackColor = PingBackColor;
                             lblName.ForeColor = PingForeColor;
                             lblRemaining.BackColor = PingBackColor;
                             lblRemaining.ForeColor = PingForeColor;
-                            lblTag.BackColor = PingBackColor;
-                            lblTag.ForeColor = PingForeColor;
                             break;
 
                         default:
@@ -211,12 +206,11 @@ namespace ThorneTimer
                             lblName.ForeColor = NormForeColor;
                             lblRemaining.BackColor = NormBackColor;
                             lblRemaining.ForeColor = NormForeColor;
-                            lblTag.BackColor = NormBackColor;
-                            lblTag.ForeColor = NormForeColor;
                             break;
                     }
 
-                    if (TimerPlus.GetMilliseconds(md.Remaining) <= TimerPlus.GetMilliseconds(WarnTime))
+                    if (md.TheColor != MiniData.ColorType.Ping
+                        && TimerPlus.GetMilliseconds(md.Remaining) <= TimerPlus.GetMilliseconds(WarnTime))
                     {
                         lblRemaining.BackColor = WarnBackColor;
                         lblRemaining.ForeColor = WarnForeColor;

@@ -44,6 +44,7 @@
             this.MaximizeBox = false;
             this.MinimizeBox = false;
             this.Name = "MiniView";
+            this.ShowInTaskbar = false;
             this.Text = "Thorne Timer";
             this.TopMost = true;
             this.Load += new System.EventHandler(this.MiniView_Load);
