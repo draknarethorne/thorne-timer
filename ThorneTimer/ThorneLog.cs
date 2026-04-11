@@ -19,14 +19,29 @@ namespace ThorneTimer
     }
 
     /// <summary>
+    /// Determines how log files are created.
+    /// Session = one file per application launch.
+    /// Daily   = one file per calendar day (appended across launches).
+    /// </summary>
+    enum LogMode
+    {
+        Session,
+        Daily
+    }
+
+    /// <summary>
     /// Diagnostic file logger for tracing timer lifecycle and state.
-    /// Creates a new log file per session: ThorneLog_YYYYMMDD_HHmmss.txt
-    /// in a Logs subfolder next to the executable.
+    /// Log files are written to a Logs subfolder next to the executable.
     /// Thread-safe via lock. Auto-flushes each write.
     /// 
-    /// Supports log levels (Debug, Info, Warn, Error) with a configurable
-    /// MinLevel filter. Old log files are cleaned up automatically based
-    /// on LogRetentionDays (default 30).
+    /// Configuration is read from the [Logging] section of
+    /// ThorneTimer.ini (next to the exe) at startup.  If the INI file
+    /// is missing, built-in defaults are used.  Database settings
+    /// (LogMinLevel, LogRetentionDays) serve as a fallback when the
+    /// INI file is absent.
+    /// 
+    /// File cleanup uses <see cref="ThorneArchive.PruneFiles"/> with
+    /// tiered retention (recent → daily → monthly → expired).
     /// 
     /// Toggle Enabled to activate/deactivate without removing call sites.
     /// </summary>
@@ -36,6 +51,10 @@ namespace ThorneTimer
         private static readonly string _logPath;
         private static readonly string _logDir;
 
+        // Tracks whether settings were loaded from INI so that
+        // LoadSettings (DB) doesn't override them.
+        private static bool _iniLoaded;
+
         /// <summary>
         /// Master switch — set to false to silence all logging without
         /// removing call sites. Flip back to true when debugging.
@@ -44,62 +63,95 @@ namespace ThorneTimer
 
         /// <summary>
         /// Minimum log level. Messages below this level are silently dropped.
-        /// Default is Debug (everything logged). Set to Info for production.
+        /// Default is Info. Set to Debug for verbose tracing.
         /// </summary>
-        public static LogLevel MinLevel = LogLevel.Debug;
+        public static LogLevel MinLevel = LogLevel.Info;
 
         /// <summary>
-        /// Number of days to retain log files. Files older than this are
-        /// deleted automatically when the logger initializes.
-        /// Default is 30 days. Set to 0 to disable cleanup.
+        /// How log files are created: Session (one per launch) or Daily
+        /// (one per calendar day, appended across launches).
         /// </summary>
-        public static int LogRetentionDays = 30;
+        public static LogMode Mode = LogMode.Session;
+
+        /// <summary>
+        /// Tiered retention policy for log files.
+        /// Loaded from [Logging] in ThorneTimer.ini, with
+        /// <see cref="RetentionPolicy.LogDefaults"/> as fallback.
+        /// </summary>
+        public static RetentionPolicy Retention = RetentionPolicy.LogDefaults;
 
         static ThorneLog()
         {
-            string exePath = Path.GetDirectoryName(
+            string exeDir = Path.GetDirectoryName(
                 System.Reflection.Assembly.GetExecutingAssembly().Location);
-            _logDir = Path.Combine(exePath, "Logs");
+            _logDir = Path.Combine(exeDir, "Logs");
             try
             {
                 if (!Directory.Exists(_logDir))
                     Directory.CreateDirectory(_logDir);
             }
             catch { }
-            string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-            _logPath = Path.Combine(_logDir, $"ThorneLog_{timestamp}.txt");
 
-            CleanupOldLogs();
+            // Load INI before building the log path so Mode is known.
+            LoadIniSettings();
+
+            if (Mode == LogMode.Daily)
+            {
+                string day = DateTime.Now.ToString("yyyyMMdd");
+                _logPath = Path.Combine(_logDir, $"ThorneLog_{day}.txt");
+            }
+            else
+            {
+                string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                _logPath = Path.Combine(_logDir, $"ThorneLog_{timestamp}.txt");
+            }
+
+            ThorneArchive.PruneFiles(_logDir, "ThorneLog_*.txt", Retention);
         }
 
+        // ── INI file support ────────────────────────────────────────
+
         /// <summary>
-        /// Deletes log files older than LogRetentionDays.
+        /// Reads the [Logging] section of ThorneTimer.ini and applies
+        /// settings found there.  Missing keys keep their defaults.
         /// </summary>
-        private static void CleanupOldLogs()
+        private static void LoadIniSettings()
         {
-            if (LogRetentionDays <= 0) return;
             try
             {
-                DateTime cutoff = DateTime.Now.AddDays(-LogRetentionDays);
-                foreach (string file in Directory.GetFiles(_logDir, "ThorneLog_*.txt"))
-                {
-                    try
-                    {
-                        if (File.GetCreationTime(file) < cutoff)
-                            File.Delete(file);
-                    }
-                    catch { }
-                }
+                string iniPath = ThorneArchive.GetIniPath();
+                var settings = ThorneArchive.ParseIniSection(iniPath, "Logging");
+                if (settings.Count == 0) return;
+
+                _iniLoaded = true;
+
+                if (settings.TryGetValue("enabled", out string enabledVal))
+                    Enabled = enabledVal.Equals("true", StringComparison.OrdinalIgnoreCase);
+
+                if (settings.TryGetValue("minlevel", out string levelVal)
+                    && Enum.TryParse(levelVal, true, out LogLevel parsed))
+                    MinLevel = parsed;
+
+                if (settings.TryGetValue("mode", out string modeVal)
+                    && Enum.TryParse(modeVal, true, out LogMode parsedMode))
+                    Mode = parsedMode;
+
+                Retention = ThorneArchive.ReadRetentionPolicy(
+                    settings, RetentionPolicy.LogDefaults);
             }
             catch { }
         }
 
+        // ── Database fallback ───────────────────────────────────────
+
         /// <summary>
-        /// Loads log settings (MinLevel, RetentionDays) from the database
-        /// settings table. Call after the database connection is established.
+        /// Loads log settings from the database settings table.
+        /// Only applies values that were NOT already set by ThorneLog.ini.
+        /// Call after the database connection is established.
         /// </summary>
         public static void LoadSettings(SQLiteConnection con)
         {
+            if (_iniLoaded) return;
             try
             {
                 string level = Database.GetSetting(con, "LogMinLevel");
@@ -108,7 +160,7 @@ namespace ThorneTimer
 
                 string days = Database.GetSetting(con, "LogRetentionDays");
                 if (!string.IsNullOrEmpty(days) && int.TryParse(days, out int d) && d >= 0)
-                    LogRetentionDays = d;
+                    Retention.RetentionDays = d;
             }
             catch { }
         }

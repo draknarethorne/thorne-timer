@@ -22,6 +22,29 @@ namespace ThorneTimer
             ThorneLog.Info($"User: {Environment.UserName}");
             ThorneLog.Info($"Working Dir: {Environment.CurrentDirectory}");
 
+            // Load backup retention policy from [Backups] in ThorneTimer.ini
+            RetentionPolicy backupPolicy = RetentionPolicy.BackupDefaults;
+            try
+            {
+                string iniPath = ThorneArchive.GetIniPath();
+                var backupIni = ThorneArchive.ParseIniSection(iniPath, "Backups");
+                if (backupIni.Count > 0)
+                {
+                    // Check Enabled flag — if false, skip backup entirely
+                    if (backupIni.TryGetValue("Enabled", out string enabledVal)
+                        && enabledVal.Equals("false", StringComparison.OrdinalIgnoreCase))
+                    {
+                        ThorneLog.Info("Database backup disabled via ThorneTimer.ini");
+                    }
+                    else
+                    {
+                        backupPolicy = ThorneArchive.ReadRetentionPolicy(
+                            backupIni, RetentionPolicy.BackupDefaults);
+                    }
+                }
+            }
+            catch { }
+
             // Create a backup of the database before doing anything else
             string dbPath = Properties.Settings.Default.DatabasePath;
             if (string.IsNullOrEmpty(dbPath) || !File.Exists(dbPath))
@@ -29,7 +52,7 @@ namespace ThorneTimer
 
             if (File.Exists(dbPath))
             {
-                string backupPath = Database.BackupDatabase(dbPath);
+                string backupPath = Database.BackupDatabase(dbPath, backupPolicy);
                 if (backupPath != null)
                     ThorneLog.Info($"Database backup created: {backupPath}");
                 else

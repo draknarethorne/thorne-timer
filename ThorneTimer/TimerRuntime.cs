@@ -591,6 +591,52 @@ namespace ThorneTimer
         }
 
         /// <summary>
+        /// Add a single new timer to the runtime (used when the user adds
+        /// a timer via the grid without reloading the full timer list).
+        /// </summary>
+        public void AddTimerState(Timers.GridData gd)
+        {
+            lock (syncLock)
+            {
+                var ts = new TimerState
+                {
+                    TimerID = gd.ID,
+                    Name = gd.Name ?? "",
+                    CategoryID = gd.CategoryID,
+                    StartKeyword = gd.StartKeyword ?? "",
+                    EndKeyword = gd.EndKeyword ?? "",
+                    WAVFile = gd.WAVFile ?? "",
+                    Speech = gd.Speech ?? "",
+                    Duration = gd.Duration ?? "00:00:00",
+                    Remaining = "",
+                    CaseYn = gd.CaseYn,
+                    EndlessYn = gd.EndlessYn,
+                    Style = gd.Style ?? "Normal",
+                    Scope = gd.Scope ?? "World",
+                    DependsOnTimer = gd.DependsOnTimer ?? "",
+                    DependsOnDelay = gd.DependsOnDelay,
+                    ClassID = gd.ClassID,
+                    ActiveYn = gd.ActiveYn
+                };
+                timerStates.Add(ts);
+            }
+        }
+
+        /// <summary>
+        /// Remove a single timer from the runtime (used when the user
+        /// deletes a timer via the grid without reloading the full list).
+        /// </summary>
+        public void RemoveTimerState(long timerID)
+        {
+            lock (syncLock)
+            {
+                var ts = timerStates.FirstOrDefault(t => t.TimerID == timerID);
+                if (ts != null)
+                    timerStates.Remove(ts);
+            }
+        }
+
+        /// <summary>
         /// Sync editable fields (Name, Style, Keywords, etc.) from the grid
         /// back to TimerRuntime without disturbing runtime state (ButtonState,
         /// Count, Remaining, running timers).

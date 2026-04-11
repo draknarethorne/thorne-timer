@@ -781,10 +781,12 @@ namespace ThorneTimer
 
         /// <summary>
         /// Creates a timestamped backup of the database file in a Backups subfolder
-        /// next to the original. Old backups beyond the retention count are pruned.
+        /// next to the original.  Old backups are pruned using the tiered
+        /// <see cref="ThorneArchive.PruneFiles"/> algorithm with the supplied
+        /// <paramref name="retention"/> policy (or <see cref="RetentionPolicy.BackupDefaults"/>).
         /// Returns the backup path on success, or null on failure.
         /// </summary>
-        static public string BackupDatabase(string dbPath, int maxBackups = 10)
+        static public string BackupDatabase(string dbPath, RetentionPolicy retention = null)
         {
             try
             {
@@ -802,19 +804,9 @@ namespace ThorneTimer
 
                 File.Copy(dbPath, backupPath, overwrite: true);
 
-                // Prune old backups beyond maxBackups (keep newest)
-                if (maxBackups > 0)
-                {
-                    var backups = Directory.GetFiles(backupDir, $"{baseName}_*{ext}")
-                        .Select(f => new FileInfo(f))
-                        .OrderByDescending(fi => fi.CreationTime)
-                        .Skip(maxBackups)
-                        .ToList();
-                    foreach (var old in backups)
-                    {
-                        try { old.Delete(); } catch { }
-                    }
-                }
+                // Tiered pruning of old backups
+                var policy = retention ?? RetentionPolicy.BackupDefaults;
+                ThorneArchive.PruneFiles(backupDir, $"{baseName}_*{ext}", policy);
 
                 return backupPath;
             }

@@ -1829,6 +1829,8 @@ namespace ThorneTimer
             grdCharacters.Columns["Name"].DisplayIndex = ci++;
             grdCharacters.Columns["ClassID"].DisplayIndex = ci++;
             grdCharacters.Columns["LogFile"].DisplayIndex = ci++;
+            grdCharacters.Columns["MiniViewX"].DisplayIndex = ci++;
+            grdCharacters.Columns["MiniViewY"].DisplayIndex = ci++;
             grdCharacters.Columns["LOG"].DisplayIndex = ci++;
 
             grdCharacters.CellClick += new DataGridViewCellEventHandler(grdCharacters_CellClick);
@@ -2987,17 +2989,22 @@ namespace ThorneTimer
             {
                 if (MessageBox.Show("Are you sure you want to delete this timer?", "Delete Timer", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1) == System.Windows.Forms.DialogResult.Yes)
                 {
+                    int rowIndex = grdTimers.CurrentCell.RowIndex;
+                    long timerID = Convert.ToInt64(grdTimers.Rows[rowIndex].Cells[grdTimers.Columns["ID"].Index].Value);
+
                     // Stop this specific timer if running, via TimerRuntime
-                    long timerID = Convert.ToInt64(grdTimers.Rows[grdTimers.CurrentCell.RowIndex].Cells[grdTimers.Columns["ID"].Index].Value);
                     timerRuntime.StopTimer(timerID);
 
                     Database.DeleteTimer(con, Convert.ToString(timerID));
 
-                    grdTimers.DataSource = Database.GetTimers(con);
-                    timerRuntime.LoadTimers((SortableBindingList<Timers.GridData>)grdTimers.DataSource);
+                    // Remove from existing data source — preserves sort/filter
+                    timerRuntime.RemoveTimerState(timerID);
+                    var data = (SortableBindingList<Timers.GridData>)grdTimers.DataSource;
+                    var item = data.FirstOrDefault(g => g.ID == timerID);
+                    if (item != null)
+                        data.Remove(item);
 
-                    ResetTimersGridColumns();
-                    SyncRuntimeToGrid();
+                    RepaintTimerGrid();
                 }
             }
         }
@@ -3008,7 +3015,17 @@ namespace ThorneTimer
 
             if (row == null || ValidDataTimers(row))
             {
-                SortableBindingList<Timers.GridData> data = Database.GetTimers(con);
+                // Switch to full view if compact so the user can edit all fields
+                if (tsbCompactView.Checked)
+                {
+                    tsbCompactView.Checked = false;
+                    compactViewToolStripMenuItem.Checked = false;
+                    Database.SetSetting(con, "CompactView", "0");
+                    ApplyCompactView(false);
+                }
+
+                // Add to the existing data source — preserves sort/filter
+                var data = (SortableBindingList<Timers.GridData>)grdTimers.DataSource;
 
                 Timers.GridData gd = new Timers.GridData
                 {
@@ -3018,19 +3035,37 @@ namespace ThorneTimer
                     Scope = "World",
                     DependsOnTimer = "",
                     DependsOnDelay = 0,
-                    ClassID = 0
+                    ClassID = 0,
+                    Duration = noTime
                 };
                 data.Add(gd);
 
-                grdTimers.DataSource = data;
-                timerRuntime.LoadTimers(data);
+                // Find the new row (may not be last if a sort is active)
+                int newRowIndex = -1;
+                for (int r = 0; r < grdTimers.Rows.Count; r++)
+                {
+                    if (Convert.ToInt64(grdTimers.Rows[r].Cells[grdTimers.Columns["ID"].Index].Value) == -1)
+                    {
+                        newRowIndex = r;
+                        break;
+                    }
+                }
+                if (newRowIndex < 0) newRowIndex = grdTimers.Rows.Count - 1;
 
-                ResetTimersGridColumns();
-                SyncRuntimeToGrid();
+                // Save immediately to get a real DB ID
+                DataGridViewRow newRow = grdTimers.Rows[newRowIndex];
+                grdTimers.EndEdit();
+                Database.SaveTimer(con, grdTimers, newRow);
 
-                grdTimers.Rows[grdTimers.Rows.Count - 1].Cells[grdTimers.Columns["Duration"].Index].Value = noTime;
-                grdTimers.CurrentCell = grdTimers.Rows[grdTimers.Rows.Count - 1].Cells[grdTimers.Columns["Name"].Index];
+                // Register in the runtime with the real ID
+                timerRuntime.AddTimerState(gd);
 
+                // Apply row color and navigate for editing
+                var ts = timerRuntime.GetState(gd.ID);
+                if (ts != null)
+                    ApplyTimerRowColor(newRow, ts);
+
+                grdTimers.CurrentCell = newRow.Cells[grdTimers.Columns["Name"].Index];
                 grdTimers.BeginEdit(true);
             }
         }
