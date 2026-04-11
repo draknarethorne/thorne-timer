@@ -193,7 +193,6 @@
     <None Include="Docs\active-views\technical-debt.md" />
     <None Include="Docs\architecture-redesign.md" />
     <None Include="Docs\auto-character-switching.md" />
-    <None Include="ThorneTimer.ini" />
     <None Include="ThorneTimer.pfx" />
     <None Include="packages.config" />
     <None Include="Properties\app.manifest" />

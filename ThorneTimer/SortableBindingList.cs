@@ -252,11 +252,11 @@ namespace ThorneTimer
             for (int i = 0; i < _sortDescriptions.Count; i++)
                 list.Add(_sortDescriptions[i]);
 
-            var existing = list.FirstOrDefault(d => d.PropertyDescriptor == prop);
-            if (existing == null)
+            int existingIndex = list.FindIndex(d => d.PropertyDescriptor == prop);
+            if (existingIndex < 0)
                 return false;
 
-            list.Remove(existing);
+            list.RemoveAt(existingIndex);
 
             if (list.Count == 0)
             {
@@ -293,7 +293,18 @@ namespace ThorneTimer
             List<T> list = Items as List<T>;
             if (list == null) return;
 
-            list.Sort(Compare);
+            // Use indexed pairs to produce a stable sort: when all sort keys
+            // compare equal the original index is used as a tie-breaker so
+            // items do not visibly "jump" between reapplications.
+            var indexed = list.Select((item, idx) => (item, idx)).ToList();
+            indexed.Sort((x, y) =>
+            {
+                int cmp = Compare(x.item, y.item);
+                return cmp != 0 ? cmp : x.idx.CompareTo(y.idx);
+            });
+
+            for (int i = 0; i < list.Count; i++)
+                list[i] = indexed[i].item;
 
             _isSorted = true;
             OnListChanged(new ListChangedEventArgs(ListChangedType.Reset, -1));

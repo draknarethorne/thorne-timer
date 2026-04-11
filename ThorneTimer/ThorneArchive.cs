@@ -190,7 +190,10 @@ namespace ThorneTimer
 
                 DateTime now = DateTime.Now;
                 DateTime recentCutoff    = now.AddDays(-policy.RecentDays);
-                DateTime dailyCutoff     = now.AddDays(-policy.RetentionDays);
+                // RetentionDays=0 means "no daily/monthly limit" — skip Tier2/Tier3.
+                DateTime dailyCutoff     = policy.RetentionDays > 0
+                    ? now.AddDays(-policy.RetentionDays)
+                    : DateTime.MinValue;
                 DateTime maxAgeCutoff    = policy.MaxAgeDays > 0
                     ? now.AddDays(-policy.MaxAgeDays)
                     : DateTime.MinValue;
@@ -210,31 +213,39 @@ namespace ThorneTimer
 
                 // ── Tier 3: monthly (RetentionDays+1 .. MaxAgeDays) ─
                 // Keep only the newest file per calendar month.
-                var monthlyBand = files
-                    .Where(f => f.CreationTime < dailyCutoff)
-                    .GroupBy(f => new { f.CreationTime.Year, f.CreationTime.Month })
-                    .ToList();
-                foreach (var grp in monthlyBand)
+                // Skipped when RetentionDays=0 (disabled).
+                if (policy.RetentionDays > 0)
                 {
-                    foreach (var fi in grp.OrderByDescending(f => f.CreationTime).Skip(1))
+                    var monthlyBand = files
+                        .Where(f => f.CreationTime < dailyCutoff)
+                        .GroupBy(f => new { f.CreationTime.Year, f.CreationTime.Month })
+                        .ToList();
+                    foreach (var grp in monthlyBand)
                     {
-                        TryDelete(fi);
-                        files.Remove(fi);
+                        foreach (var fi in grp.OrderByDescending(f => f.CreationTime).Skip(1))
+                        {
+                            TryDelete(fi);
+                            files.Remove(fi);
+                        }
                     }
                 }
 
                 // ── Tier 2: daily (RecentDays+1 .. RetentionDays) ───
                 // Keep only the newest file per calendar day.
-                var dailyBand = files
-                    .Where(f => f.CreationTime < recentCutoff && f.CreationTime >= dailyCutoff)
-                    .GroupBy(f => f.CreationTime.Date)
-                    .ToList();
-                foreach (var grp in dailyBand)
+                // Skipped when RetentionDays=0 (disabled).
+                if (policy.RetentionDays > 0)
                 {
-                    foreach (var fi in grp.OrderByDescending(f => f.CreationTime).Skip(1))
+                    var dailyBand = files
+                        .Where(f => f.CreationTime < recentCutoff && f.CreationTime >= dailyCutoff)
+                        .GroupBy(f => f.CreationTime.Date)
+                        .ToList();
+                    foreach (var grp in dailyBand)
                     {
-                        TryDelete(fi);
-                        files.Remove(fi);
+                        foreach (var fi in grp.OrderByDescending(f => f.CreationTime).Skip(1))
+                        {
+                            TryDelete(fi);
+                            files.Remove(fi);
+                        }
                     }
                 }
 

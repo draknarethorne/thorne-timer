@@ -146,7 +146,7 @@ namespace ThorneTimer
 
         /// <summary>
         /// Loads log settings from the database settings table.
-        /// Only applies values that were NOT already set by ThorneLog.ini.
+        /// Only applies values that were NOT already set by ThorneTimer.ini.
         /// Call after the database connection is established.
         /// </summary>
         public static void LoadSettings(SQLiteConnection con)
