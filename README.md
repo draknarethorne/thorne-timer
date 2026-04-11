@@ -242,6 +242,21 @@ msbuild "Thorne-Timer.sln" /t:Rebuild /p:Configuration=Debug /p:Platform="Any CP
 3. Right-click **ThorneTimer** in Solution Explorer → **Set as Startup Project**
 4. Press **F5** to build and run
 
+### Development Tools
+
+This project uses **two IDEs** for different purposes — each chosen for what it does best:
+
+| Tool | When to Use | What It's Best At |
+|------|-------------|-------------------|
+| **Visual Studio** | Active development, debugging, building | IntelliSense for C#/.NET, WinForms designer, NuGet management, breakpoint debugging, profiling |
+| **VS Code** | Documentation, code review, git workflow, AI-assisted analysis | Markdown editing, Copilot agents, multi-file search, lightweight browsing, PR reviews |
+
+**Visual Studio** is the primary IDE for writing C# code, designing WinForms, and debugging the application. Open `Thorne-Timer.sln` for full project support.
+
+**VS Code** is the companion workspace for documentation, architecture analysis, and AI-powered code review via GitHub Copilot agents. Open `thorne-timer.code-workspace` for the configured workspace with recommended extensions and settings.
+
+> 💡 **Tip:** Both can be open simultaneously — Visual Studio for building and debugging, VS Code for documentation edits, Copilot chat, and git operations.
+
 ---
 
 ## Troubleshooting
