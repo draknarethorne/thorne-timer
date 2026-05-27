@@ -35,6 +35,9 @@ namespace ThorneTimer
         public string FilePath { get; set; }
         public long LastFileSize { get; set; }
         public bool IsActive { get; set; }
+        public DateTime LastActivityUtc { get; set; }
+        public bool CampingOut { get; set; }
+        public DateTime CampStartUtc { get; set; }
     }
 
     /// <summary>
@@ -49,6 +52,7 @@ namespace ThorneTimer
         private Thread monitorThread;
         private List<CharacterFileState> fileStates;
         private readonly object stateLock = new object();
+        private long selectedCharacterID; // UI selection - controls which file to read
 
         /// <summary>
         /// Minimum bytes a non-active file must grow before triggering a switch.
@@ -72,6 +76,12 @@ namespace ThorneTimer
         public long SuppressedAutoSwitchCharacterID { get; set; }
 
         /// <summary>
+        /// Seconds of log inactivity after camp warning before triggering camp-out.
+        /// Default is 10 seconds.
+        /// </summary>
+        public int CampInactivityThresholdSeconds { get; set; } = 10;
+
+        /// <summary>
         /// Fired when new text is read from the active character's log file.
         /// </summary>
         public event EventHandler<LogChunkReceivedEventArgs> LogChunkReceived;
@@ -81,6 +91,11 @@ namespace ThorneTimer
         /// indicating the user has switched characters in-game.
         /// </summary>
         public event EventHandler<CharacterSwitchedEventArgs> CharacterSwitched;
+
+        /// <summary>
+        /// Fired when the active character camps out (after camp warning + inactivity threshold).
+        /// </summary>
+        public event EventHandler<CharacterSwitchedEventArgs> CharacterCampedOut;
 
         /// <summary>
         /// The file path of the currently active character being monitored.
@@ -93,15 +108,50 @@ namespace ThorneTimer
         public bool IsRunning => monitorThread != null && monitorThread.IsAlive;
 
         /// <summary>
-        /// Start monitoring multiple character log files.
-        /// Only the file belonging to activeCharacterID will have its content
-        /// read and fired via LogChunkReceived. All files are checked for
-        /// growth to detect character switches.
+        /// Get the character ID of the actively logging character (based on file growth).
+        /// Returns 0 if not running or no character is actively logging.
+        /// This is the authoritative source for "who is logging" state.
         /// </summary>
-        public void Start(List<CharacterFileState> characters, long activeCharacterID)
+        public long GetActiveCharacterID()
+        {
+            lock (stateLock)
+            {
+                if (fileStates == null) return 0;
+                var active = fileStates.FirstOrDefault(f => f.IsActive);
+                return active?.CharacterID ?? 0;
+            }
+        }
+
+        /// <summary>
+        /// Get the character ID selected for viewing in the UI.
+        /// This may differ from GetActiveCharacterID() during browsing mode.
+        /// Returns 0 if no character is selected.
+        /// </summary>
+        public long GetSelectedCharacterID()
+        {
+            lock (stateLock)
+            {
+                return selectedCharacterID;
+            }
+        }
+
+        // Camp-out detection patterns
+        private const string CampWarningPattern = "It will take about 5 more seconds to prepare your camp.";
+        private const string CampAbandonPattern = "You abandon your preparations to camp.";
+        private const string DisconnectPattern = "You have been disconnected.";
+        private const string LinkDeadPattern = "LOADING, PLEASE WAIT...";
+
+        /// <summary>
+        /// Start monitoring multiple character log files.
+        /// Content is read from the selected character's file and fired via LogChunkReceived.
+        /// All files are checked for growth to detect character switches.
+        /// IsActive flags are set by file growth detection, NOT by this method.
+        /// </summary>
+        public void Start(List<CharacterFileState> characters, long selectedCharacterID)
         {
             if (IsRunning) Stop();
 
+            this.selectedCharacterID = selectedCharacterID;
             fileStates = new List<CharacterFileState>();
             foreach (var c in characters)
             {
@@ -113,7 +163,10 @@ namespace ThorneTimer
                     CharacterName = c.CharacterName,
                     FilePath = c.FilePath,
                     LastFileSize = 0,
-                    IsActive = c.CharacterID == activeCharacterID
+                    IsActive = false, // Will be set by file growth detection
+                    LastActivityUtc = DateTime.UtcNow,
+                    CampingOut = false,
+                    CampStartUtc = DateTime.MinValue
                 };
 
                 // Seed LastFileSize to current file length (skip existing content)
@@ -128,7 +181,8 @@ namespace ThorneTimer
 
                 fileStates.Add(state);
 
-                if (state.IsActive)
+                // Set FilePath to selected character for content reading
+                if (state.CharacterID == selectedCharacterID)
                 {
                     FilePath = state.FilePath;
                 }
@@ -183,38 +237,46 @@ namespace ThorneTimer
         }
 
         /// <summary>
-        /// Update the active character without restarting the monitor.
-        /// Called after a character switch has been processed by the UI.
+        /// Update the selected character for UI viewing without restarting the monitor.
+        /// Called when the user manually changes the character dropdown.
+        /// This does NOT change which character is actively logging (IsActive flag) —
+        /// that is determined exclusively by file growth detection.
         /// </summary>
         public void SetActiveCharacter(long characterID)
         {
             lock (stateLock)
             {
+                selectedCharacterID = characterID;
                 if (fileStates == null) return;
-                foreach (var fs in fileStates)
+
+                // Update FilePath for content reading (browsing mode support)
+                var selectedState = fileStates.FirstOrDefault(f => f.CharacterID == characterID);
+                if (selectedState != null)
                 {
-                    fs.IsActive = fs.CharacterID == characterID;
-                    if (fs.IsActive)
-                    {
-                        FilePath = fs.FilePath;
-                    }
+                    FilePath = selectedState.FilePath;
+                }
+                else if (characterID == 0)
+                {
+                    FilePath = null; // "(None)" selected
                 }
             }
         }
 
         /// <summary>
         /// Multi-file poll loop. Checks all character files for growth.
-        /// Reads content from active file, detects switches on non-active files.
+        /// Reads content from selected file (browsing mode support), detects switches on non-active files.
         /// </summary>
         private void PollLoop(CancellationToken token)
         {
             while (!token.IsCancellationRequested)
             {
                 List<CharacterFileState> snapshot;
+                long currentSelectedID;
                 lock (stateLock)
                 {
                     if (fileStates == null) break;
                     snapshot = fileStates.ToList();
+                    currentSelectedID = selectedCharacterID;
                 }
 
                 foreach (var state in snapshot)
@@ -230,6 +292,7 @@ namespace ThorneTimer
 
                         long growth = currentSize - state.LastFileSize;
 
+                        // Check for character switch (non-active file growing)
                         if (!state.IsActive)
                         {
                             // Non-active file is growing — potential character switch
@@ -256,6 +319,9 @@ namespace ThorneTimer
                                         oldActive.IsActive = false;
                                     }
                                     state.IsActive = true;
+
+                                    // Auto-switch also updates selected character and FilePath
+                                    selectedCharacterID = state.CharacterID;
                                     FilePath = state.FilePath;
                                 }
 
@@ -266,22 +332,28 @@ namespace ThorneTimer
                                     NewCharacterName = state.CharacterName
                                 });
                             }
-                            else
-                            {
-                                // Below threshold — update size but don't switch
-                                state.LastFileSize = currentSize;
-                                continue;
-                            }
                         }
 
-                        // Read new content from the (now-)active file
-                        ReadNewContent(state, token);
+                        // Read content from selected character's file (enables browsing mode)
+                        // This may be different from the actively logging character
+                        if (state.CharacterID == currentSelectedID)
+                        {
+                            ReadNewContent(state, token);
+                        }
+                        else
+                        {
+                            // Track file size for non-selected files without reading content
+                            state.LastFileSize = currentSize;
+                        }
                     }
                     catch
                     {
                         // Swallow file access errors and retry on next poll
                     }
                 }
+
+                // Check for camp-out timeout on actively logging character
+                CheckCampOutTimeout(snapshot);
 
                 // Sleep in small increments to allow faster cancellation response
                 for (int i = 0; i < 10 && !token.IsCancellationRequested; i++)
@@ -292,7 +364,36 @@ namespace ThorneTimer
         }
 
         /// <summary>
+        /// Checks if the active character has camped out (camp warning + inactivity threshold).
+        /// Fires CharacterCampedOut event if timeout is reached.
+        /// </summary>
+        private void CheckCampOutTimeout(List<CharacterFileState> snapshot)
+        {
+            var activeState = snapshot.FirstOrDefault(s => s.IsActive);
+            if (activeState == null) return;
+            if (!activeState.CampingOut) return;
+
+            // Check if inactivity threshold has been exceeded since camp warning
+            double secondsSinceCampStart = (DateTime.UtcNow - activeState.CampStartUtc).TotalSeconds;
+            if (secondsSinceCampStart >= CampInactivityThresholdSeconds)
+            {
+                // Character has camped out — clear camp state, clear IsActive flag, and fire event
+                activeState.CampingOut = false;
+                activeState.CampStartUtc = DateTime.MinValue;
+                activeState.IsActive = false; // No longer actively logging
+
+                CharacterCampedOut?.Invoke(this, new CharacterSwitchedEventArgs
+                {
+                    OldCharacterID = activeState.CharacterID,
+                    NewCharacterID = 0,  // No actively logging character
+                    NewCharacterName = ""
+                });
+            }
+        }
+
+        /// <summary>
         /// Reads new bytes from a file state and fires LogChunkReceived.
+        /// Also detects camp-out patterns and updates activity timestamps.
         /// </summary>
         private void ReadNewContent(CharacterFileState state, CancellationToken token)
         {
@@ -309,6 +410,22 @@ namespace ThorneTimer
                     if (bytesRead == 0) break;
 
                     var text = ASCIIEncoding.ASCII.GetString(buffer, 0, bytesRead);
+
+                    // Update activity timestamp
+                    state.LastActivityUtc = DateTime.UtcNow;
+
+                    // Camp-out pattern detection
+                    if (text.Contains(CampWarningPattern))
+                    {
+                        state.CampingOut = true;
+                        state.CampStartUtc = DateTime.UtcNow;
+                    }
+                    else if (text.Contains(CampAbandonPattern))
+                    {
+                        state.CampingOut = false;
+                        state.CampStartUtc = DateTime.MinValue;
+                    }
+
                     LogChunkReceived?.Invoke(this, new LogChunkReceivedEventArgs { Text = text });
                 }
             }

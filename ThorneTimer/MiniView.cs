@@ -13,6 +13,16 @@ namespace ThorneTimer
 {
     public partial class MiniView : Form
     {
+        // Hide from Alt-Tab/task switcher by setting WS_EX_TOOLWINDOW
+        protected override CreateParams CreateParams
+        {
+            get
+            {
+                CreateParams cp = base.CreateParams;
+                cp.ExStyle |= 0x80; // WS_EX_TOOLWINDOW
+                return cp;
+            }
+        }
         public const int WM_NCLBUTTONDOWN = 0xA1;
         public const int HT_CAPTION = 0x2;
 

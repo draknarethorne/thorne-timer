@@ -20,6 +20,83 @@ namespace ThorneTimer
 {
     public partial class FormMain : Form
     {
+        // Attempts to copy OneCore voices to SAPI registry location to expose them to System.Speech.Synthesis
+        private void TryExposeOneCoreVoicesToSAPI()
+        {
+            ThorneLog.Info("TryExposeOneCoreVoicesToSAPI: starting");
+            try
+            {
+                // Only works on Windows 10/11+
+                using (var oneCore = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Speech_OneCore\Voices\Tokens"))
+                using (var sapi = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Speech\Voices\Tokens", true))
+                {
+                    if (oneCore == null)
+                    {
+                        ThorneLog.Debug("TryExposeOneCoreVoicesToSAPI: OneCore registry key not found");
+                        return;
+                    }
+                    if (sapi == null)
+                    {
+                        ThorneLog.Debug("TryExposeOneCoreVoicesToSAPI: SAPI registry key not accessible (requires admin?)");
+                        return;
+                    }
+
+                    int copied = 0;
+                    foreach (var voiceKeyName in oneCore.GetSubKeyNames())
+                    {
+                        try
+                        {
+                            if (sapi.OpenSubKey(voiceKeyName) != null)
+                            {
+                                ThorneLog.Debug($"TryExposeOneCoreVoicesToSAPI: voice key '{voiceKeyName}' already present in SAPI, skipping");
+                                continue; // Already present
+                            }
+
+                            using (var src = oneCore.OpenSubKey(voiceKeyName))
+                            using (var dst = sapi.CreateSubKey(voiceKeyName))
+                            {
+                                if (src == null || dst == null)
+                                {
+                                    ThorneLog.Debug($"TryExposeOneCoreVoicesToSAPI: failed to open src/dst for '{voiceKeyName}'");
+                                    continue;
+                                }
+
+                                foreach (var valueName in src.GetValueNames())
+                                {
+                                    dst.SetValue(valueName, src.GetValue(valueName));
+                                }
+                                foreach (var subKeyName in src.GetSubKeyNames())
+                                {
+                                    using (var srcSub = src.OpenSubKey(subKeyName))
+                                    using (var dstSub = dst.CreateSubKey(subKeyName))
+                                    {
+                                        if (srcSub == null || dstSub == null) continue;
+                                        foreach (var valueName in srcSub.GetValueNames())
+                                        {
+                                            dstSub.SetValue(valueName, srcSub.GetValue(valueName));
+                                        }
+                                    }
+                                }
+                            }
+
+                            copied++;
+                            ThorneLog.Info($"TryExposeOneCoreVoicesToSAPI: copied OneCore voice key '{voiceKeyName}' to SAPI");
+                        }
+                        catch (Exception exVoice)
+                        {
+                            ThorneLog.Warn($"TryExposeOneCoreVoicesToSAPI: failed copying voice key '{voiceKeyName}': {exVoice.Message}");
+                        }
+                    }
+
+                    ThorneLog.Info($"TryExposeOneCoreVoicesToSAPI: completed. Copied {copied} voice(s)");
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log failure but don't surface to user
+                ThorneLog.Warn($"TryExposeOneCoreVoicesToSAPI: failed: {ex.Message}");
+            }
+        }
         // Helper to safely parse int with fallback
         private int SafeParseInt(string value, int defaultValue)
         {
@@ -115,6 +192,9 @@ namespace ThorneTimer
         readonly TimerRuntime timerRuntime = new TimerRuntime();
         readonly LogMonitor logMonitor = new LogMonitor();
         SQLiteConnection con;
+
+        // UI indicator for browsing mode (viewing != actively logging character)
+        private Label lblBrowsingIndicator;
 
         Bitmap iconPlay;
         Bitmap iconStop;
@@ -508,6 +588,38 @@ namespace ThorneTimer
             if (Properties.Settings.Default.ParseLog)
             {
                 StartLog();
+
+                // Auto-detect if the last active character is actually online.
+                // If their log file hasn't been modified recently (within 5 minutes),
+                // assume they're offline and set character to "(None)" for cleaner UX.
+                long lastActiveCharID = 0;
+                long.TryParse(activeCharacterID, out lastActiveCharID);
+                if (lastActiveCharID > 0 && !IsCharacterLogActive(lastActiveCharID, thresholdMinutes: 5))
+                {
+                    ThorneLog.Info($"FormMain_Load: Last active character (ID={lastActiveCharID}) appears offline (log not recently modified). Setting to '(None)'.");
+
+                    // Set to "(None)" character (ID=0)
+                    activeCharacterID = "0";
+                    Database.SetSetting(con, "ActiveCharacterID", activeCharacterID);
+
+                    // Update dropdown without triggering SelectedIndexChanged
+                    tscActiveCharacter.SelectedIndexChanged -= tscActiveCharacter_SelectedIndexChanged;
+                    foreach (ComboBoxItem item in (List<ComboBoxItem>)tscActiveCharacter.ComboBox.DataSource)
+                    {
+                        if (Convert.ToInt64(item.Value) == 0)
+                        {
+                            tscActiveCharacter.SelectedItem = item;
+                            break;
+                        }
+                    }
+                    tscActiveCharacter.SelectedIndexChanged += tscActiveCharacter_SelectedIndexChanged;
+
+                    // Update LogMonitor to no active character
+                    logMonitor.SetActiveCharacter(0);
+
+                    // Update status bar
+                    statusParsing.Text = "Watching: (no active character)";
+                }
             }
 
             if (Properties.Settings.Default.MiniView)
@@ -520,8 +632,9 @@ namespace ThorneTimer
             timerRuntime.TimerSoundRequested += OnTimerSoundRequested;
             timerRuntime.CategoryTimersActivated += OnCategoryTimersActivated;
 
-            // Wire LogMonitor character switch detection
+            // Wire LogMonitor events
             logMonitor.CharacterSwitched += OnCharacterSwitched;
+            logMonitor.CharacterCampedOut += OnCharacterCampedOut;
 
             // Restore auto-switch setting
             bool autoSwitch = Database.GetSetting(con, "AutoSwitchEnabled") != "0";
@@ -549,6 +662,27 @@ namespace ThorneTimer
             tscActiveCharacter.SelectedIndexChanged -= tscActiveCharacter_SelectedIndexChanged;
             SetupActiveCharacters();
             tscActiveCharacter.SelectedIndexChanged += tscActiveCharacter_SelectedIndexChanged;
+
+            // Add tooltip to character dropdown explaining viewer behavior
+            tscActiveCharacter.ToolTipText = "Select character to view timers (active character tracks in background)";
+
+            // Create browsing mode indicator label (initially hidden)
+            lblBrowsingIndicator = new Label
+            {
+                Text = "",
+                AutoSize = false,
+                Height = 24,
+                Dock = DockStyle.Top,
+                TextAlign = ContentAlignment.MiddleLeft,
+                BackColor = Color.FromArgb(255, 250, 205), // Light yellow
+                ForeColor = Color.FromArgb(139, 69, 19),   // Dark brown
+                Padding = new Padding(8, 4, 8, 4),
+                Font = new Font(this.Font.FontFamily, 9f, FontStyle.Bold),
+                Visible = false
+            };
+            // Insert the label above the timer grid in the Timers tab
+            tabTimers.Controls.Add(lblBrowsingIndicator);
+            lblBrowsingIndicator.BringToFront();
 
             ThorneLog.Separator("FORM LOAD");
             ThorneLog.Info($"FormMain_Load: activeCharacterID={activeCharacterID}");
@@ -1508,25 +1642,81 @@ namespace ThorneTimer
 
         private void SetupActiveVoice()
         {
-            // Initialize a new instance of the speech synthesizer.  
-            using (SpeechSynthesizer synthesizer = new SpeechSynthesizer())
-            {
-                foreach (InstalledVoice voice in synthesizer.GetInstalledVoices(new CultureInfo("en-US")))
-                {
-                    VoiceInfo info = voice.VoiceInfo;
+            ThorneLog.Info("SetupActiveVoice: starting voice setup");
 
-                    cboActiveVoice.Items.Add(info.Name);
+            // OneCore → SAPI registry attempt disabled for now — native "natural" voices
+            // on Windows 11 are not reliably exposed via this hack and it requires admin.
+            ThorneLog.Debug("SetupActiveVoice: OneCore->SAPI registry hack is disabled (commented out)");
+
+            cboActiveVoice.Items.Clear();
+
+            try
+            {
+                using (SpeechSynthesizer synthesizer = new SpeechSynthesizer())
+                {
+                    var installed = synthesizer.GetInstalledVoices();
+                    ThorneLog.Info($"SetupActiveVoice: enumerating {installed.Count} installed voice(s)");
+
+                    int added = 0;
+                    foreach (InstalledVoice voice in installed)
+                    {
+                        try
+                        {
+                            VoiceInfo info = voice.VoiceInfo;
+                            string cultureName = info.Culture != null ? info.Culture.Name : "<null>";
+                            string cultureTwo = info.Culture != null ? info.Culture.TwoLetterISOLanguageName : "<null>";
+                            ThorneLog.Debug($"SetupActiveVoice: found voice Name='{info.Name}', Id='{info.Id}', Description='{info.Description}', Culture='{cultureName}'");
+
+                            bool isEnglish = info.Culture != null && info.Culture.TwoLetterISOLanguageName == "en";
+                            if (isEnglish)
+                            {
+                                cboActiveVoice.Items.Add(info.Name);
+                                added++;
+                                ThorneLog.Info($"SetupActiveVoice: added voice '{info.Name}' (English)");
+                            }
+                            else
+                            {
+                                ThorneLog.Debug($"SetupActiveVoice: skipped voice '{info.Name}' (not English: {cultureTwo})");
+                            }
+                        }
+                        catch (Exception exVoice)
+                        {
+                            ThorneLog.Warn($"SetupActiveVoice: error processing a voice: {exVoice.Message}");
+                        }
+                    }
+
+                    ThorneLog.Info($"SetupActiveVoice: completed enumeration. Added {added} English voice(s) to combo box");
                 }
             }
+            catch (Exception ex)
+            {
+                ThorneLog.Error($"SetupActiveVoice: failed to enumerate installed voices: {ex.Message}");
+            }
 
-            cboActiveVoice.SelectedItem = activeVoice;
+            // Try to select previously saved voice
+            if (!string.IsNullOrEmpty(activeVoice) && cboActiveVoice.Items.Contains(activeVoice))
+            {
+                cboActiveVoice.SelectedItem = activeVoice;
+                ThorneLog.Info($"SetupActiveVoice: selected saved voice '{activeVoice}'");
+            }
+            else
+            {
+                if (!string.IsNullOrEmpty(activeVoice))
+                    ThorneLog.Warn($"SetupActiveVoice: saved voice '{activeVoice}' not found in current list");
+                cboActiveVoice.SelectedItem = activeVoice; // keep behavior unchanged
+            }
         }
 
         private void SetupActiveCharacters()
         {
             string oldActiveCharacterID = activeCharacterID;
 
-            tscActiveCharacter.ComboBox.DataSource = Database.GetActiveCharacters(con);
+            var characters = Database.GetActiveCharacters(con);
+
+            // Add "None" option at the beginning for manual "no active character" state
+            characters.Insert(0, new ComboBoxItem { Value = 0, Text = "(None)" });
+
+            tscActiveCharacter.ComboBox.DataSource = characters;
 
             foreach (ComboBoxItem item in (List<ComboBoxItem>)tscActiveCharacter.ComboBox.DataSource)
             {
@@ -2337,23 +2527,76 @@ namespace ThorneTimer
             autoSwitchSuppressed = false;
             logMonitor.SuppressedAutoSwitchCharacterID = 0;
 
+            // Hide browsing indicator when stopping log monitoring
+            if (lblBrowsingIndicator != null)
+                lblBrowsingIndicator.Visible = false;
+
             logMonitor.Stop();
+        }
+
+        /// <summary>
+        /// Checks if the specified character's log file has been modified recently.
+        /// Used to detect if a character is actually online when the app starts.
+        /// </summary>
+        /// <param name="characterID">Character ID to check</param>
+        /// <param name="thresholdMinutes">Consider file "active" if modified within this many minutes (default: 5)</param>
+        /// <returns>True if log file exists and was modified within threshold, false otherwise</returns>
+        private bool IsCharacterLogActive(long characterID, int thresholdMinutes = 5)
+        {
+            try
+            {
+                // Get character's log file path from database
+                var characters = Database.GetCharacters(con);
+                var character = characters.FirstOrDefault(c => c.ID == characterID);
+                if (character == null || string.IsNullOrEmpty(character.LogFile))
+                {
+                    ThorneLog.Debug($"IsCharacterLogActive: charID={characterID} - no log file configured");
+                    return false;
+                }
+
+                // Check if file exists and get last write time
+                if (!File.Exists(character.LogFile))
+                {
+                    ThorneLog.Debug($"IsCharacterLogActive: charID={characterID} - log file does not exist: {character.LogFile}");
+                    return false;
+                }
+
+                DateTime lastWrite = File.GetLastWriteTimeUtc(character.LogFile);
+                double minutesSinceWrite = (DateTime.UtcNow - lastWrite).TotalMinutes;
+                bool isActive = minutesSinceWrite <= thresholdMinutes;
+
+                ThorneLog.Info($"IsCharacterLogActive: charID={characterID} ({character.Name}) - file: {character.LogFile}, lastWrite: {lastWrite:yyyy-MM-dd HH:mm:ss} UTC, minutesSince: {minutesSinceWrite:F1}, threshold: {thresholdMinutes}, isActive: {isActive}");
+                return isActive;
+            }
+            catch (Exception ex)
+            {
+                ThorneLog.Error($"IsCharacterLogActive: charID={characterID} - exception: {ex.Message}");
+                return false;
+            }
         }
 
         private void OnLogChunkReceived(object sender, LogChunkReceivedEventArgs e)
         {
             // The active character's log is generating content.  If auto-switch
             // was temporarily suppressed (manual character switch), re-enable it
-            // — the user has settled on this character.
+            // ONLY if the activity is from the NEW (active) character, not the
+            // suppressed OLD character.
             if (autoSwitchSuppressed)
             {
-                autoSwitchSuppressed = false;
-                logMonitor.SuppressedAutoSwitchCharacterID = 0;
-                this.BeginInvoke(new Action(() =>
+                long currentCharID = 0;
+                long.TryParse(activeCharacterID, out currentCharID);
+
+                // Only clear suppression if the active character is NOT the suppressed one
+                if (currentCharID > 0 && currentCharID != logMonitor.SuppressedAutoSwitchCharacterID)
                 {
-                    if (tsbStartStopWatching.Text == stopWatchingText && logMonitor.FilePath != null)
-                        statusParsing.Text = "Watching: " + Path.GetFileName(logMonitor.FilePath);
-                }));
+                    autoSwitchSuppressed = false;
+                    logMonitor.SuppressedAutoSwitchCharacterID = 0;
+                    this.BeginInvoke(new Action(() =>
+                    {
+                        if (tsbStartStopWatching.Text == stopWatchingText && logMonitor.FilePath != null)
+                            statusParsing.Text = "Watching: " + Path.GetFileName(logMonitor.FilePath);
+                    }));
+                }
             }
 
             timerRuntime.ProcessLogText(e.Text);
@@ -2687,6 +2930,80 @@ namespace ThorneTimer
             autoSwitchSuppressed = false;
             logMonitor.SuppressedAutoSwitchCharacterID = 0;
             statusParsing.Text = "Watching: " + Path.GetFileName(logMonitor.FilePath) + " (auto)";
+            lblBrowsingIndicator.Visible = false; // Auto-switch means we're viewing the active character
+
+            // Refresh mini views
+            UpdateMiniView();
+        }
+
+        /// <summary>
+        /// Handles camp-out detection from LogMonitor.
+        /// Sets active character to "None" (0) which stops all Character-scope timers.
+        /// World and Character+ timers continue running.
+        /// </summary>
+        private void OnCharacterCampedOut(object sender, CharacterSwitchedEventArgs e)
+        {
+            if (this.InvokeRequired)
+            {
+                this.BeginInvoke(new Action(() => OnCharacterCampedOut(sender, e)));
+                return;
+            }
+
+            ThorneLog.Separator("CHARACTER CAMP-OUT (auto)");
+            ThorneLog.Info($"Camp-out detected for charID={e.OldCharacterID}");
+            ThorneLog.DumpTimerGrid("CampOut-before", grdTimers);
+
+            // Save outgoing character's timer state
+            var outgoingStates = timerRuntime.SaveCharacterState();
+            Database.SaveTimerStates(con, outgoingStates, activeCharacterID);
+
+            // Set active character to "None" (0)
+            activeCharacterID = "0";
+            Database.SetSetting(con, "ActiveCharacterID", activeCharacterID);
+
+            // Update the character dropdown to "(None)" without triggering SelectedIndexChanged
+            tscActiveCharacter.SelectedIndexChanged -= tscActiveCharacter_SelectedIndexChanged;
+            foreach (ComboBoxItem item in (List<ComboBoxItem>)tscActiveCharacter.ComboBox.DataSource)
+            {
+                if (Convert.ToInt64(item.Value) == 0)
+                {
+                    tscActiveCharacter.SelectedItem = item;
+                    break;
+                }
+            }
+            tscActiveCharacter.SelectedIndexChanged += tscActiveCharacter_SelectedIndexChanged;
+
+            // Tell LogMonitor there's no active character
+            logMonitor.SetActiveCharacter(0);
+
+            // Suppress per-cell repaints during the reload cycle
+            grdTimers.Visible = false;
+            BeginGridUpdate();
+            try
+            {
+                // Reload timers — this will stop all Character-scope timers
+                // since activeCharacterID is now "0"
+                LoadTimerRuntime();
+
+                ThorneLog.DumpTimerGrid("CampOut-after", grdTimers);
+
+                // Re-apply sort order
+                var list = grdTimers.DataSource as SortableBindingList<Timers.GridData>;
+                if (list != null)
+                    list.ReapplySort();
+                RefreshGridAfterSort();
+            }
+            finally
+            {
+                EndGridUpdate();
+                grdTimers.Visible = true;
+            }
+
+            // Update status bar
+            autoSwitchSuppressed = false;
+            logMonitor.SuppressedAutoSwitchCharacterID = 0;
+            statusParsing.Text = "Watching: (no active character)";
+            lblBrowsingIndicator.Visible = false; // No active character means no browsing mode
 
             // Refresh mini views
             UpdateMiniView();
@@ -2714,11 +3031,18 @@ namespace ThorneTimer
             var catData = Database.GetCategories(con);
             timerRuntime.LoadCategories(catData);
 
+            // Determine if this character is actually active in LogMonitor
+            // (actively logging) vs just being viewed in the UI.
+            // Character-scope timers should only run when actively logging.
+            long currentCharID = 0;
+            long.TryParse(activeCharacterID, out currentCharID);
+            bool isActive = logMonitor.IsRunning && logMonitor.GetActiveCharacterID() == currentCharID;
+
             // Restore persisted Character-scope timer state
             ThorneLog.Debug($"LoadTimerRuntime: calling LoadTimerStates for charID={activeCharacterID}");
             var savedStates = Database.LoadTimerStates(con, activeCharacterID);
-            ThorneLog.Debug($"LoadTimerRuntime: calling RestoreCharacterState with {savedStates.Count} saved states");
-            timerRuntime.RestoreCharacterState(savedStates);
+            ThorneLog.Debug($"LoadTimerRuntime: calling RestoreCharacterState with {savedStates.Count} saved states, isActive={isActive}");
+            timerRuntime.RestoreCharacterState(savedStates, isActive);
             ThorneLog.Debug("LoadTimerRuntime: calling SyncRuntimeToGrid");
 
             // Sync to grid
@@ -2744,12 +3068,13 @@ namespace ThorneTimer
             BeginGridUpdate();
             try
             {
-                var states = timerRuntime.GetAllStates();
+                // Build dictionary for O(1) lookups instead of O(n) FirstOrDefault per row
+                var stateDict = timerRuntime.GetAllStates().ToDictionary(s => s.TimerID);
+
                 foreach (DataGridViewRow row in grdTimers.Rows)
                 {
                     long rowID = Convert.ToInt64(row.Cells[grdTimers.Columns["ID"].Index].Value);
-                    var ts = states.FirstOrDefault(s => s.TimerID == rowID);
-                    if (ts == null) continue;
+                    if (!stateDict.TryGetValue(rowID, out var ts)) continue;
 
                     // Sync per-character ActiveYn preference
                     DataGridViewCheckBoxCell activeCell = row.Cells[grdTimers.Columns["ActiveYn"].Index] as DataGridViewCheckBoxCell;
@@ -3135,7 +3460,16 @@ namespace ThorneTimer
             ThorneLog.Info($"Switch FROM charID={activeCharacterID}");
             ThorneLog.DumpTimerGrid("ManualSwitch-before", grdTimers);
 
+            // Capture OLD character ID before changing activeCharacterID
+            long oldCharID = 0;
+            long.TryParse(activeCharacterID, out oldCharID);
+
+            // Determine which character is actively logging in LogMonitor
+            long loggingCharID = logMonitor.IsRunning ? logMonitor.GetActiveCharacterID() : 0;
+            ThorneLog.Info($"LogMonitor active character: charID={loggingCharID}");
+
             // Save outgoing character's timer state before switching
+            // This saves Character/Character+ timer state to DB for the OLD character
             var outgoingStates = timerRuntime.SaveCharacterState();
             Database.SaveTimerStates(con, outgoingStates, activeCharacterID);
 
@@ -3143,21 +3477,21 @@ namespace ThorneTimer
             ThorneLog.Info($"Switch TO charID={activeCharacterID}");
             Database.SetSetting(con, "ActiveCharacterID", activeCharacterID);
 
-            // Tell LogMonitor which character is now active
+            // Tell LogMonitor which character is now active (in UI, not necessarily logging)
             long newCharID = 0;
             long.TryParse(activeCharacterID, out newCharID);
             logMonitor.SetActiveCharacter(newCharID);
 
-            // Temporarily suppress auto-switch so the log monitor doesn't
-            // immediately yank back to the previously-playing character.
-            // Only the outgoing character is suppressed — a brand-new login
-            // on a different character will still trigger a switch.
-            // Re-enables automatically when the active character's log
+            // Temporarily suppress auto-switch for the OLD character (not NEW) so
+            // the log monitor doesn't immediately yank back to the previously-playing
+            // character.  Only the OLD (outgoing) character is suppressed — a
+            // brand-new login on a different character will still trigger a switch.
+            // Re-enables automatically when the NEW (active) character's log
             // generates content (see OnLogChunkReceived).
-            if (logMonitor.AutoSwitchEnabled)
+            if (logMonitor.AutoSwitchEnabled && oldCharID > 0)
             {
                 autoSwitchSuppressed = true;
-                logMonitor.SuppressedAutoSwitchCharacterID = newCharID;
+                logMonitor.SuppressedAutoSwitchCharacterID = oldCharID;  // FIX: Suppress OLD, not NEW
             }
 
             // Suppress per-cell repaints during the full reload cycle
@@ -3183,12 +3517,35 @@ namespace ThorneTimer
                 grdTimers.Visible = true;
             }
 
-            // Update status bar if watching
-            if (tsbStartStopWatching.Text == stopWatchingText && logMonitor.FilePath != null)
+            // Update status bar and browsing indicator if watching
+            if (tsbStartStopWatching.Text == stopWatchingText)
             {
-                statusParsing.Text = autoSwitchSuppressed
-                    ? "Watching: " + Path.GetFileName(logMonitor.FilePath) + " (auto-switch paused)"
-                    : "Watching: " + Path.GetFileName(logMonitor.FilePath);
+                if (newCharID == 0)
+                {
+                    statusParsing.Text = "Watching: (no active character)";
+                    lblBrowsingIndicator.Visible = false;
+                }
+                else if (loggingCharID > 0 && loggingCharID != newCharID)
+                {
+                    // Browsing mode: viewing different character than actively logging one
+                    var loggingChar = Database.GetCharacter(con, loggingCharID.ToString());
+                    var viewingChar = Database.GetCharacter(con, activeCharacterID);
+                    statusParsing.Text = $"Active: {loggingChar.Name} | Viewing: {viewingChar.Name}";
+                    lblBrowsingIndicator.Text = $"⚠ Browsing Mode — {loggingChar.Name} is actively logging. Character-scope timers for {viewingChar.Name} are paused.";
+                    lblBrowsingIndicator.Visible = true;
+                }
+                else
+                {
+                    // Normal mode: viewing the actively logging character
+                    statusParsing.Text = autoSwitchSuppressed
+                        ? "Watching: " + Path.GetFileName(logMonitor.FilePath) + " (auto-switch paused)"
+                        : "Watching: " + Path.GetFileName(logMonitor.FilePath);
+                    lblBrowsingIndicator.Visible = false;
+                }
+            }
+            else
+            {
+                lblBrowsingIndicator.Visible = false;
             }
 
             UpdateMiniView();

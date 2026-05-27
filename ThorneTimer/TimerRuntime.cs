@@ -938,16 +938,18 @@ namespace ThorneTimer
         /// <summary>
         /// Restores an incoming character's timer state from previously saved data.
         /// Restores per-character ActiveYn preferences for all timers.
-        /// Character-scope timers are restarted with their saved remaining time.
+        /// Character-scope timers are restarted ONLY if isActive=true (character is actively logging).
         /// Character+ scope timers are restarted with remaining adjusted for
         /// elapsed offline time (server-tracked cooldowns).
         /// World-scope timers are left alone (still running).
         /// </summary>
-        public void RestoreCharacterState(Dictionary<long, TimerState> savedStates)
+        /// <param name="savedStates">Previously saved timer states for this character</param>
+        /// <param name="isActive">True if this character is actively logging (LogMonitor active), false if just viewing</param>
+        public void RestoreCharacterState(Dictionary<long, TimerState> savedStates, bool isActive = true)
         {
             lock (syncLock)
             {
-                ThorneLog.Info($"RestoreCharacterState: timerStates={timerStates.Count} savedStates={savedStates.Count}");
+                ThorneLog.Info($"RestoreCharacterState: timerStates={timerStates.Count} savedStates={savedStates.Count} isActive={isActive}");
                 ThorneLog.DumpSavedStates("RestoreCharacterState-input", savedStates);
 
                 foreach (var ts in timerStates)
@@ -987,6 +989,16 @@ namespace ThorneTimer
 
                     if (wasRunning && hasRemaining)
                     {
+                        // Character-scope timers should only run when the character is actively logging.
+                        // If we're just viewing this character (not actively logging), keep timers frozen.
+                        if (ts.Scope == "Character" && !isActive)
+                        {
+                            ThorneLog.Debug($"  RESTORE TID={ts.TimerID} \"{ts.Name}\" Scope=Character: SKIPPED (character not active), frozen at {saved.Remaining}");
+                            ts.Remaining = saved.Remaining;
+                            ts.ButtonState = saved.ButtonState;
+                            continue;
+                        }
+
                         if (!ValidDuration(saved.Remaining)) continue;
 
                         string effectiveRemaining = saved.Remaining;
