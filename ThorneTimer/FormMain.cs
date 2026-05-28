@@ -2703,6 +2703,29 @@ namespace ThorneTimer
 
             _appliedFilterSignature = signature;
 
+            // Re-apply row colors — reassigning DataSource produces a fresh
+            // set of DataGridViewRow objects with default cell styles, so the
+            // Gainsboro tint we set on inactive rows (and the lightened style
+            // color on running rows) is lost on every swap.  SyncRuntimeToGrid
+            // covers this when RefreshGridAfterSort is the caller, but the
+            // filter-toggle handlers call RefreshTimerGridDataSource directly.
+            using (ThorneLog.Time("RefreshTimerGridDataSource: reapply row colors"))
+            {
+                var idCol2 = grdTimers.Columns["ID"];
+                if (idCol2 != null)
+                {
+                    var stateDict = timerRuntime.GetAllStates().ToDictionary(s => s.TimerID);
+                    foreach (DataGridViewRow row in grdTimers.Rows)
+                    {
+                        if (row.IsNewRow) continue;
+                        var idVal = row.Cells[idCol2.Index].Value;
+                        if (idVal == null) continue;
+                        if (stateDict.TryGetValue(Convert.ToInt64(idVal), out var ts))
+                            ApplyTimerRowColor(row, ts);
+                    }
+                }
+            }
+
             // Restore selection to the previously-selected timer if still
             // visible; otherwise pick the first visible row.
             using (ThorneLog.Time("RefreshTimerGridDataSource: restore selection"))
