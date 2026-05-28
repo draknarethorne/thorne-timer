@@ -36,13 +36,17 @@ namespace ThorneTimer
 
         public static void SeedDefaultStyles(SQLiteConnection con)
         {
-            EnsureStyle(con, "Normal", 1, Color.Yellow.ToArgb(), Color.Black.ToArgb());
-            EnsureStyle(con, "Buff", 2, Color.Orange.ToArgb(), Color.Black.ToArgb());
-            EnsureStyle(con, "Pet", 3, Color.FromArgb(220, 160, 255).ToArgb(), Color.Black.ToArgb());
-            EnsureStyle(con, "Ping", 4, Color.LightGreen.ToArgb(), Color.Black.ToArgb());
-            EnsureStyle(con, "Spawn", 5, Color.Cyan.ToArgb(), Color.Black.ToArgb());
-            EnsureStyle(con, "Lockout", 6, Color.DodgerBlue.ToArgb(), Color.Black.ToArgb());
-            EnsureStyle(con, "Character", 7, Color.White.ToArgb(), Color.Black.ToArgb());
+            // Default style colors tuned for visibility against a black mini-view
+            // background. These values are only seeded into NEW databases; existing
+            // .tdb files keep whatever colors the user has already saved.
+            // Hex values below are the ForeColor (timer text / row tint source).
+            EnsureStyle(con, "Normal",    1, Color.FromArgb(0x80, 0xFF, 0xFF).ToArgb(), Color.Black.ToArgb()); // light cyan
+            EnsureStyle(con, "Buff",      2, Color.FromArgb(0xFF, 0xB8, 0x33).ToArgb(), Color.Black.ToArgb()); // amber
+            EnsureStyle(con, "Pet",       3, Color.FromArgb(0xE4, 0xB9, 0xFF).ToArgb(), Color.Black.ToArgb()); // lavender
+            EnsureStyle(con, "Ping",      4, Color.FromArgb(0x2B, 0xFF, 0x2B).ToArgb(), Color.Black.ToArgb()); // neon green
+            EnsureStyle(con, "Spawn",     5, Color.FromArgb(0xFF, 0xFF, 0x00).ToArgb(), Color.Black.ToArgb()); // yellow
+            EnsureStyle(con, "Lockout",   6, Color.FromArgb(0xFF, 0x7D, 0x7D).ToArgb(), Color.Black.ToArgb()); // salmon
+            EnsureStyle(con, "Character", 7, Color.White.ToArgb(),                       Color.Black.ToArgb()); // white
         }
 
         public List<StyleData> GetStyles()

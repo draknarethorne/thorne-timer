@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data.SQLite;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
@@ -209,6 +210,38 @@ namespace ThorneTimer
         /// Existing call sites continue to work without changes.
         /// </summary>
         public static void Log(string message) => Info(message);
+
+        // ── Perf timing ─────────────────────────────────────────────
+
+        /// <summary>
+        /// Scoped timer for measuring code block duration.  Use with
+        /// <c>using (ThorneLog.Time("label")) { ... }</c>.  Emits an
+        /// INFO line on dispose: <c>PERF [label]: 12.3 ms</c>.
+        /// No-op when logging is disabled.
+        /// </summary>
+        public static IDisposable Time(string label) => new PerfScope(label);
+
+        private sealed class PerfScope : IDisposable
+        {
+            private readonly string _label;
+            private readonly Stopwatch _sw;
+            private bool _disposed;
+
+            public PerfScope(string label)
+            {
+                _label = label;
+                _sw = Enabled ? Stopwatch.StartNew() : null;
+            }
+
+            public void Dispose()
+            {
+                if (_disposed) return;
+                _disposed = true;
+                if (_sw == null) return;
+                _sw.Stop();
+                Info($"PERF [{_label}]: {_sw.Elapsed.TotalMilliseconds:F1} ms");
+            }
+        }
 
         // ── Separators ──────────────────────────────────────────────
 
