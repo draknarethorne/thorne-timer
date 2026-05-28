@@ -171,7 +171,7 @@ Thorne Timer is evolving into a **complete tactical HUD** for serious multi-boxi
 
 | Phase | Description |
 |-------|-------------|
-| **Current (v0.6.0, in testing)** | User-editable styles & views, per-view colors, camp-out auto-pause, performance and UX polish |
+| **Current (v0.6.0 beta)** | User-editable styles & views, per-view colors, camp-out auto-pause, repository/manager refactor, richer Tome Information with sortable lists |
 | **Next (v0.7.0)** | Timer maintenance dialog — separate gameplay view from add/edit/delete, read-only main grid |
 | **Planned** | Class-specific timer profiles, zone-aware timers, global (cross-character) timers |
 | **Future** | Full spell/ability management per class with smart timer automation |
@@ -184,19 +184,36 @@ For detailed phase breakdowns, see the [Roadmap](Docs/ROADMAP.md).
 
 ## Version History
 
-**v0.6.0** _in testing_
+**v0.6.0** _beta_
 
+_GUI enhancements, architecture cleanup, and a much richer Tome Information dialog._
+
+**Styles, Views & Categories**
 - ✅ **Styles tab** — first-class, user-editable styles with Add/Delete/Rename and color picker
 - ✅ **New default styles** — Pet (lavender), Spawn (cyan), Lockout (DodgerBlue), Character (white)
 - ✅ **Views tab** — Add/Delete views with dynamic Style filter dropdown, per-view ForeColor / BackColor / ShowWarning / EmptyBehavior
 - ✅ **Per-view colors** — each view drives its own mini-view appearance and the main grid row tint
+- ✅ **Hybrid Designer + Controller + Repository pattern** for Styles, Views, and Categories tabs
+
+**Character & log handling**
 - ✅ **`(None)` character** — manual pause without camping out
 - ✅ **Camp-out auto-pause** — detects `/camp` with 10-second inactivity threshold, switches active character to `(None)`
 - ✅ **Auto-switch fixes** — suppress the OLD character (not the new one) on manual switch, proper re-enable logic
+
+**Tome Information dialog**
+- ✅ **Richer statistics** — total / active / running timer counts, catalog counts (characters, categories, styles, views, classes), and per-category / style / class / scope breakdowns
+- ✅ **Tome version stamping** — new `db_meta` table records which app version created and last wrote the tome
+- ✅ **Sortable lists** — click any column header on the Feature Usage and breakdown lists to sort; numeric columns sort numerically (10 > 2), text columns alphabetically
+- ✅ **Consistent "All" labelling** — unassigned class breakdown rows now read "All" to match the main timer grid's class combo
+
+**Voice & mini views**
 - ✅ **Voice system** — all English voices (en-GB, en-AU, en-CA, etc.), comprehensive logging
 - ✅ **Mini views hidden from Alt-Tab** via `WS_EX_TOOLWINDOW`
+
+**Architecture & performance**
+- ✅ **Per-entity repositories** — Categories, Views, Characters, Classes, Timers, TimerState, and TomeStatistics each own their SQL; `Database.cs` trimmed to connection / schema / settings plumbing
+- ✅ **FormMain split into managers** — RecentDatabasesManager, WindowPositionManager, GridLayoutManager, VoiceManager, MiniViewSettingsManager; plus a CharactersController for the Characters tab
 - ✅ **Grid performance** — O(n²) → O(n) dictionary lookup in `SyncRuntimeToGrid` (~98% faster with 130+ timers)
-- ✅ **Hybrid Designer + Controller + Repository pattern** for Styles, Views, and Categories tabs
 - ✅ **One-shot startup migration** — v0.5.0 → v0.6.0 palette migration runs once; deletions stick, no snapback
 
 **v0.5.0** (June 2025)
