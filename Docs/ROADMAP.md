@@ -106,6 +106,18 @@ Separate gameplay view from timer maintenance, eliminating complexity in the mai
 
 **Why Priority:** The v0.6.0 controller/repository refactor plus the `isActive` flag and `GetActiveCharacterID()` on `LogMonitor` give us the right building blocks: configuration tabs already separate edit grids from runtime, and the main form can be locked to the actively logging character without snapshot/restore gymnastics. Completing Phase C also unblocks every feature in Phase G below (because `TimersController` is where Duplicate, DependsOn picker, right-click menus, etc. naturally live).
 
+#### Phase C add-on — `.tdb` provenance & auto-archive 🛡️
+
+Lightweight data-safety feature so we never lose a "last known good" `.tdb` across upgrades.
+
+- **New `db_meta` table** (`Key TEXT PRIMARY KEY, Value TEXT`) holding `AppVersionFirstSeen`, `AppVersionLastWrite`, `LastWriteUtc`. Stamped at the end of `Database.Open()` with `Assembly.GetExecutingAssembly().GetName().Version`.
+- **Auto-archive on detected upgrade** — before running migrations, if the stamped version is older than the running assembly version, copy the live `.tdb` to `Data/Archive/ThorneTimer-v{stamped}-{yyyyMMdd}.tdb` (`File.Copy`, with the connection closed). Fall back to a `_2`, `_3` counter only if the dated name collides.
+- **Pre-stamp DBs (no `db_meta` row)** — treat as version unknown; run migrations and stamp going forward, but do **not** auto-archive (we don't know the source version).
+- **Never auto-delete** archives. Pairs with the historical `Archive/` files already committed for upgrade-path testing.
+- **Failure is non-fatal** — copy errors log via `ThorneLog.Warn` but never block app launch.
+
+**Why bundled with Phase C:** the maintenance dialog will be the first feature that makes destructive timer edits easy, so having an automatic pre-upgrade snapshot in place is a natural prerequisite. Trivially small change (well under a day), but it has to be deliberately scheduled or it'll get forgotten.
+
 ### Phase G — Smarter Timer Authoring (v0.8.0) ✨ **NEW**
 
 The single biggest user pain identified: **adding new timers takes too long**. This phase makes authoring feel fast and forgiving.
