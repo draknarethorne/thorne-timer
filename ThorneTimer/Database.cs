@@ -115,8 +115,22 @@ namespace ThorneTimer
                 cmd.ExecuteNonQuery();
 
                 // Create miniviews table used by the UI
-                cmd.CommandText = "CREATE TABLE miniviews(ID INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT, PositionX INTEGER DEFAULT 100, PositionY INTEGER DEFAULT 100, ViewType TEXT DEFAULT 'Normal', SortOrder INTEGER DEFAULT 0, ActiveYn INTEGER DEFAULT 1, StyleFilter TEXT DEFAULT 'Normal')";
+                cmd.CommandText = "CREATE TABLE miniviews(ID INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT, PositionX INTEGER DEFAULT 100, PositionY INTEGER DEFAULT 100, ViewType TEXT DEFAULT 'Normal', SortOrder INTEGER DEFAULT 0, ActiveYn INTEGER DEFAULT 1, StyleFilter TEXT DEFAULT 'Normal', ForeColor INTEGER, BackColor INTEGER, ShowWarning INTEGER DEFAULT 1)";
                 cmd.ExecuteNonQuery();
+
+                // Seed default 7 views for new databases (v0.6.0: per-view colors)
+                // Normal, Buffs, Pings, Character are Active by default (most commonly used)
+                cmd.CommandText = @"INSERT INTO miniviews (Name, StyleFilter, ForeColor, BackColor, ShowWarning, PositionX, PositionY, SortOrder, ActiveYn) VALUES
+                    ('Normal', 'Normal', -256, -16777216, 1, 100, 100, 1, 1),
+                    ('Buffs', 'Buff', -23296, -16777216, 1, 400, 100, 2, 1),
+                    ('Pets', 'Pet', -6684825, -16777216, 1, 700, 100, 3, 0),
+                    ('Pings', 'Ping', -16711936, -16777216, 0, 100, 300, 4, 1),
+                    ('Spawns', 'Spawn', -256, -16777216, 1, 400, 300, 5, 0),
+                    ('Lockouts', 'Lockout', -23296, -16777216, 1, 700, 300, 6, 0),
+                    ('Character', 'Character', -1, -16777216, 0, 100, 500, 7, 1)";
+                cmd.ExecuteNonQuery();
+
+                StylesRepository.EnsureSchema(con);
 
                 // Create grid_columns table for persisting column widths across sessions
                 cmd.CommandText = "CREATE TABLE grid_columns(ID INTEGER PRIMARY KEY AUTOINCREMENT, GridName TEXT, ColumnName TEXT, Width INTEGER)";
@@ -406,6 +420,97 @@ namespace ThorneTimer
 
                     // Set StyleFilter to match ViewType for existing rows
                     cmd.CommandText = "UPDATE miniviews SET ActiveYn = 1, StyleFilter = ViewType";
+                    cmd.ExecuteNonQuery();
+                }
+
+                // Add per-view color configuration columns (ForeColor, BackColor, ShowWarning)
+                // v0.6.0: Move from global settings to per-view database-driven colors
+                if (!isFieldExist(con, "miniviews", "ForeColor"))
+                {
+                    SQLiteCommand cmd = new SQLiteCommand(con);
+
+                    // EmptyBehavior must exist before EnsureViewExists is invoked below,
+                    // since the INSERT in EnsureViewExists references the EmptyBehavior column.
+                    if (!isFieldExist(con, "miniviews", "EmptyBehavior"))
+                    {
+                        cmd.CommandText = "ALTER TABLE miniviews ADD COLUMN EmptyBehavior TEXT DEFAULT 'ViewName'";
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    // Add columns
+                    cmd.CommandText = "ALTER TABLE miniviews ADD COLUMN ForeColor INTEGER DEFAULT NULL";
+                    cmd.ExecuteNonQuery();
+
+                    cmd.CommandText = "ALTER TABLE miniviews ADD COLUMN BackColor INTEGER DEFAULT NULL";
+                    cmd.ExecuteNonQuery();
+
+                    cmd.CommandText = "ALTER TABLE miniviews ADD COLUMN ShowWarning INTEGER DEFAULT 1";
+                    cmd.ExecuteNonQuery();
+
+                    // Migrate existing views with colors from old global settings
+                    // Preserve user's custom colors by copying from settings table
+                    cmd.CommandText = @"
+                        UPDATE miniviews SET 
+                            ForeColor = CASE StyleFilter
+                                WHEN 'Normal' THEN (SELECT MiniViewNormFore FROM settings WHERE ID = 1)
+                                WHEN 'Buff' THEN (SELECT MiniViewBuffFore FROM settings WHERE ID = 1)
+                                WHEN 'Pet' THEN (SELECT MiniViewBuffFore FROM settings WHERE ID = 1)
+                                WHEN 'Ping' THEN (SELECT MiniViewPingFore FROM settings WHERE ID = 1)
+                                ELSE -256
+                            END,
+                            BackColor = CASE StyleFilter
+                                WHEN 'Normal' THEN (SELECT MiniViewNormBack FROM settings WHERE ID = 1)
+                                WHEN 'Buff' THEN (SELECT MiniViewBuffBack FROM settings WHERE ID = 1)
+                                WHEN 'Pet' THEN (SELECT MiniViewBuffBack FROM settings WHERE ID = 1)
+                                WHEN 'Ping' THEN (SELECT MiniViewPingBack FROM settings WHERE ID = 1)
+                                ELSE -16777216
+                            END,
+                            ShowWarning = CASE StyleFilter
+                                WHEN 'Ping' THEN 0
+                                ELSE 1
+                            END
+                        WHERE ForeColor IS NULL";
+                    cmd.ExecuteNonQuery();
+
+                    // Seed new style views if they don't exist (no "Timers" suffix)
+                    EnsureViewExists(con, "Spawns", "Spawn", -256, -16777216, 1, "HideEmpty", 400, 300, 10, 0);
+                    EnsureViewExists(con, "Lockouts", "Lockout", -23296, -16777216, 1, "HideEmpty", 700, 300, 11, 0);
+                    EnsureViewExists(con, "Character", "Character", -1, -16777216, 0, "CharacterName", 100, 500, 12, 1);
+
+                    // Create separate Pet view if none exists
+                    cmd.CommandText = "SELECT COUNT(*) FROM miniviews WHERE StyleFilter = 'Pet'";
+                    long petCount = (long)cmd.ExecuteScalar();
+                    if (petCount == 0)
+                    {
+                        EnsureViewExists(con, "Pets", "Pet", -6684825, -16777216, 1, "ViewName", 700, 100, 13, 0);
+                    }
+                }
+
+                // Add EmptyBehavior column to miniviews table (v0.6.0)
+                // Controls what displays when a view has no active timers:
+                //   'CharacterName' - Show active character (e.g., "Gandalf")
+                //   'ViewName' - Show view's Name field (e.g., "Normal", "Buffs")
+                //   'Spaces' - Show empty spaces (invisible but positionable)
+                //   'HideEmpty' - Hide window completely
+                if (!isFieldExist(con, "miniviews", "EmptyBehavior"))
+                {
+                    SQLiteCommand cmd = new SQLiteCommand(con);
+
+                    cmd.CommandText = "ALTER TABLE miniviews ADD COLUMN EmptyBehavior TEXT DEFAULT 'ViewName'";
+                    cmd.ExecuteNonQuery();
+
+                    // Set sensible defaults for existing views based on their StyleFilter:
+                    // - Character view: Always shows character name
+                    // - Lockout/Spawn: Hide when empty (episodic timers)
+                    // - Normal/Buff/Ping/Pet: Show view name (always-visible gameplay info)
+                    cmd.CommandText = @"
+                        UPDATE miniviews SET EmptyBehavior = CASE StyleFilter
+                            WHEN 'Character' THEN 'CharacterName'
+                            WHEN 'Lockout' THEN 'HideEmpty'
+                            WHEN 'Spawn' THEN 'HideEmpty'
+                            ELSE 'ViewName'
+                        END
+                        WHERE EmptyBehavior IS NULL";
                     cmd.ExecuteNonQuery();
                 }
 
@@ -764,6 +869,8 @@ namespace ThorneTimer
                     cmd.ExecuteNonQuery();
                 }
 
+                StylesRepository.EnsureSchema(con);
+
                 // Seed default views if miniviews table is empty
                 SeedDefaultViews(con);
             }
@@ -912,23 +1019,27 @@ namespace ThorneTimer
         }
 
         /// <summary>
-        /// Creates the 4 default views (Normal, Pet, Buff, Ping) if they don't exist.
-        /// Uses the active character's MiniViewX/Y as the base position.
+        /// Ensures each style in the styles table has at least one paired mini-view,
+        /// but ONLY when the miniviews table is completely empty (fresh DB or user
+        /// explicitly cleared it). Once any views exist, this is a no-op so that
+        /// user-deleted views are never silently re-added on startup. A future
+        /// "Reset Defaults" action can call this explicitly.
         /// </summary>
         static private void SeedDefaultViews(SQLiteConnection con)
         {
-            SQLiteCommand cmd = new SQLiteCommand(con)
+            using (var checkCmd = new SQLiteCommand(con))
             {
-                CommandText = "SELECT COUNT(*) FROM miniviews"
-            };
-            long count = (long)cmd.ExecuteScalar();
+                checkCmd.CommandText = "SELECT COUNT(*) FROM miniviews";
+                long count = (long)checkCmd.ExecuteScalar();
+                if (count > 0) return;
+            }
 
-            if (count == 0)
+            // Resolve base position from active character if available
+            int baseX = 100;
+            int baseY = 100;
+
+            using (var cmd = new SQLiteCommand(con))
             {
-                // Get base position from active character if available
-                int baseX = 100;
-                int baseY = 100;
-
                 cmd.CommandText = "SELECT ActiveCharacterID FROM settings WHERE ID = 1";
                 object result = cmd.ExecuteScalar();
                 if (result != null && result != DBNull.Value)
@@ -946,53 +1057,54 @@ namespace ThorneTimer
                         }
                     }
                 }
+            }
 
-                // Insert the 4 default views with positions matching current hardcoded offsets
-                cmd.Parameters.Clear();
-                cmd.CommandText = "INSERT INTO miniviews (Name, ViewType, PositionX, PositionY, SortOrder, ActiveYn, StyleFilter) VALUES (@name, @type, @x, @y, @order, @active, @style)";
+            // Read existing styles in sort order, then create one paired view per style.
+            var styles = new StylesRepository(con).GetStyles();
+            int slot = 0;
+            foreach (StyleData style in styles)
+            {
+                if (string.IsNullOrWhiteSpace(style.Name)) continue;
 
-                // Normal view
-                cmd.Parameters.AddWithValue("@name", "Normal Timers");
-                cmd.Parameters.AddWithValue("@type", "Normal");
-                cmd.Parameters.AddWithValue("@x", baseX);
-                cmd.Parameters.AddWithValue("@y", baseY);
-                cmd.Parameters.AddWithValue("@order", 1);
-                cmd.Parameters.AddWithValue("@active", 1);
-                cmd.Parameters.AddWithValue("@style", "Normal");
-                cmd.ExecuteNonQuery();
+                string viewName = DefaultViewNameForStyle(style.Name);
+                string emptyBehavior = DefaultEmptyBehaviorForStyle(style.Name);
 
-                // Pet view (offset +200)
-                cmd.Parameters.Clear();
-                cmd.Parameters.AddWithValue("@name", "Pet Timers");
-                cmd.Parameters.AddWithValue("@type", "Pet");
-                cmd.Parameters.AddWithValue("@x", baseX + 200);
-                cmd.Parameters.AddWithValue("@y", baseY);
-                cmd.Parameters.AddWithValue("@order", 2);
-                cmd.Parameters.AddWithValue("@active", 1);
-                cmd.Parameters.AddWithValue("@style", "Pet");
-                cmd.ExecuteNonQuery();
+                // Column / row layout: 3 columns of 250px, rows 200px tall
+                int x = baseX + (slot % 3) * 250;
+                int y = baseY + (slot / 3) * 200;
 
-                // Buff view (offset +400)
-                cmd.Parameters.Clear();
-                cmd.Parameters.AddWithValue("@name", "Buff Timers");
-                cmd.Parameters.AddWithValue("@type", "Buff");
-                cmd.Parameters.AddWithValue("@x", baseX + 400);
-                cmd.Parameters.AddWithValue("@y", baseY);
-                cmd.Parameters.AddWithValue("@order", 3);
-                cmd.Parameters.AddWithValue("@active", 1);
-                cmd.Parameters.AddWithValue("@style", "Buff");
-                cmd.ExecuteNonQuery();
+                EnsureViewExists(con, viewName, style.Name,
+                    style.ForeColor, style.BackColor, 1, emptyBehavior,
+                    x, y, style.SortOrder, 1);
 
-                // Ping view (offset +1000)
-                cmd.Parameters.Clear();
-                cmd.Parameters.AddWithValue("@name", "Ping Timers");
-                cmd.Parameters.AddWithValue("@type", "Ping");
-                cmd.Parameters.AddWithValue("@x", baseX + 1000);
-                cmd.Parameters.AddWithValue("@y", baseY);
-                cmd.Parameters.AddWithValue("@order", 4);
-                cmd.Parameters.AddWithValue("@active", 1);
-                cmd.Parameters.AddWithValue("@style", "Ping");
-                cmd.ExecuteNonQuery();
+                slot++;
+            }
+        }
+
+        static private string DefaultViewNameForStyle(string styleName)
+        {
+            switch (styleName)
+            {
+                case "Normal": return "Normal Timers";
+                case "Buff": return "Buff Timers";
+                case "Pet": return "Pet Timers";
+                case "Ping": return "Ping Timers";
+                case "Spawn": return "Spawns";
+                case "Lockout": return "Lockouts";
+                case "Character": return "Character";
+                default: return styleName + " Timers";
+            }
+        }
+
+        static private string DefaultEmptyBehaviorForStyle(string styleName)
+        {
+            switch (styleName)
+            {
+                case "Character": return "CharacterName";
+                case "Spawn":
+                case "Lockout":
+                    return "HideEmpty";
+                default: return "ViewName";
             }
         }
 
@@ -1065,6 +1177,44 @@ namespace ThorneTimer
             if (rdr.Read()) exists = true;
             try { rdr.Close(); } catch { }
             return exists;
+        }
+
+        /// <summary>
+        /// Ensures a mini-view with the specified StyleFilter exists in the database.
+        /// If no view exists for the given style, inserts a new one with default configuration.
+        /// Used during database migration to seed new timer styles (Spawn, Lockout, Character, Pet).
+        /// </summary>
+        static private void EnsureViewExists(SQLiteConnection con, string name, string styleFilter,
+                                            int foreColor, int backColor, int showWarning, string emptyBehavior,
+                                            int x, int y, int sortOrder, int active)
+        {
+            using (var cmd = new SQLiteCommand(con))
+            {
+                // Check if view already exists for this style
+                cmd.CommandText = "SELECT COUNT(*) FROM miniviews WHERE StyleFilter = @style";
+                cmd.Parameters.AddWithValue("@style", styleFilter);
+                long count = (long)cmd.ExecuteScalar();
+
+                if (count == 0)
+                {
+                    // Insert new view with specified configuration
+                    cmd.CommandText = @"INSERT INTO miniviews (Name, StyleFilter, ForeColor, BackColor, ShowWarning, EmptyBehavior,
+                                       PositionX, PositionY, SortOrder, ActiveYn) 
+                                       VALUES (@name, @style, @fore, @back, @warn, @empty, @x, @y, @order, @active)";
+                    cmd.Parameters.Clear();
+                    cmd.Parameters.AddWithValue("@name", name);
+                    cmd.Parameters.AddWithValue("@style", styleFilter);
+                    cmd.Parameters.AddWithValue("@fore", foreColor);
+                    cmd.Parameters.AddWithValue("@back", backColor);
+                    cmd.Parameters.AddWithValue("@warn", showWarning);
+                    cmd.Parameters.AddWithValue("@empty", emptyBehavior);
+                    cmd.Parameters.AddWithValue("@x", x);
+                    cmd.Parameters.AddWithValue("@y", y);
+                    cmd.Parameters.AddWithValue("@order", sortOrder);
+                    cmd.Parameters.AddWithValue("@active", active);
+                    cmd.ExecuteNonQuery();
+                }
+            }
         }
 
         // Valid column names for the settings table (whitelist for SetSetting)
@@ -1549,7 +1699,7 @@ namespace ThorneTimer
 
             SQLiteCommand cmd = new SQLiteCommand(con)
             {
-                CommandText = "SELECT * from miniviews ORDER BY SortOrder, Name"
+                CommandText = "SELECT ID, Name, ActiveYn, StyleFilter, PositionX, PositionY, SortOrder, ForeColor, BackColor, ShowWarning, EmptyBehavior FROM miniviews ORDER BY SortOrder, Name"
             };
             SQLiteDataReader rdr = cmd.ExecuteReader();
 
@@ -1563,7 +1713,11 @@ namespace ThorneTimer
                     StyleFilter = rdr.IsDBNull(rdr.GetOrdinal("StyleFilter")) ? "Normal" : rdr.GetString(rdr.GetOrdinal("StyleFilter")),
                     PositionX = rdr.IsDBNull(rdr.GetOrdinal("PositionX")) ? 100 : rdr.GetInt32(rdr.GetOrdinal("PositionX")),
                     PositionY = rdr.IsDBNull(rdr.GetOrdinal("PositionY")) ? 100 : rdr.GetInt32(rdr.GetOrdinal("PositionY")),
-                    SortOrder = rdr.IsDBNull(rdr.GetOrdinal("SortOrder")) ? 0 : rdr.GetInt32(rdr.GetOrdinal("SortOrder"))
+                    SortOrder = rdr.IsDBNull(rdr.GetOrdinal("SortOrder")) ? 0 : rdr.GetInt32(rdr.GetOrdinal("SortOrder")),
+                    ForeColor = rdr.IsDBNull(rdr.GetOrdinal("ForeColor")) ? Color.Yellow.ToArgb() : rdr.GetInt32(rdr.GetOrdinal("ForeColor")),
+                    BackColor = rdr.IsDBNull(rdr.GetOrdinal("BackColor")) ? Color.Black.ToArgb() : rdr.GetInt32(rdr.GetOrdinal("BackColor")),
+                    ShowWarning = rdr.IsDBNull(rdr.GetOrdinal("ShowWarning")) ? 1 : rdr.GetInt32(rdr.GetOrdinal("ShowWarning")),
+                    EmptyBehavior = rdr.IsDBNull(rdr.GetOrdinal("EmptyBehavior")) ? "ViewName" : rdr.GetString(rdr.GetOrdinal("EmptyBehavior"))
                 };
 
                 gridData.Add(data);
@@ -1591,24 +1745,30 @@ namespace ThorneTimer
             DataGridViewCell Name = row.Cells[dataGridView.Columns["Name"].Index];
             DataGridViewCell ActiveYn = row.Cells[dataGridView.Columns["ActiveYn"].Index];
             DataGridViewCell StyleFilter = row.Cells[dataGridView.Columns["StyleFilter"].Index];
+            DataGridViewCell ShowWarning = row.Cells[dataGridView.Columns["ShowWarning"].Index];
+            DataGridViewCell EmptyBehavior = row.Cells[dataGridView.Columns["EmptyBehavior"].Index];
 
             SQLiteCommand cmd = new SQLiteCommand(con);
 
             if (Convert.ToString(ID.Value) == "-1")
             {
-                cmd.CommandText = "INSERT INTO miniviews (Name, ActiveYn, StyleFilter) VALUES (@name, @active, @style)";
+                cmd.CommandText = "INSERT INTO miniviews (Name, ActiveYn, StyleFilter, ShowWarning, EmptyBehavior, PositionX, PositionY, SortOrder) VALUES (@name, @active, @style, @warn, @empty, 100, 100, 0)";
                 cmd.Parameters.AddWithValue("@name", Convert.ToString(Name.Value));
                 cmd.Parameters.AddWithValue("@active", Convert.ToInt32(ActiveYn.Value));
                 cmd.Parameters.AddWithValue("@style", Convert.ToString(StyleFilter.Value));
+                cmd.Parameters.AddWithValue("@warn", Convert.ToInt32(ShowWarning.Value ?? 1));
+                cmd.Parameters.AddWithValue("@empty", Convert.ToString(EmptyBehavior.Value ?? "ViewName"));
                 cmd.ExecuteNonQuery();
                 cmd.Parameters.Clear();
             }
             else
             {
-                cmd.CommandText = "UPDATE miniviews SET Name = @name, ActiveYn = @active, StyleFilter = @style WHERE ID = @id";
+                cmd.CommandText = "UPDATE miniviews SET Name = @name, ActiveYn = @active, StyleFilter = @style, ShowWarning = @warn, EmptyBehavior = @empty WHERE ID = @id";
                 cmd.Parameters.AddWithValue("@name", Convert.ToString(Name.Value));
                 cmd.Parameters.AddWithValue("@active", Convert.ToInt32(ActiveYn.Value));
                 cmd.Parameters.AddWithValue("@style", Convert.ToString(StyleFilter.Value));
+                cmd.Parameters.AddWithValue("@warn", Convert.ToInt32(ShowWarning.Value ?? 1));
+                cmd.Parameters.AddWithValue("@empty", Convert.ToString(EmptyBehavior.Value ?? "ViewName"));
                 cmd.Parameters.AddWithValue("@id", Convert.ToInt32(ID.Value));
                 cmd.ExecuteNonQuery();
                 cmd.Parameters.Clear();
@@ -1634,6 +1794,10 @@ namespace ThorneTimer
             public int SortOrder { get; set; }
             public int ActiveYn { get; set; }
             public string StyleFilter { get; set; }
+            public int ForeColor { get; set; }      // v0.6.0: Per-view foreground color
+            public int BackColor { get; set; }      // v0.6.0: Per-view background color
+            public int ShowWarning { get; set; }    // v0.6.0: Per-view warning color control
+            public string EmptyBehavior { get; set; }  // v0.6.0: Per-view empty display behavior
         }
 
         /// <summary>
@@ -1645,7 +1809,7 @@ namespace ThorneTimer
 
             SQLiteCommand cmd = new SQLiteCommand(con)
             {
-                CommandText = "SELECT ID, Name, PositionX, PositionY, SortOrder, ActiveYn, StyleFilter FROM miniviews ORDER BY SortOrder"
+                CommandText = "SELECT ID, Name, PositionX, PositionY, SortOrder, ActiveYn, StyleFilter, ForeColor, BackColor, ShowWarning, EmptyBehavior FROM miniviews ORDER BY SortOrder"
             };
 
             using (SQLiteDataReader rdr = cmd.ExecuteReader())
@@ -1660,7 +1824,11 @@ namespace ThorneTimer
                         PositionY = rdr.IsDBNull(rdr.GetOrdinal("PositionY")) ? 100 : rdr.GetInt32(rdr.GetOrdinal("PositionY")),
                         SortOrder = rdr.IsDBNull(rdr.GetOrdinal("SortOrder")) ? 0 : rdr.GetInt32(rdr.GetOrdinal("SortOrder")),
                         ActiveYn = rdr.IsDBNull(rdr.GetOrdinal("ActiveYn")) ? 1 : rdr.GetInt32(rdr.GetOrdinal("ActiveYn")),
-                        StyleFilter = rdr.IsDBNull(rdr.GetOrdinal("StyleFilter")) ? "Normal" : rdr.GetString(rdr.GetOrdinal("StyleFilter"))
+                        StyleFilter = rdr.IsDBNull(rdr.GetOrdinal("StyleFilter")) ? "Normal" : rdr.GetString(rdr.GetOrdinal("StyleFilter")),
+                        ForeColor = rdr.IsDBNull(rdr.GetOrdinal("ForeColor")) ? Color.Yellow.ToArgb() : rdr.GetInt32(rdr.GetOrdinal("ForeColor")),
+                        BackColor = rdr.IsDBNull(rdr.GetOrdinal("BackColor")) ? Color.Black.ToArgb() : rdr.GetInt32(rdr.GetOrdinal("BackColor")),
+                        ShowWarning = rdr.IsDBNull(rdr.GetOrdinal("ShowWarning")) ? 1 : rdr.GetInt32(rdr.GetOrdinal("ShowWarning")),
+                        EmptyBehavior = rdr.IsDBNull(rdr.GetOrdinal("EmptyBehavior")) ? "ViewName" : rdr.GetString(rdr.GetOrdinal("EmptyBehavior"))
                     };
 
                     views.Add(data);

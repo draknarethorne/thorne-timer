@@ -137,6 +137,8 @@ namespace ThorneTimer
 
             ThorneLog.Info("Opening database connection...");
             con = Database.Connection(dbPath);
+            stylesRepository = new StylesRepository(con);
+            miniViews.Styles = stylesRepository;
             ThorneLog.Info("Database connection established");
 
             // Load log settings from DB now that connection is open
@@ -191,6 +193,12 @@ namespace ThorneTimer
         readonly MiniViews miniViews = new MiniViews();
         readonly TimerRuntime timerRuntime = new TimerRuntime();
         readonly LogMonitor logMonitor = new LogMonitor();
+        StylesRepository stylesRepository;
+        StylesController stylesController;
+        ViewsRepository viewsRepository;
+        ViewsController viewsController;
+        CategoriesRepository categoriesRepository;
+        CategoriesController categoriesController;
         SQLiteConnection con;
 
         // UI indicator for browsing mode (viewing != actively logging character)
@@ -532,20 +540,15 @@ namespace ThorneTimer
             CreateToolbarIcons();
             this.FormClosing += FormMain_FormClosing;
             txtWarningTime.LostFocus += WarningTime_LostFocus;
-            txtPingTime.LostFocus += PingTime_LostFocus;
+            // v0.6.0: Removed txtPingTime (now style/view configuration)
 
             this.RestoreWindowPosition();
 
-
+            // v0.6.0: Load global mini view settings only
             tbOpacity.Value = Math.Max(tbOpacity.Minimum, Math.Min(tbOpacity.Maximum, SafeParseInt(Database.GetSetting(con, "MiniViewOpacity"), 100)));
             miniViews.mvOpacity = tbOpacity.Value;
             tbFontSize.Value = Math.Max(tbFontSize.Minimum, Math.Min(tbFontSize.Maximum, SafeParseInt(Database.GetSetting(con, "MiniViewFontSize"), 8)));
             miniViews.mvFontSize = tbFontSize.Value;
-
-            miniViews.mvNormForeColor = SafeParseInt(Database.GetSetting(con, "MiniViewNormFore"), Color.Black.ToArgb());
-            lblNormPickFore.BackColor = Color.FromArgb(miniViews.mvNormForeColor);
-            miniViews.mvNormBackColor = SafeParseInt(Database.GetSetting(con, "MiniViewNormBack"), Color.White.ToArgb());
-            lblNormPickBack.BackColor = Color.FromArgb(miniViews.mvNormBackColor);
 
             miniViews.mvWarnForeColor = SafeParseInt(Database.GetSetting(con, "MiniViewWarnFore"), Color.White.ToArgb());
             lblWarnPickFore.BackColor = Color.FromArgb(miniViews.mvWarnForeColor);
@@ -553,20 +556,6 @@ namespace ThorneTimer
             lblWarnPickBack.BackColor = Color.FromArgb(miniViews.mvWarnBackColor);
             miniViews.mvWarnTime = Database.GetSetting(con, "MiniViewWarnTime");
             txtWarningTime.Text = miniViews.mvWarnTime;
-
-            miniViews.mvShowPing = SafeParseInt(Database.GetSetting(con, "MiniViewShowPing"), 1);
-            chkShowPing.Checked = miniViews.ShowPing();
-            miniViews.mvPingForeColor = SafeParseInt(Database.GetSetting(con, "MiniViewPingFore"), Color.LightGreen.ToArgb());
-            lblPingPickFore.BackColor = Color.FromArgb(miniViews.mvPingForeColor);
-            miniViews.mvPingBackColor = SafeParseInt(Database.GetSetting(con, "MiniViewPingBack"), Color.Black.ToArgb());
-            lblPingPickBack.BackColor = Color.FromArgb(miniViews.mvPingBackColor);
-            miniViews.mvPingTime = Database.GetSetting(con, "MiniViewPingTime");
-            txtPingTime.Text = miniViews.mvPingTime;
-
-            miniViews.mvBuffForeColor = SafeParseInt(Database.GetSetting(con, "MiniViewBuffFore"), Color.Orange.ToArgb());
-            lblBuffPickFore.BackColor = Color.FromArgb(miniViews.mvBuffForeColor);
-            miniViews.mvBuffBackColor = SafeParseInt(Database.GetSetting(con, "MiniViewBuffBack"), Color.Black.ToArgb());
-            lblBuffPickBack.BackColor = Color.FromArgb(miniViews.mvBuffBackColor);
 
             UpdateMiniAppearance();
 
@@ -584,6 +573,12 @@ namespace ThorneTimer
             grdTimers.DataError += new DataGridViewDataErrorEventHandler(GrdTimers_DataError);
 
             activeCharacterID = Database.GetSetting(con, "ActiveCharacterID");
+
+            // Populate character dropdown BEFORE any code tries to access it
+            // (needed by the offline character detection block below)
+            tscActiveCharacter.SelectedIndexChanged -= tscActiveCharacter_SelectedIndexChanged;
+            SetupActiveCharacters();
+            tscActiveCharacter.SelectedIndexChanged += tscActiveCharacter_SelectedIndexChanged;
 
             if (Properties.Settings.Default.ParseLog)
             {
@@ -654,15 +649,6 @@ namespace ThorneTimer
             showActiveOnlyToolStripMenuItem.Checked = showActiveOnly;
             timerRuntime.ShowActiveOnly = showActiveOnly;
 
-            // Suppress SelectedIndexChanged during setup — setting DataSource
-            // and SelectedItem each fire the event, which would trigger full
-            // LoadTimerRuntime cycles before the app is ready.  This was the
-            // root cause of duplicate TimerPlus instances and cross-character
-            // timer state bleed.
-            tscActiveCharacter.SelectedIndexChanged -= tscActiveCharacter_SelectedIndexChanged;
-            SetupActiveCharacters();
-            tscActiveCharacter.SelectedIndexChanged += tscActiveCharacter_SelectedIndexChanged;
-
             // Add tooltip to character dropdown explaining viewer behavior
             tscActiveCharacter.ToolTipText = "Select character to view timers (active character tracks in background)";
 
@@ -703,6 +689,7 @@ namespace ThorneTimer
                 SetupCharacterGrid();
                 SetupCategoriesGrid();
                 SetupViewsGrid();
+                SetupStylesGrid();
                 // Load timer and category data into TimerRuntime
                 var savedStates = LoadTimerRuntime();
 
@@ -730,6 +717,8 @@ namespace ThorneTimer
                 LoadColumnWidths("Timers", grdTimers);
                 LoadColumnWidths("Characters", grdCharacters);
                 LoadColumnWidths("Categories", grdCategories);
+                if (stylesController?.Grid != null)
+                    LoadColumnWidths("Styles", stylesController.Grid);
 
                 // Seed per-view FillWeight caches from the current (post-load) state
                 // so the very first compact/advanced toggle has weights to restore.
@@ -923,6 +912,7 @@ namespace ThorneTimer
             AddToRecentDatabases(dbPath);
 
             // Reload all UI from new database
+            ResetRepositories();
             ReloadFromDatabase();
 
             UpdateTitleBar(dbPath);
@@ -942,37 +932,21 @@ namespace ThorneTimer
 
         private void ReloadFromDatabase()
         {
-            // Reload settings from new database
+            ResetRepositories();
+
+            // Reload global settings from database
             tbOpacity.Value = Math.Max(tbOpacity.Minimum, Math.Min(tbOpacity.Maximum, SafeParseInt(Database.GetSetting(con, "MiniViewOpacity"), 100)));
             miniViews.mvOpacity = tbOpacity.Value;
             tbFontSize.Value = Math.Max(tbFontSize.Minimum, Math.Min(tbFontSize.Maximum, SafeParseInt(Database.GetSetting(con, "MiniViewFontSize"), 8)));
             miniViews.mvFontSize = tbFontSize.Value;
 
-            miniViews.mvNormForeColor = SafeParseInt(Database.GetSetting(con, "MiniViewNormFore"), Color.Black.ToArgb());
-            lblNormPickFore.BackColor = Color.FromArgb(miniViews.mvNormForeColor);
-            miniViews.mvNormBackColor = SafeParseInt(Database.GetSetting(con, "MiniViewNormBack"), Color.White.ToArgb());
-            lblNormPickBack.BackColor = Color.FromArgb(miniViews.mvNormBackColor);
-
+            // v0.6.0: Warning colors still global (apply to all views when ShowWarning is enabled)
             miniViews.mvWarnForeColor = SafeParseInt(Database.GetSetting(con, "MiniViewWarnFore"), Color.White.ToArgb());
             lblWarnPickFore.BackColor = Color.FromArgb(miniViews.mvWarnForeColor);
             miniViews.mvWarnBackColor = SafeParseInt(Database.GetSetting(con, "MiniViewWarnBack"), Color.Red.ToArgb());
             lblWarnPickBack.BackColor = Color.FromArgb(miniViews.mvWarnBackColor);
             miniViews.mvWarnTime = Database.GetSetting(con, "MiniViewWarnTime");
             txtWarningTime.Text = miniViews.mvWarnTime;
-
-            miniViews.mvShowPing = SafeParseInt(Database.GetSetting(con, "MiniViewShowPing"), 1);
-            chkShowPing.Checked = miniViews.ShowPing();
-            miniViews.mvPingForeColor = SafeParseInt(Database.GetSetting(con, "MiniViewPingFore"), Color.LightGreen.ToArgb());
-            lblPingPickFore.BackColor = Color.FromArgb(miniViews.mvPingForeColor);
-            miniViews.mvPingBackColor = SafeParseInt(Database.GetSetting(con, "MiniViewPingBack"), Color.Black.ToArgb());
-            lblPingPickBack.BackColor = Color.FromArgb(miniViews.mvPingBackColor);
-            miniViews.mvPingTime = Database.GetSetting(con, "MiniViewPingTime");
-            txtPingTime.Text = miniViews.mvPingTime;
-
-            miniViews.mvBuffForeColor = SafeParseInt(Database.GetSetting(con, "MiniViewBuffFore"), Color.Orange.ToArgb());
-            lblBuffPickFore.BackColor = Color.FromArgb(miniViews.mvBuffForeColor);
-            miniViews.mvBuffBackColor = SafeParseInt(Database.GetSetting(con, "MiniViewBuffBack"), Color.Black.ToArgb());
-            lblBuffPickBack.BackColor = Color.FromArgb(miniViews.mvBuffBackColor);
 
             UpdateMiniAppearance();
 
@@ -1028,6 +1002,9 @@ namespace ThorneTimer
             grdViews.DataSource = null;
             grdViews.Columns.Clear();
             SetupViewsGrid();
+            grdStyles.DataSource = null;
+            grdStyles.Columns.Clear();
+            SetupStylesGrid();
 
             // Reload TimerRuntime with new database data
             BeginGridUpdate();
@@ -1046,6 +1023,7 @@ namespace ThorneTimer
                 LoadColumnWidths("Timers", grdTimers);
                 LoadColumnWidths("Characters", grdCharacters);
                 LoadColumnWidths("Categories", grdCategories);
+                LoadColumnWidths("Styles", grdStyles);
 
                 // Seed per-view FillWeight caches so the first compact/advanced
                 // toggle after a database switch has weights to restore.
@@ -1067,6 +1045,14 @@ namespace ThorneTimer
             }
 
             UpdateMiniView();
+        }
+
+        private void ResetRepositories()
+        {
+            stylesRepository = new StylesRepository(con);
+            viewsRepository = new ViewsRepository(con);
+            categoriesRepository = new CategoriesRepository(con);
+            miniViews.Styles = stylesRepository;
         }
 
         private string GetDataDirectory()
@@ -1713,8 +1699,8 @@ namespace ThorneTimer
 
             var characters = Database.GetActiveCharacters(con);
 
-            // Add "None" option at the beginning for manual "no active character" state
-            characters.Insert(0, new ComboBoxItem { Value = 0, Text = "(None)" });
+            // Add "All Characters" option at the beginning for watching all character log files
+            characters.Insert(0, new ComboBoxItem { Value = 0, Text = "All Characters" });
 
             tscActiveCharacter.ComboBox.DataSource = characters;
 
@@ -1846,7 +1832,7 @@ namespace ThorneTimer
                 DataPropertyName = "Style",
                 FlatStyle = FlatStyle.Flat
             };
-            cboRole.Items.AddRange("Normal", "Buff", "Pet", "Ping");
+            cboRole.Items.AddRange("Normal", "Buff", "Pet", "Ping", "Spawn", "Lockout", "Character");
             grdTimers.Columns.Add(cboRole);
             grdTimers.Columns["Style"].Width = 80;
             grdTimers.Columns["Style"].MinimumWidth = 60;
@@ -2028,107 +2014,182 @@ namespace ThorneTimer
 
         private void SetupCategoriesGrid()
         {
-            grdCategories.Columns.Add("ID", "ID");
-            grdCategories.Columns[0].DataPropertyName = grdCategories.Columns[0].Name;
-            grdCategories.Columns[0].Visible = false;
-            grdCategories.Columns.Add("Name", "Name");
-            grdCategories.Columns[1].Width = 100;
-            grdCategories.Columns[1].FillWeight = 100;
-            grdCategories.Columns[1].DataPropertyName = grdCategories.Columns[1].Name;
-            grdCategories.Columns.Add("StartKeyword", "Start Keyword");
-            grdCategories.Columns[2].DataPropertyName = grdCategories.Columns[2].Name;
-            grdCategories.Columns[2].Width = 300;
-            grdCategories.Columns[2].FillWeight = 300;
-            grdCategories.Columns.Add("EndKeyword", "End Keyword");
-            grdCategories.Columns[3].DataPropertyName = grdCategories.Columns[3].Name;
-            grdCategories.Columns[3].Width = 300;
-            grdCategories.Columns[3].FillWeight = 300;
+            if (categoriesRepository == null)
+                categoriesRepository = new CategoriesRepository(con);
 
-            DataGridViewCheckBoxColumn chkActiveYn = new DataGridViewCheckBoxColumn
-            {
-                HeaderText = "Auto Stop",
-                Name = "AutoStop",
-                TrueValue = 1,
-                FalseValue = 0
-            };
-            grdCategories.Columns.Add(chkActiveYn);
-            grdCategories.Columns[4].DataPropertyName = grdCategories.Columns[4].Name;
-            grdCategories.Columns[4].Width = 70;
-            grdCategories.Columns[4].MinimumWidth = 70;
-            grdCategories.Columns[4].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+            categoriesController?.Dispose();
+            categoriesController = new CategoriesController(categoriesRepository, OnCategoriesChanged);
+            categoriesController.Initialize(grdCategories);
+        }
 
-            grdCategories.DataSource = Database.GetCategories(con);
-
-            grdCategories.RowValidating += ValidateRowCategories;
+        private void OnCategoriesChanged()
+        {
+            RefreshGridCategorySource();
         }
 
         private void SetupViewsGrid()
         {
-            grdViews.AllowUserToAddRows = false;
-            grdViews.AllowUserToDeleteRows = false;
+            if (viewsRepository == null)
+                viewsRepository = new ViewsRepository(con);
+            if (stylesRepository == null)
+                stylesRepository = new StylesRepository(con);
 
-            grdViews.Columns.Add("ID", "ID");
-            grdViews.Columns["ID"].DataPropertyName = "ID";
-            grdViews.Columns["ID"].Visible = false;
+            viewsController?.Dispose();
+            viewsController = new ViewsController(viewsRepository, stylesRepository, OnViewsChanged);
+            viewsController.Initialize(grdViews);
+        }
 
-            grdViews.Columns.Add("Name", "Name");
-            grdViews.Columns["Name"].DataPropertyName = "Name";
-            grdViews.Columns["Name"].Width = 200;
-            grdViews.Columns["Name"].FillWeight = 200;
+        private void OnViewsChanged()
+        {
+            miniViews.RefreshMiniViews(con, activeCharacterID);
+            UpdateMiniView();
+        }
 
-            DataGridViewComboBoxColumn cboStyle = new DataGridViewComboBoxColumn
+        private void SetupStylesGrid()
+        {
+            if (stylesRepository == null)
+                stylesRepository = new StylesRepository(con);
+
+            stylesController?.Dispose();
+            stylesController = new StylesController(stylesRepository, OnStylesChanged);
+            stylesController.Initialize(grdStyles);
+        }
+
+        private void OnStylesChanged()
+        {
+            stylesRepository?.RefreshCache();
+            viewsController?.RefreshStyleOptions();
+            miniViews.RefreshMiniViews(con, activeCharacterID);
+            RepaintTimerGrid();
+            UpdateMiniView();
+        }
+
+        void grdViews_CellToolTipTextNeeded(object sender, DataGridViewCellToolTipTextNeededEventArgs e)
+        {
+            // Provide tooltips for EmptyBehavior column
+            if (e.RowIndex >= 0 && e.ColumnIndex >= 0 && grdViews.Columns[e.ColumnIndex].Name == "EmptyBehavior")
             {
-                HeaderText = "Style",
-                Name = "StyleFilter",
-                DataPropertyName = "StyleFilter",
-                FlatStyle = FlatStyle.Flat
-            };
-            cboStyle.Items.AddRange("Normal", "Buff", "Pet", "Ping");
-            grdViews.Columns.Add(cboStyle);
-            grdViews.Columns["StyleFilter"].Width = 85;
-            grdViews.Columns["StyleFilter"].MinimumWidth = 60;
-            grdViews.Columns["StyleFilter"].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+                var cellValue = grdViews.Rows[e.RowIndex].Cells[e.ColumnIndex].Value?.ToString();
+                switch (cellValue)
+                {
+                    case "CharacterName":
+                        e.ToolTipText = "Always show active character name (typically used for Character view)";
+                        break;
+                    case "ViewName":
+                        e.ToolTipText = "Show view name when empty (e.g., 'Buffs', 'Pets', 'Spawns')";
+                        break;
+                    case "Spaces":
+                        e.ToolTipText = "Show minimal blank space to maintain view presence on screen";
+                        break;
+                    case "HideEmpty":
+                        e.ToolTipText = "Completely hide view when no timers are active (view disappears)";
+                        break;
+                    default:
+                        e.ToolTipText = "Controls what displays when view has no active timers";
+                        break;
+                }
+            }
+        }
 
-            DataGridViewCheckBoxColumn chkActive = new DataGridViewCheckBoxColumn
+        void grdViews_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
+
+            // Format the Example column with styled preview text
+            if (grdViews.Columns[e.ColumnIndex].Name == "Example")
             {
-                HeaderText = "Active",
-                Name = "ActiveYn",
-                DataPropertyName = "ActiveYn",
-                TrueValue = (long)1,
-                FalseValue = (long)0
-            };
-            grdViews.Columns.Add(chkActive);
-            grdViews.Columns["ActiveYn"].Width = 50;
-            grdViews.Columns["ActiveYn"].MinimumWidth = 50;
-            grdViews.Columns["ActiveYn"].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+                DataGridViewRow row = grdViews.Rows[e.RowIndex];
 
-            // Hide position/sort columns — managed internally
-            grdViews.Columns.Add("PositionX", "PositionX");
-            grdViews.Columns["PositionX"].DataPropertyName = "PositionX";
-            grdViews.Columns["PositionX"].Visible = false;
-            grdViews.Columns.Add("PositionY", "PositionY");
-            grdViews.Columns["PositionY"].DataPropertyName = "PositionY";
-            grdViews.Columns["PositionY"].Visible = false;
-            grdViews.Columns.Add("SortOrder", "SortOrder");
-            grdViews.Columns["SortOrder"].DataPropertyName = "SortOrder";
-            grdViews.Columns["SortOrder"].Visible = false;
+                // Get ForeColor and BackColor from hidden columns
+                int foreColor = Convert.ToInt32(row.Cells[grdViews.Columns["ForeColor"].Index].Value ?? Color.Yellow.ToArgb());
+                int backColor = Convert.ToInt32(row.Cells[grdViews.Columns["BackColor"].Index].Value ?? Color.Black.ToArgb());
 
-            // Explicit column display order: Active, Name, Style
-            // Hidden: ID, PositionX, PositionY, SortOrder
-            int vi = 0;
-            grdViews.Columns["ID"].DisplayIndex = vi++;
-            grdViews.Columns["ActiveYn"].DisplayIndex = vi++;
-            grdViews.Columns["Name"].DisplayIndex = vi++;
-            grdViews.Columns["StyleFilter"].DisplayIndex = vi++;
-            grdViews.Columns["PositionX"].DisplayIndex = vi++;
-            grdViews.Columns["PositionY"].DisplayIndex = vi++;
-            grdViews.Columns["SortOrder"].DisplayIndex = vi++;
+                // Set example text
+                e.Value = "Sample Timer 01:23";
 
-            grdViews.DataSource = Database.GetViews(con);
+                // Apply colors to the cell
+                e.CellStyle.ForeColor = Color.FromArgb(foreColor);
+                e.CellStyle.BackColor = Color.FromArgb(backColor);
 
-            grdViews.RowValidating += ValidateRowViews;
-            grdViews.CurrentCellDirtyStateChanged += grdViews_CurrentCellDirtyStateChanged;
-            grdViews.CellValueChanged += grdViews_CellValueChanged;
+                e.FormattingApplied = true;
+            }
+        }
+
+        /// <summary>
+        /// Draws colored rectangles for ForeColor and BackColor cells (Settings tab UX).
+        /// </summary>
+        void grdViews_CellPainting(object sender, DataGridViewCellPaintingEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
+
+            string colName = grdViews.Columns[e.ColumnIndex].Name;
+            if (colName != "ForeColor" && colName != "BackColor") return;
+
+            // Get the ARGB integer value from the cell
+            int argb = Convert.ToInt32(grdViews.Rows[e.RowIndex].Cells[e.ColumnIndex].Value ?? Color.Yellow.ToArgb());
+            Color cellColor = Color.FromArgb(argb);
+
+            // Paint the cell background and border
+            e.Paint(e.CellBounds, DataGridViewPaintParts.Background | DataGridViewPaintParts.Border);
+
+            // Draw a colored rectangle inset 4px from cell edges
+            Rectangle colorRect = new Rectangle(
+                e.CellBounds.X + 4,
+                e.CellBounds.Y + 4,
+                e.CellBounds.Width - 8,
+                e.CellBounds.Height - 8);
+
+            using (var brush = new SolidBrush(cellColor))
+            {
+                e.Graphics.FillRectangle(brush, colorRect);
+            }
+
+            // Draw a border around the colored rectangle
+            using (var pen = new Pen(Color.DarkGray, 1))
+            {
+                e.Graphics.DrawRectangle(pen, colorRect);
+            }
+
+            e.Handled = true;
+        }
+
+        /// <summary>
+        /// Handles clicks on ForeColor and BackColor cells to open ColorDialog.
+        /// </summary>
+        void grdViews_CellClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
+
+            string colName = grdViews.Columns[e.ColumnIndex].Name;
+            if (colName != "ForeColor" && colName != "BackColor") return;
+
+            // Get current color
+            DataGridViewCell cell = grdViews.Rows[e.RowIndex].Cells[e.ColumnIndex];
+            int currentArgb = Convert.ToInt32(cell.Value ?? Color.Yellow.ToArgb());
+            Color currentColor = Color.FromArgb(currentArgb);
+
+            // Show color picker
+            using (ColorDialog dlg = new ColorDialog())
+            {
+                dlg.Color = currentColor;
+                dlg.FullOpen = true;
+
+                if (dlg.ShowDialog() == DialogResult.OK)
+                {
+                    // Update cell value
+                    cell.Value = dlg.Color.ToArgb();
+
+                    // Persist to database
+                    SaveDataViews();
+
+                    // Refresh Example column preview
+                    grdViews.InvalidateRow(e.RowIndex);
+
+                    // Refresh mini views if active
+                    miniViews.RefreshMiniViews(con, activeCharacterID);
+                    UpdateMiniView();
+                }
+            }
         }
 
         void ValidateRowViews(object sender, DataGridViewCellCancelEventArgs data)
@@ -2156,11 +2217,7 @@ namespace ThorneTimer
 
         void SaveDataViews()
         {
-            for (int r = 0; r < grdViews.Rows.Count; r++)
-            {
-                DataGridViewRow row = grdViews.Rows[r];
-                Database.SaveView(con, grdViews, row);
-            }
+            viewsController?.SaveAll();
         }
 
         void grdTimers_CurrentCellDirtyStateChanged(object sender, EventArgs e)
@@ -2201,13 +2258,7 @@ namespace ThorneTimer
 
         void SaveDataCategories()
         {
-            for (int r = 0; r < grdCategories.Rows.Count; r++)
-            {
-                DataGridViewRow row = grdCategories.Rows[r];
-
-                Database.SaveCategory(con, grdCategories, row);
-            }
-
+            categoriesController?.SaveAll();
             RefreshGridCategorySource();
         }
 
@@ -3126,29 +3177,21 @@ namespace ThorneTimer
         }
 
         /// <summary>
-        /// Returns the mini view fore color for the given timer style.
-        /// This ties the main grid's running-row tint to the same colors
-        /// configured in Settings ? Mini View, so changing a style color
-        /// in one place updates both.
+        /// Returns the configured base color for the given timer style.
+        /// Style owns visual identity; views own window/display behavior.
         /// </summary>
         private Color GetStyleColor(string style)
         {
-            switch (style)
-            {
-                case "Ping":
-                    return Color.FromArgb(miniViews.mvPingForeColor);
-                case "Buff":
-                case "Pet":
-                    return Color.FromArgb(miniViews.mvBuffForeColor);
-                default:
-                    return Color.FromArgb(miniViews.mvNormForeColor);
-            }
+            if (stylesRepository == null)
+                stylesRepository = new StylesRepository(con);
+
+            return stylesRepository.GetRowBaseColor(style);
         }
 
         /// <summary>
         /// Applies row colors based on timer state and style.
         /// Running timers paint the entire row with a lightened version
-        /// of their style color (derived from mini view fore colors),
+        /// of their style base color,
         /// with a deeper accent on the Remaining cell.
         /// Inactive timers get a pink entire row.
         /// </summary>
@@ -3477,6 +3520,12 @@ namespace ThorneTimer
             ThorneLog.Info($"Switch TO charID={activeCharacterID}");
             Database.SetSetting(con, "ActiveCharacterID", activeCharacterID);
 
+            // Update mini-view character display if views are active
+            if (miniViews.MiniViewsActive())
+            {
+                miniViews.UpdateActiveCharacter(con, activeCharacterID);
+            }
+
             // Tell LogMonitor which character is now active (in UI, not necessarily logging)
             long newCharID = 0;
             long.TryParse(activeCharacterID, out newCharID);
@@ -3522,7 +3571,7 @@ namespace ThorneTimer
             {
                 if (newCharID == 0)
                 {
-                    statusParsing.Text = "Watching: (no active character)";
+                    statusParsing.Text = "Watching: all characters";
                     lblBrowsingIndicator.Visible = false;
                 }
                 else if (loggingCharID > 0 && loggingCharID != newCharID)
@@ -3553,48 +3602,32 @@ namespace ThorneTimer
 
         private void btnAddCategory_Click(object sender, EventArgs e)
         {
-            DataGridViewRow row = grdCategories.CurrentRow;
-
-            //if (row == null)
-            {
-                List<Categories.GridData> data = Database.GetCategories(con);
-
-                Categories.GridData gd = new Categories.GridData
-                {
-                    ID = -1
-                };
-                data.Add(gd);
-
-                grdCategories.DataSource = data;
-
-                grdCategories.CurrentCell = grdCategories.Rows[grdCategories.Rows.Count - 1].Cells[grdCategories.Columns["Name"].Index];
-                grdCategories.BeginEdit(true);
-            }
+            categoriesController?.AddCategory();
         }
 
         private void btnDeleteCategory_Click(object sender, EventArgs e)
         {
-            if (grdCategories.CurrentCell != null)
-            {
-                if (MessageBox.Show("Are you sure you want to delete this category?", "Delete Category", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1) == System.Windows.Forms.DialogResult.Yes)
-                {
-                    DataGridViewCell idCell = grdCategories.Rows[grdCategories.CurrentCell.RowIndex].Cells[grdCategories.Columns["ID"].Index];
-                    Database.DeleteCategory(con, Convert.ToString(idCell.Value));
-
-                    grdCategories.DataSource = Database.GetCategories(con);
-                    RefreshGridCategorySource();
-                }
-            }
+            categoriesController?.DeleteCurrentCategory();
         }
 
         private void btnAddView_Click(object sender, EventArgs e)
         {
-            //miniViews.AddView(con, grdViews);
+            viewsController?.AddView();
         }
 
         private void btnDeleteView_Click(object sender, EventArgs e)
         {
-            //miniViews.DeleteView(con, grdViews);
+            viewsController?.DeleteCurrentView();
+        }
+
+        private void btnAddStyle_Click(object sender, EventArgs e)
+        {
+            stylesController?.AddStyle();
+        }
+
+        private void btnDeleteStyle_Click(object sender, EventArgs e)
+        {
+            stylesController?.DeleteCurrentStyle();
         }
 
         private void cboActiveVoice_SelectedIndexChanged(object sender, EventArgs e)
@@ -3768,27 +3801,7 @@ namespace ThorneTimer
             Database.SetSetting(con, "VoiceRate", voiceRate);
         }
 
-        private void lblNormPickFore_Click(object sender, EventArgs e)
-        {
-            colorDialogPicker.Color = lblNormPickFore.BackColor;
-            colorDialogPicker.ShowDialog();
-            lblNormPickFore.BackColor = colorDialogPicker.Color;
-
-            miniViews.mvNormForeColor = lblNormPickFore.BackColor.ToArgb();
-            Database.SetSetting(con, "MiniViewNormFore", miniViews.mvNormForeColor);
-            UpdateMiniAppearance();
-        }
-
-        private void lblNormPickBack_Click(object sender, EventArgs e)
-        {
-            colorDialogPicker.Color = lblNormPickBack.BackColor;
-            colorDialogPicker.ShowDialog();
-            lblNormPickBack.BackColor = colorDialogPicker.Color;
-
-            miniViews.mvNormBackColor = lblNormPickBack.BackColor.ToArgb();
-            Database.SetSetting(con, "MiniViewNormBack", miniViews.mvNormBackColor);
-            UpdateMiniAppearance();
-        }
+        // v0.6.0: Removed obsolete per-style color pickers (now per-view configuration)
 
         private void tomeInfoToolStripMenuItem_Click(object sender, EventArgs e)
         {
@@ -3809,51 +3822,7 @@ namespace ThorneTimer
             aboutForm.ShowDialog(this);
         }
 
-        private void lblPingPickFore_Click(object sender, EventArgs e)
-        {
-            colorDialogPicker.Color = lblPingPickFore.BackColor;
-            colorDialogPicker.ShowDialog();
-            lblPingPickFore.BackColor = colorDialogPicker.Color;
-
-            miniViews.mvPingForeColor = lblPingPickFore.BackColor.ToArgb();
-            Database.SetSetting(con, "MiniViewPingFore", miniViews.mvPingForeColor);
-            UpdateMiniAppearance();
-        }
-
-        private void lblPingPickBack_Click(object sender, EventArgs e)
-        {
-            colorDialogPicker.Color = lblPingPickBack.BackColor;
-            colorDialogPicker.ShowDialog();
-            lblPingPickBack.BackColor = colorDialogPicker.Color;
-
-            miniViews.mvPingBackColor = lblPingPickBack.BackColor.ToArgb();
-            Database.SetSetting(con, "MiniViewPingBack", miniViews.mvPingBackColor);
-            UpdateMiniAppearance();
-        }
-
-        private void PingTime_LostFocus(object sender, EventArgs e)
-        {
-            if (!ValidTime(txtPingTime.Text))
-            {
-                MessageBox.Show("Invalid Ping Time Format. Use 'MM:SS'", "Error");
-
-                tabCtrlMain.SelectedIndex = 3;
-                txtPingTime.Focus();
-            }
-            else
-            {
-                miniViews.mvPingTime = txtPingTime.Text;
-                Database.SetSetting(con, "MiniViewPingTime", miniViews.mvPingTime);
-                UpdateMiniAppearance();
-            }
-        }
-
-        private void chkShowPing_Click(object sender, EventArgs e)
-        {
-            miniViews.mvShowPing = Convert.ToInt32(chkShowPing.Checked);
-            Database.SetSetting(con, "MiniViewShowPing", miniViews.mvShowPing);
-            UpdateMiniAppearance();
-        }
+        // v0.6.0: Removed obsolete Ping color pickers, PingTime, and ShowPing checkbox (now per-view)
 
         private void btnStopAll_Click(object sender, EventArgs e)
         {
@@ -4165,28 +4134,6 @@ namespace ThorneTimer
                 SavePreGroupSortState();
                 ApplyDefaultSort();
             }
-        }
-
-        private void lblBuffPickFore_Click(object sender, EventArgs e)
-        {
-            colorDialogPicker.Color = lblBuffPickFore.BackColor;
-            colorDialogPicker.ShowDialog();
-            lblBuffPickFore.BackColor = colorDialogPicker.Color;
-
-            miniViews.mvBuffForeColor = lblBuffPickFore.BackColor.ToArgb();
-            Database.SetSetting(con, "MiniViewBuffFore", miniViews.mvBuffForeColor);
-            UpdateMiniAppearance();
-        }
-
-        private void lblBuffPickBack_Click(object sender, EventArgs e)
-        {
-            colorDialogPicker.Color = lblBuffPickBack.BackColor;
-            colorDialogPicker.ShowDialog();
-            lblBuffPickBack.BackColor = colorDialogPicker.Color;
-
-            miniViews.mvBuffBackColor = lblBuffPickBack.BackColor.ToArgb();
-            Database.SetSetting(con, "MiniViewBuffBack", miniViews.mvBuffBackColor);
-            UpdateMiniAppearance();
         }
 
         private void btnResetCounts_Click(object sender, EventArgs e)

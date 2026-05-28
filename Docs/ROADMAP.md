@@ -44,10 +44,11 @@ Multi-character support and the four-style mini view system.
 - **Parameterized SQL** — all database operations use parameterized queries
 - **Window Management** — size/position persistence, screen bounds safety, min-size enforcement
 
-### Phase D++ — GUI Enhancements & Performance (v0.6.0)
+### Phase D++ — GUI Enhancements & Performance (v0.6.0) 🔄 **IN PROGRESS**
 
-Quality of life improvements and critical bug fixes.
+Quality of life improvements, critical bug fixes, and per-view color configuration.
 
+**Shipped in v0.6.0 (testing):**
 - **Voice System** — All English voice support (en-GB, en-AU, en-CA, etc.), comprehensive logging
 - **Mini View Refinements** — Hidden from Alt-Tab task switcher via WS_EX_TOOLWINDOW
 - **Camp-Out Auto-Pause** — Detects `/camp` with 10-second inactivity threshold, sets character to "(None)"
@@ -55,6 +56,15 @@ Quality of life improvements and critical bug fixes.
 - **Auto-Switch Bug Fixes** — Suppress OLD character (not NEW) on manual switch, proper re-enable logic
 - **Grid Performance** — O(n²) → O(n) dictionary optimization in SyncRuntimeToGrid (~98% faster with 130+ timers)
 - **Character State Management** — Proper handling of "no active character" state across all operations
+
+**Active Development (agile pivot):**
+- **Per-View Color Configuration** — Database-driven colors, Views grid as configuration hub, ViewsGridController extraction
+- **New Timer Styles** — Pet (purple), Spawn (yellow), Lockout (orange), Character (white) with independent color control
+- **Per-View Warning Control** — Checkbox to enable/disable warning colors per view
+- **Settings Cleanup** — Remove per-style color pickers, keep only global warning colors
+- **Architecture Improvement** — ViewsGridController.cs reduces FormMain complexity (~200 line extraction)
+
+**Why the Pivot:** User hit color configuration limitations during gameplay—need for multiple views of same style with different colors became urgent. Existing global color approach doesn't scale. This work enables future per-view properties (font size, opacity, thresholds).
 
 ---
 

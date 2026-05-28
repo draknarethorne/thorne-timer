@@ -100,3 +100,5 @@ Thorne-Timer/
 - **Timer styles**: Timers support multiple display styles (bar, countdown, stopwatch)
 - **Character switching**: Users can switch active character; timers filter by character context
 - **Mini view lifecycle**: Created/destroyed dynamically, always-on-top overlay windows
+- **Feature-specific logic**: Prefer moving feature-specific logic into support classes/controllers/repositories instead of adding more logic directly to `FormMain` when practical.
+- **Tab Management**: For Thorne Timer WinForms tabs, use a hybrid pattern: keep base UI controls in the designer for discoverability, and move tab behavior and data access into dedicated controllers and repositories while maintaining the Database as the core schema and shared access.

@@ -71,3 +71,4 @@ TestResults/
 publish/
 # Exclude local NuGet config
 NuGet.Config
+/ThorneTimer/Data/nul

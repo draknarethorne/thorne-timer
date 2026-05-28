@@ -72,6 +72,10 @@
             this.btnDeleteView = new System.Windows.Forms.Button();
             this.btnAddView = new System.Windows.Forms.Button();
             this.grdViews = new System.Windows.Forms.DataGridView();
+            this.tabStyles = new System.Windows.Forms.TabPage();
+            this.btnAddStyle = new System.Windows.Forms.Button();
+            this.btnDeleteStyle = new System.Windows.Forms.Button();
+            this.grdStyles = new System.Windows.Forms.DataGridView();
             this.tabSettings = new System.Windows.Forms.TabPage();
             this.gbVoice = new System.Windows.Forms.GroupBox();
             this.lblVoiceEnabled = new System.Windows.Forms.Label();
@@ -138,6 +142,8 @@
             ((System.ComponentModel.ISupportInitialize)(this.grdCategories)).BeginInit();
             this.tabViews.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.grdViews)).BeginInit();
+            this.tabStyles.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.grdStyles)).BeginInit();
             this.tabSettings.SuspendLayout();
             this.gbVoice.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.tbVoiceRate)).BeginInit();
@@ -479,6 +485,7 @@
             this.tabCtrlMain.Controls.Add(this.tabTimers);
             this.tabCtrlMain.Controls.Add(this.tabCharacters);
             this.tabCtrlMain.Controls.Add(this.tabCategories);
+            this.tabCtrlMain.Controls.Add(this.tabStyles);
             this.tabCtrlMain.Controls.Add(this.tabViews);
             this.tabCtrlMain.Controls.Add(this.tabSettings);
             this.tabCtrlMain.Location = new System.Drawing.Point(12, 52);
@@ -683,8 +690,6 @@
             this.btnDeleteView.TabIndex = 8;
             this.btnDeleteView.Text = "Delete";
             this.btnDeleteView.UseVisualStyleBackColor = true;
-            this.btnDeleteView.Enabled = false;
-            this.btnDeleteView.Visible = false;
             this.btnDeleteView.Click += new System.EventHandler(this.btnDeleteView_Click);
             // 
             // btnAddView
@@ -696,8 +701,6 @@
             this.btnAddView.TabIndex = 7;
             this.btnAddView.Text = "Add";
             this.btnAddView.UseVisualStyleBackColor = true;
-            this.btnAddView.Enabled = false;
-            this.btnAddView.Visible = false;
             this.btnAddView.Click += new System.EventHandler(this.btnAddView_Click);
             // 
             // grdViews
@@ -709,8 +712,58 @@
             this.grdViews.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             this.grdViews.Location = new System.Drawing.Point(6, 6);
             this.grdViews.Name = "grdViews";
-            this.grdViews.Size = new System.Drawing.Size(1314, 532);
+            this.grdViews.Size = new System.Drawing.Size(1356, 532);
             this.grdViews.TabIndex = 2;
+            // 
+            // tabStyles
+            // 
+            this.tabStyles.BackColor = System.Drawing.SystemColors.Control;
+            this.tabStyles.Controls.Add(this.btnAddStyle);
+            this.tabStyles.Controls.Add(this.btnDeleteStyle);
+            this.tabStyles.Controls.Add(this.grdStyles);
+            this.tabStyles.Location = new System.Drawing.Point(4, 22);
+            this.tabStyles.Name = "tabStyles";
+            this.tabStyles.Padding = new System.Windows.Forms.Padding(3);
+            this.tabStyles.Size = new System.Drawing.Size(1368, 583);
+            this.tabStyles.TabIndex = 5;
+            this.tabStyles.Text = "Styles";
+            // 
+            // grdStyles
+            // 
+            this.grdStyles.AllowUserToAddRows = false;
+            this.grdStyles.AllowUserToDeleteRows = false;
+            this.grdStyles.AllowUserToResizeRows = false;
+            this.grdStyles.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.grdStyles.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.Fill;
+            this.grdStyles.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            this.grdStyles.Location = new System.Drawing.Point(6, 6);
+            this.grdStyles.Name = "grdStyles";
+            this.grdStyles.Size = new System.Drawing.Size(1356, 532);
+            this.grdStyles.TabIndex = 0;
+            // 
+            // btnAddStyle
+            // 
+            this.btnAddStyle.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.btnAddStyle.Location = new System.Drawing.Point(6, 544);
+            this.btnAddStyle.Name = "btnAddStyle";
+            this.btnAddStyle.Size = new System.Drawing.Size(75, 23);
+            this.btnAddStyle.TabIndex = 1;
+            this.btnAddStyle.Text = "Add";
+            this.btnAddStyle.UseVisualStyleBackColor = true;
+            this.btnAddStyle.Click += new System.EventHandler(this.btnAddStyle_Click);
+            // 
+            // btnDeleteStyle
+            // 
+            this.btnDeleteStyle.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.btnDeleteStyle.Location = new System.Drawing.Point(87, 544);
+            this.btnDeleteStyle.Name = "btnDeleteStyle";
+            this.btnDeleteStyle.Size = new System.Drawing.Size(75, 23);
+            this.btnDeleteStyle.TabIndex = 2;
+            this.btnDeleteStyle.Text = "Delete";
+            this.btnDeleteStyle.UseVisualStyleBackColor = true;
+            this.btnDeleteStyle.Click += new System.EventHandler(this.btnDeleteStyle_Click);
             // 
             // tabSettings
             // 
@@ -830,20 +883,7 @@
             // 
             // grpMiniView
             // 
-            this.grpMiniView.Controls.Add(this.lblBuffPickBack);
-            this.grpMiniView.Controls.Add(this.lblBuffPickFore);
-            this.grpMiniView.Controls.Add(this.lblBuffColors);
-            this.grpMiniView.Controls.Add(this.chkShowPing);
-            this.grpMiniView.Controls.Add(this.lblShowPing);
-            this.grpMiniView.Controls.Add(this.txtPingTime);
-            this.grpMiniView.Controls.Add(this.lblPingTime);
-            this.grpMiniView.Controls.Add(this.lblPingPickBack);
-            this.grpMiniView.Controls.Add(this.lblPingPickFore);
-            this.grpMiniView.Controls.Add(this.lblPingColors);
-            this.grpMiniView.Controls.Add(this.lblNormPickBack);
-            this.grpMiniView.Controls.Add(this.lblNormPickFore);
             this.grpMiniView.Controls.Add(this.tbFontSize);
-            this.grpMiniView.Controls.Add(this.lblNormalColors);
             this.grpMiniView.Controls.Add(this.tbOpacity);
             this.grpMiniView.Controls.Add(this.lblOpacity);
             this.grpMiniView.Controls.Add(this.txtWarningTime);
@@ -869,7 +909,6 @@
             this.lblBuffPickBack.Name = "lblBuffPickBack";
             this.lblBuffPickBack.Size = new System.Drawing.Size(12, 15);
             this.lblBuffPickBack.TabIndex = 35;
-            this.lblBuffPickBack.Click += new System.EventHandler(this.lblBuffPickBack_Click);
             // 
             // lblBuffPickFore
             // 
@@ -881,7 +920,6 @@
             this.lblBuffPickFore.Name = "lblBuffPickFore";
             this.lblBuffPickFore.Size = new System.Drawing.Size(12, 15);
             this.lblBuffPickFore.TabIndex = 34;
-            this.lblBuffPickFore.Click += new System.EventHandler(this.lblBuffPickFore_Click);
             // 
             // lblBuffColors
             // 
@@ -900,7 +938,6 @@
             this.chkShowPing.Size = new System.Drawing.Size(15, 14);
             this.chkShowPing.TabIndex = 32;
             this.chkShowPing.UseVisualStyleBackColor = true;
-            this.chkShowPing.Click += new System.EventHandler(this.chkShowPing_Click);
             // 
             // lblShowPing
             // 
@@ -940,7 +977,6 @@
             this.lblPingPickBack.Name = "lblPingPickBack";
             this.lblPingPickBack.Size = new System.Drawing.Size(12, 15);
             this.lblPingPickBack.TabIndex = 28;
-            this.lblPingPickBack.Click += new System.EventHandler(this.lblPingPickBack_Click);
             // 
             // lblPingPickFore
             // 
@@ -953,7 +989,6 @@
             this.lblPingPickFore.Name = "lblPingPickFore";
             this.lblPingPickFore.Size = new System.Drawing.Size(12, 15);
             this.lblPingPickFore.TabIndex = 27;
-            this.lblPingPickFore.Click += new System.EventHandler(this.lblPingPickFore_Click);
             // 
             // lblPingColors
             // 
@@ -974,7 +1009,6 @@
             this.lblNormPickBack.Name = "lblNormPickBack";
             this.lblNormPickBack.Size = new System.Drawing.Size(12, 15);
             this.lblNormPickBack.TabIndex = 25;
-            this.lblNormPickBack.Click += new System.EventHandler(this.lblNormPickBack_Click);
             // 
             // lblNormPickFore
             // 
@@ -986,7 +1020,6 @@
             this.lblNormPickFore.Name = "lblNormPickFore";
             this.lblNormPickFore.Size = new System.Drawing.Size(12, 15);
             this.lblNormPickFore.TabIndex = 24;
-            this.lblNormPickFore.Click += new System.EventHandler(this.lblNormPickFore_Click);
             // 
             // tbFontSize
             // 
@@ -1156,6 +1189,8 @@
             ((System.ComponentModel.ISupportInitialize)(this.grdCategories)).EndInit();
             this.tabViews.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.grdViews)).EndInit();
+            this.tabStyles.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)(this.grdStyles)).EndInit();
             this.tabSettings.ResumeLayout(false);
             this.gbVoice.ResumeLayout(false);
             this.gbVoice.PerformLayout();
@@ -1254,6 +1289,10 @@
         private System.Windows.Forms.Label lblBuffColors;
         private System.Windows.Forms.TabPage tabViews;
         private System.Windows.Forms.DataGridView grdViews;
+        private System.Windows.Forms.TabPage tabStyles;
+        private System.Windows.Forms.DataGridView grdStyles;
+        private System.Windows.Forms.Button btnAddStyle;
+        private System.Windows.Forms.Button btnDeleteStyle;
         private System.Windows.Forms.Button btnDeleteView;
         private System.Windows.Forms.Button btnAddView;
         private System.Windows.Forms.Button btnResetCounts;
