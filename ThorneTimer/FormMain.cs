@@ -204,6 +204,26 @@ namespace ThorneTimer
         readonly MiniViews miniViews = new MiniViews();
         readonly TimerRuntime timerRuntime = new TimerRuntime();
         readonly LogMonitor logMonitor = new LogMonitor();
+
+        // v0.6.0 grid filter refactor:
+        // _allTimers holds every timer definition loaded from the database.
+        // _visibleTimers is the filtered subset currently bound to grdTimers
+        // (filtered by ClassID / ActiveYn per the active character + view toggles).
+        // Filtering swaps DataSource = _visibleTimers in one assignment instead
+        // of toggling row.Visible 100+ times (each setter costs ~14 ms in
+        // DataGridView, dominating character switch cost).
+        SortableBindingList<Timers.GridData> _allTimers;
+        SortableBindingList<Timers.GridData> _visibleTimers;
+
+        // Filter signature of the currently-bound _visibleTimers.  Used to
+        // short-circuit RefreshTimerGridDataSource when nothing has changed
+        // (e.g. the 3 back-to-back refresh calls during FormMain_Load).
+        // Format: "classID|showAll|activeOnly|allTimersVersion"
+        string _appliedFilterSignature;
+
+        // Incremented whenever _allTimers membership changes (Add/Delete/Reload)
+        // so a no-op filter signature still triggers a refresh after data churn.
+        int _allTimersVersion;
         StylesRepository stylesRepository;
         StylesController stylesController;
         ViewsRepository viewsRepository;
@@ -1702,39 +1722,58 @@ namespace ThorneTimer
             grdTimers.Columns["Count"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             grdTimers.Columns["Count"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCellsExceptHeader;
 
-            grdTimers.DataSource = TimersRepository.GetTimers(con);
+            // v0.6.0 grid filter refactor:
+            // Load every timer into the master list (_allTimers) and start
+            // with a visible-list clone containing every entry.  The first
+            // RefreshTimerGridDataSource call will narrow _visibleTimers
+            // based on the active character + filter toggles.  GridData
+            // instances are shared between both lists so any cell edit (which
+            // flows through DataPropertyName binding) updates the underlying
+            // object — and therefore both lists — automatically.
+            _allTimers = TimersRepository.GetTimers(con);
+            _allTimersVersion++;
+            _visibleTimers = new SortableBindingList<Timers.GridData>(_allTimers.ToList());
+            grdTimers.DataSource = _visibleTimers;
 
-            // Register display-name resolvers so sorting uses the visible name
-            // (e.g. "Necromancer") instead of the raw numeric ID.
-            var timerList = grdTimers.DataSource as SortableBindingList<Timers.GridData>;
-            if (timerList != null)
-            {
-                var categories = CategoriesRepository.GetGridCategories(con);
-                var catLookup = new Dictionary<long, string>();
-                foreach (var c in categories) catLookup[c.Value] = c.Text;
-                timerList.RegisterDisplayResolver("CategoryID", raw =>
-                {
-                    if (raw is long id && catLookup.TryGetValue(id, out string name)) return name;
-                    if (raw is int intId && catLookup.TryGetValue(intId, out string name2)) return name2;
-                    return raw?.ToString() ?? "";
-                });
-
-                var classes = ClassesRepository.GetGridClasses(con);
-                var clsLookup = new Dictionary<long, string>();
-                foreach (var c in classes) clsLookup[c.Value] = c.Text;
-                timerList.RegisterDisplayResolver("ClassID", raw =>
-                {
-                    if (raw is long id && clsLookup.TryGetValue(id, out string name)) return name;
-                    if (raw is int intId && clsLookup.TryGetValue(intId, out string name2)) return name2;
-                    return raw?.ToString() ?? "";
-                });
-            }
+            RegisterTimerDisplayResolvers(_visibleTimers);
 
             grdTimers.RowValidating += ValidateRowTimers;
             grdTimers.EditingControlShowing += GrdTimers_EditingControlShowing;
             grdTimers.CellToolTipTextNeeded += GrdTimers_CellToolTipTextNeeded;
 
             ResetTimersGridColumns();
+        }
+
+        /// <summary>
+        /// Registers display-name resolvers on the given timer list so that
+        /// multi-column sorting on CategoryID/ClassID uses the visible name
+        /// (e.g. "Necromancer") instead of the raw numeric ID.  Must be
+        /// re-applied any time a fresh SortableBindingList is bound to
+        /// grdTimers (e.g. after the filter refactor rebuilds _visibleTimers).
+        /// </summary>
+        private void RegisterTimerDisplayResolvers(SortableBindingList<Timers.GridData> timerList)
+        {
+            if (timerList == null) return;
+
+            var categories = CategoriesRepository.GetGridCategories(con);
+            var catLookup = new Dictionary<long, string>();
+            foreach (var c in categories) catLookup[c.Value] = c.Text;
+            timerList.RegisterDisplayResolver("CategoryID", raw =>
+            {
+                if (raw is long id && catLookup.TryGetValue(id, out string name)) return name;
+                if (raw is int intId && catLookup.TryGetValue(intId, out string name2)) return name2;
+                return raw?.ToString() ?? "";
+            });
+
+            var classes = ClassesRepository.GetGridClasses(con);
+            var clsLookup = new Dictionary<long, string>();
+            foreach (var c in classes) clsLookup[c.Value] = c.Text;
+            timerList.RegisterDisplayResolver("ClassID", raw =>
+            {
+                if (raw is long id && clsLookup.TryGetValue(id, out string name)) return name;
+                if (raw is int intId && clsLookup.TryGetValue(intId, out string name2)) return name2;
+                return raw?.ToString() ?? "";
+            });
         }
 
         private void SetupCharacterGrid()
@@ -2560,8 +2599,16 @@ namespace ThorneTimer
         }
 
         /// <summary>
-        /// Refreshes the timer grid row visibility based on class and active filters.
-        /// Called when ShowAllClasses or ShowActiveOnly toggles change, or after character switch.
+        /// Refreshes the timer grid by rebuilding _visibleTimers from _allTimers
+        /// based on the active character's class and the ShowAllClasses /
+        /// ShowActiveOnly filters, then swapping it onto grdTimers.DataSource
+        /// in a single assignment.
+        ///
+        /// This replaces an earlier per-row Visible toggle loop that cost
+        /// ~14 ms per row on a 100+ row grid (~1.8 s on character switch).
+        /// Swapping the bound list lets DataGridView do its bulk reset once
+        /// and avoids the layout cascade triggered by individual row.Visible
+        /// mutations.  See Docs/perf/grid-filter-refactor.md.
         /// </summary>
         private void RefreshTimerGridDataSource()
         {
@@ -2571,80 +2618,108 @@ namespace ThorneTimer
                 return;
             }
 
+            if (_allTimers == null) return;
+
             long classID = GetActiveCharacterClassID();
             bool showAll = timerRuntime.ShowAllClasses;
             bool activeOnly = timerRuntime.ShowActiveOnly;
 
-            // Detach the current cell before changing row visibility —
-            // WinForms throws InvalidOperationException if you try to
-            // hide the row the CurrencyManager is currently pointing to.
-            grdTimers.CurrentCell = null;
+            // Short-circuit when the filter inputs haven't changed since the
+            // last bind — avoids redundant rebuilds during the three back-to-back
+            // RefreshGridAfterSort calls on startup.  _allTimersVersion forces a
+            // refresh after add/delete even if the filter signature is otherwise
+            // identical.
+            string signature = string.Format("{0}|{1}|{2}|{3}",
+                classID, showAll ? 1 : 0, activeOnly ? 1 : 0, _allTimersVersion);
+            if (signature == _appliedFilterSignature)
+                return;
 
-            int rowCount = grdTimers.Rows.Count;
-            int classIdColIdx = grdTimers.Columns["ClassID"].Index;
-            int activeYnColIdx = grdTimers.Columns["ActiveYn"].Index;
+            // Capture sort state and selection so we can restore them on the
+            // new bound list — re-binding clears CurrentCell and resets sort.
+            var oldList = grdTimers.DataSource as SortableBindingList<Timers.GridData>;
+            var oldSort = oldList != null ? oldList.SortDescriptions : null;
 
-            // Suspend the binding's currency manager around the visibility loop.
-            // DataGridView.Row.Visible fires OnRowStateChanged → ListChanged
-            // broadcast for every row mutated, which dominates the loop cost
-            // even with SuspendLayout and grdTimers.Visible = false.  Pausing
-            // the CurrencyManager turns that broadcast off; one ResumeBinding
-            // at the end triggers a single layout/scroll recalc.
-            CurrencyManager cm = null;
-            if (grdTimers.DataSource != null)
+            long selectedTimerID = -1;
+            if (grdTimers.CurrentCell != null)
             {
-                cm = this.BindingContext[grdTimers.DataSource] as CurrencyManager;
+                var idCol = grdTimers.Columns["ID"];
+                var selRow = grdTimers.CurrentCell.OwningRow;
+                if (idCol != null && selRow != null && !selRow.IsNewRow && selRow.Cells[idCol.Index].Value != null)
+                {
+                    selectedTimerID = Convert.ToInt64(selRow.Cells[idCol.Index].Value);
+                }
             }
+
+            // Build the filtered visible list from _allTimers.
+            var filtered = new List<Timers.GridData>(_allTimers.Count);
+            using (ThorneLog.Time($"RefreshTimerGridDataSource: filter ({_allTimers.Count} timers)"))
+            {
+                foreach (var gd in _allTimers)
+                {
+                    if (!showAll)
+                    {
+                        if (!(gd.ClassID == 0 || (classID > 0 && gd.ClassID == classID)))
+                            continue;
+                    }
+                    if (activeOnly && gd.ActiveYn != 1)
+                        continue;
+
+                    filtered.Add(gd);
+                }
+            }
+
+            // Swap the bound list in a single assignment.
+            _visibleTimers = new SortableBindingList<Timers.GridData>(filtered);
+            RegisterTimerDisplayResolvers(_visibleTimers);
+
+            grdTimers.CurrentCell = null;
             BeginGridUpdate();
-            if (cm != null) cm.SuspendBinding();
             try
             {
-                using (ThorneLog.Time($"RefreshTimerGridDataSource: visibility loop ({rowCount} rows)"))
+                using (ThorneLog.Time($"RefreshTimerGridDataSource: bind ({filtered.Count} rows)"))
                 {
-                    foreach (DataGridViewRow row in grdTimers.Rows)
-                    {
-                        if (row.IsNewRow) continue;
+                    grdTimers.DataSource = _visibleTimers;
+                }
 
-                        bool visible = true;
-
-                        // Class filter
-                        if (!showAll)
-                        {
-                            long timerClassID = Convert.ToInt64(row.Cells[classIdColIdx].Value);
-                            visible = (timerClassID == 0 || (classID > 0 && timerClassID == classID));
-                        }
-
-                        // Active filter
-                        if (visible && activeOnly)
-                        {
-                            long activeYn = Convert.ToInt64(row.Cells[activeYnColIdx].Value);
-                            visible = (activeYn == 1);
-                        }
-
-                        // Skip the expensive setter when nothing changes —
-                        // DataGridView row.Visible assignment triggers internal
-                        // layout work even with SuspendLayout/Visible=false.
-                        if (row.Visible != visible)
-                            row.Visible = visible;
-                    }
+                // Restore prior sort if any.
+                if (oldSort != null && oldSort.Count > 0)
+                {
+                    var sorts = new (string, ListSortDirection)[oldSort.Count];
+                    for (int i = 0; i < oldSort.Count; i++)
+                        sorts[i] = (oldSort[i].PropertyDescriptor.Name, oldSort[i].SortDirection);
+                    using (ThorneLog.Time("RefreshTimerGridDataSource: reapply sort"))
+                        _visibleTimers.ApplyMultiSort(sorts);
                 }
             }
             finally
             {
-                if (cm != null) cm.ResumeBinding();
                 EndGridUpdate();
             }
 
-            // Restore selection to the first visible row
+            _appliedFilterSignature = signature;
+
+            // Restore selection to the previously-selected timer if still
+            // visible; otherwise pick the first visible row.
             using (ThorneLog.Time("RefreshTimerGridDataSource: restore selection"))
             {
-                foreach (DataGridViewRow row in grdTimers.Rows)
+                var idCol = grdTimers.Columns["ID"];
+                var nameCol = grdTimers.Columns["Name"];
+                if (idCol != null && nameCol != null)
                 {
-                    if (row.Visible && !row.IsNewRow)
+                    DataGridViewRow target = null;
+                    foreach (DataGridViewRow row in grdTimers.Rows)
                     {
-                        grdTimers.CurrentCell = row.Cells[grdTimers.Columns["Name"].Index];
-                        break;
+                        if (row.IsNewRow) continue;
+                        if (selectedTimerID >= 0 && row.Cells[idCol.Index].Value != null
+                            && Convert.ToInt64(row.Cells[idCol.Index].Value) == selectedTimerID)
+                        {
+                            target = row;
+                            break;
+                        }
+                        if (target == null) target = row;
                     }
+                    if (target != null)
+                        grdTimers.CurrentCell = target.Cells[nameCol.Index];
                 }
             }
         }
@@ -2839,6 +2914,26 @@ namespace ThorneTimer
                 ThorneLog.Debug($"LoadTimerRuntime: calling RestoreCharacterState with {savedStates.Count} saved states, isActive={isActive}");
                 using (ThorneLog.Time("LoadTimerRuntime: timerRuntime.RestoreCharacterState"))
                     timerRuntime.RestoreCharacterState(savedStates, isActive);
+
+                // Push the now-current per-character ActiveYn (and any other
+                // runtime-tracked fields used for filtering) from the runtime
+                // back into the master _allTimers list.  RefreshTimerGridDataSource
+                // filters by GridData.ActiveYn / ClassID, so the master list must
+                // reflect the active character's state before the next rebuild.
+                if (_allTimers != null)
+                {
+                    using (ThorneLog.Time("LoadTimerRuntime: sync ActiveYn into _allTimers"))
+                    {
+                        var stateDict = timerRuntime.GetAllStates().ToDictionary(s => s.TimerID);
+                        foreach (var gd in _allTimers)
+                        {
+                            if (stateDict.TryGetValue(gd.ID, out var ts))
+                                gd.ActiveYn = ts.ActiveYn;
+                        }
+                        _allTimersVersion++;
+                    }
+                }
+
                 ThorneLog.Debug("LoadTimerRuntime: calling SyncRuntimeToGrid");
 
                 // Sync to grid
@@ -3142,6 +3237,16 @@ namespace ThorneTimer
                     if (item != null)
                         data.Remove(item);
 
+                    // Mirror the deletion in the master list so a later
+                    // filter rebuild doesn't resurrect the row.
+                    if (_allTimers != null)
+                    {
+                        var masterItem = _allTimers.FirstOrDefault(g => g.ID == timerID);
+                        if (masterItem != null)
+                            _allTimers.Remove(masterItem);
+                        _allTimersVersion++;
+                    }
+
                     RepaintTimerGrid();
                 }
             }
@@ -3177,6 +3282,16 @@ namespace ThorneTimer
                     Duration = noTime
                 };
                 data.Add(gd);
+
+                // Also add to the master list so the new timer survives
+                // any subsequent filter rebuild.  Defaults (ActiveYn=1,
+                // ClassID=0) are filter-safe under both ShowActiveOnly and
+                // class-restricted views, so the row stays visible.
+                if (_allTimers != null)
+                {
+                    _allTimers.Add(gd);
+                    _allTimersVersion++;
+                }
 
                 // Find the new row (may not be last if a sort is active)
                 int newRowIndex = -1;
@@ -3594,10 +3709,13 @@ namespace ThorneTimer
         {
             using (ThorneLog.Time("RefreshGridAfterSort TOTAL"))
             {
-                using (ThorneLog.Time("RefreshGridAfterSort: SyncRuntimeToGrid"))
-                    SyncRuntimeToGrid();
+                // Filter first so SyncRuntimeToGrid only walks visible rows
+                // (the filter swaps DataSource, so any prior cell-level edits
+                // are discarded anyway).
                 using (ThorneLog.Time("RefreshGridAfterSort: RefreshTimerGridDataSource"))
                     RefreshTimerGridDataSource();
+                using (ThorneLog.Time("RefreshGridAfterSort: SyncRuntimeToGrid"))
+                    SyncRuntimeToGrid();
                 using (ThorneLog.Time("RefreshGridAfterSort: UpdateSortGlyphs"))
                     UpdateSortGlyphs();
             }

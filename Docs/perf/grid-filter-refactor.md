@@ -1,6 +1,6 @@
 # Timer Grid Filter Refactor — Design Note
 
-**Status:** Proposal — not yet implemented
+**Status:** Implemented on `v0.6.0-gui-enhancements`
 **Author:** Performance investigation, May 2026
 **Branch:** `v0.6.0-gui-enhancements`
 **Related code:** `ThorneTimer/FormMain.cs` — `RefreshTimerGridDataSource`, `SyncRuntimeToGrid`, `RefreshGridAfterSort`
