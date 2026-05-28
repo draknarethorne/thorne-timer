@@ -1,6 +1,16 @@
 # Implementation Plan: Per-View Color Configuration
 
-**Feature:** Move mini-view color configuration from Settings tab to Views grid  
+> **✅ Implemented in v0.6.0** — This plan has been delivered on branch `v0.6.0-gui-enhancements`. See `Docs/ROADMAP.md` Phase D++ for the shipped feature list. This document is retained as historical design context and will be moved to `Docs/archive/` after v0.6.0 ships.
+>
+> **Where the design diverged from this plan:**
+> - `Styles` became a **first-class table** (`styles`) with its own tab, Add/Delete/Rename, and a `ColorDialog` picker — not just an enum.
+> - The Views grid `Style` column is bound to a **dynamic dropdown** sourced from the live styles table.
+> - We did **not** build a `view_timers` junction or `CustomColors` JSON column; colors live as `ForeColor`/`BackColor` columns on `miniviews` directly.
+> - Settings tab still owns global **warning** colors (`WarnFore`/`WarnBack`); per-view `ShowWarning` decides whether each view applies them.
+
+---
+
+**Feature:** Move mini-view color configuration from Settings tab to Views grid
 **Version:** v0.6.0  
 **Status:** Planning  
 **Date:** 2025-01-22  

@@ -1,5 +1,7 @@
 # Phase 1: Views Grid Structure - Completion Status
 
+> **✅ Superseded by full v0.6.0 implementation.** The Views grid now has Add/Delete buttons, a dynamic Style dropdown sourced from the `styles` table, color cells with `ColorDialog` pickers, and an `EmptyBehavior` column. The default palette referenced below is also out of date — see `StylesRepository.SeedDefaultStyles` for the current values (Pet=lavender, Spawn=cyan, Lockout=DodgerBlue, Character=white). This document will be moved to `Docs/archive/` once v0.6.0 ships.
+
 ## ✅ Completed Changes
 
 ### 1. Fixed DataGridViewComboBoxCell Validation Error

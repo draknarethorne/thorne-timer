@@ -1,5 +1,7 @@
 # Technical Debt Tracker
 
+> **⚠️ Partial v0.6.0 update needed.** TD-001 (SQL injection) was resolved in Phase D. TD-002 (God Class `FormMain`) is partially addressed by the v0.6.0 controller/repository extraction for Styles, Views, and Categories — the Timers and Characters grids are still next on the list. Other items below have not been re-scored against the current codebase.
+
 > **Last Updated:** 2026-03-27  
 > **Purpose:** Track and prioritize technical debt for systematic resolution
 

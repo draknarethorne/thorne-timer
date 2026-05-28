@@ -48,16 +48,19 @@ Thorne Timer fills that gap. It lives *outside* the game, quietly reading your l
 ## Features
 
 ### 🎯 Timer Overlays (Mini Views)
-Compact, always-on-top windows that float over your game client. Four distinct view types keep your screen organized:
+Compact, always-on-top windows that float over your game client. Views are now **fully user-configurable** — add as many as you need, choose which timer style each one shows, and pick its own colors.
 
-- **Normal** — Standard countdown timers for respawns, cooldowns, and custom events
-- **Buff** — Track buff durations so you never let a key buff drop
-- **Pet** — Dedicated pet-related timers for summoners and beastlords
-- **Ping** — Instant visual notifications for log events (tells, auction alerts, custom triggers)
+Thorne Timer ships with a default set of styles you can edit, rename, or extend:
 
-Each view remembers its position independently — arrange them once and they stay put.
+- **Normal** (yellow) — Standard countdown timers for respawns, cooldowns, and custom events
+- **Buff** (orange) — Track buff durations so you never let a key buff drop
+- **Pet** (lavender) — Dedicated pet-related timers for summoners and beastlords
+- **Ping** (light green) — Instant visual notifications for log events (tells, auction alerts, custom triggers)
+- **Spawn** (cyan) — Respawn timers and named-mob windows
+- **Lockout** (DodgerBlue) — Long-duration raid and instance lockouts
+- **Character** (white) — Per-character overlays such as the active character header
 
-> 📌 **Note:** The four views above are currently fixed defaults. An upcoming update will let you create your own custom views and link them to specific styles, categories, or individual timers — giving you full control over how your overlays are organized.
+Each view remembers its position independently — arrange them once and they stay put. Use the **Styles** and **Views** tabs to add, rename, or delete styles and views, change their colors, and control how empty views display (character name, view name, blank, or hidden).
 
 ### ⏱️ Real-Time Log Parsing
 Point Thorne Timer at your EQ log file and it starts working immediately:
@@ -75,11 +78,12 @@ Never miss a timer expiration again:
 - **Adjustable volume and speech rate** — Tune it to your preference
 - **Per-timer audio** — Different sounds for different events
 
-### 📊 Timer Styles
-Each timer has a **Style** (Normal, Buff, Pet, or Ping) that determines which overlay window displays it. This lets you:
+### 📊 Timer Styles (first-class entity)
+Each timer has a **Style** that determines its color and which overlay window displays it. Styles are now a **first-class, user-editable entity** with their own tab — add, rename, recolor, or delete them, and any view filtered on that style updates immediately. Use styles to:
 
 - Separate combat timers from buff tracking
 - Keep ping notifications in their own corner
+- Color-code by raid role, class, or any system you want
 - Organize your screen the way you play
 
 ### 🗂️ Tome System
@@ -167,8 +171,8 @@ Thorne Timer is evolving into a **complete tactical HUD** for serious multi-boxi
 
 | Phase | Description |
 |-------|-------------|
-| **Current** | Timer styles, mini view overlays, per-timer settings, column persistence, UI polish |
-| **Next** | Custom user-defined views, style-to-view linking, per-character timer collections, configuration dialogs |
+| **Current (v0.6.0, in testing)** | User-editable styles & views, per-view colors, camp-out auto-pause, performance and UX polish |
+| **Next (v0.7.0)** | Timer maintenance dialog — separate gameplay view from add/edit/delete, read-only main grid |
 | **Planned** | Class-specific timer profiles, zone-aware timers, global (cross-character) timers |
 | **Future** | Full spell/ability management per class with smart timer automation |
 
@@ -179,6 +183,21 @@ For detailed phase breakdowns, see the [Roadmap](Docs/ROADMAP.md).
 ---
 
 ## Version History
+
+**v0.6.0** _in testing_
+
+- ✅ **Styles tab** — first-class, user-editable styles with Add/Delete/Rename and color picker
+- ✅ **New default styles** — Pet (lavender), Spawn (cyan), Lockout (DodgerBlue), Character (white)
+- ✅ **Views tab** — Add/Delete views with dynamic Style filter dropdown, per-view ForeColor / BackColor / ShowWarning / EmptyBehavior
+- ✅ **Per-view colors** — each view drives its own mini-view appearance and the main grid row tint
+- ✅ **`(None)` character** — manual pause without camping out
+- ✅ **Camp-out auto-pause** — detects `/camp` with 10-second inactivity threshold, switches active character to `(None)`
+- ✅ **Auto-switch fixes** — suppress the OLD character (not the new one) on manual switch, proper re-enable logic
+- ✅ **Voice system** — all English voices (en-GB, en-AU, en-CA, etc.), comprehensive logging
+- ✅ **Mini views hidden from Alt-Tab** via `WS_EX_TOOLWINDOW`
+- ✅ **Grid performance** — O(n²) → O(n) dictionary lookup in `SyncRuntimeToGrid` (~98% faster with 130+ timers)
+- ✅ **Hybrid Designer + Controller + Repository pattern** for Styles, Views, and Categories tabs
+- ✅ **One-shot startup migration** — v0.5.0 → v0.6.0 palette migration runs once; deletions stick, no snapback
 
 **v0.5.0** (June 2025)
 

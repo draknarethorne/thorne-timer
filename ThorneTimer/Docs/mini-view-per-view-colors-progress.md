@@ -1,6 +1,8 @@
 # Per-View Color Configuration — Implementation Progress
 
-**Version:** v0.6.0  
+> **✅ Implementation complete on `v0.6.0-gui-enhancements` (in testing).** Phases 1–3 documented below shipped as planned; Phase 4 (Settings cleanup) and Phase 5 (new styles — Pet/Spawn/Lockout/Character) were also completed via the `StylesController` / `StylesRepository` work. This document will be moved to `Docs/archive/` once v0.6.0 ships.
+
+**Version:** v0.6.0
 **Started:** 2025-01-22  
 **Status:** 🔄 IN PROGRESS  
 **Branch:** `v0.6.0-gui-enhancements`

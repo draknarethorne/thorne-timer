@@ -8,11 +8,12 @@
 
 ### Current State Issues
 
-v0.6.0 introduced snapshot/restore logic to preserve actively logging character timers during manual character switches. While functional, this creates architectural complexity:
+The v0.6.0 main form still mixes gameplay with configuration. The character dropdown serves a dual purpose (gameplay + browsing), and Timers / Characters editing happens inline in the same form that displays the active runtime. The previously attempted complex snapshot/restore architecture (background character timer preservation) was **reverted** — the v0.6.0 model is intentionally simple: one active character at a time, with browsing handled as a read-only display concern. See `SESSION-HANDOFF-v0.6.0-logmonitor-fix.md` for the full reversion context.
 
-- Main form grid allows manual character browsing during gameplay
+What remains is the architectural split between **playing** and **maintaining**:
+
+- Main form grid still allows manual character browsing during gameplay
 - Character dropdown in main form serves dual purpose (gameplay + maintenance)
-- Snapshot/restore required to prevent timer interference
 - Complexity in distinguishing "displayed character" vs "actively logging character"
 
 ### Long-Term Vision
@@ -47,12 +48,12 @@ The intended architecture separates gameplay from maintenance:
 
 ### Why v0.6.0 Work Enables This
 
-The snapshot/restore and `isActive` infrastructure built in v0.6.0 provides the foundation for Phase C:
+The v0.6.0 architecture provides the foundation for Phase C:
 
-✅ **`isActive` flag** — Dialog can load timers with `isActive=false` to prevent unintended countdown  
-✅ **`GetActiveCharacterID()`** — Main form can query LogMonitor to always show active character  
-✅ **Snapshot/restore pattern** — Already handles "editing one thing while another runs"  
-✅ **Conceptual separation** — `activeCharacterID` (UI) vs logging character already distinguished  
+✅ **`isActive` flag** — `TimerRuntime.RestoreCharacterState(states, isActive)` already supports loading timers in a frozen state; the maintenance dialog can pass `isActive=false`.
+✅ **`LogMonitor.GetActiveCharacterID()` / `selectedCharacterID`** — UI selection is already separated from file-growth detection, so the main form can lock its grid to the actively logging character.
+✅ **Hybrid Designer + Controller + Repository pattern** — the Styles, Views, and Categories tabs already prove out the model the maintenance dialog will follow (designer shell + controller behavior + typed repository CRUD).
+✅ **Conceptual separation** — `activeCharacterID` (UI) vs logging character is already a working distinction.
 
 ### Benefits of Early Phase C
 
@@ -85,10 +86,10 @@ Phase B (Ping Refactor) is an internal refactoring with no user-facing benefits:
 
 Phase C will reuse v0.6.0 patterns:
 
-- Maintenance dialog calls `LoadTimerRuntime()` with logic to pass `isActive=false`
-- Main form removes character dropdown, locks grid to `logMonitor.GetActiveCharacterID()`
-- Snapshot/restore infrastructure ensures active character timers unaffected during maintenance
-- Dialog grid configured as editable, main form grid configured as read-only
+- Maintenance dialog uses the same Designer + Controller + Repository pattern as Styles/Views/Categories (e.g. `TimersMaintenanceController` + extended `TimersRepository`).
+- Main form removes the editable timer grid path and locks its read-only display to `logMonitor.GetActiveCharacterID()`.
+- Dialog grid loads timers with `isActive=false` so opening it never starts countdowns or affects the actively logging character.
+- The `(None)` character path from v0.6.0 already proves the main form handles a no-active-character state cleanly.
 
 ## References
 

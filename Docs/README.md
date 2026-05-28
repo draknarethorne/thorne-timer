@@ -20,6 +20,9 @@ Detailed development roadmap with phase breakdowns and future plans.
 
 ## Directory Structure
 
+### `archive/` 🗄️
+Historical design documents and superseded proposals — retained for context but no longer reflect the current architecture. Useful for understanding why certain paths were chosen (or rejected).
+
 ### `releases/` 📦
 Release process documentation, templates, and checklists.
 
@@ -36,8 +39,10 @@ Internal architecture and technical design documentation.
 Includes:
 - Architecture redesign notes
 - Auto character switching design
-- Active views design and technical debt tracking
-- Schema migration records
+- Active views design (partially superseded by v0.6.0)
+- Phase C maintenance dialog priority
+- Per-view color implementation notes (banner-marked, archived after v0.6.0 release)
+- Technical debt tracking
 
 ---
 
