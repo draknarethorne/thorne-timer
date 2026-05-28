@@ -51,11 +51,12 @@ Desktop.ini
 # SQL Server files
 *.mdf
 *.ldf
-# Others
-*.db
-# Allow the example database shipped with the project
-!ThorneTimer/Data/ThorneTimer.db
+# Generated runtime backups (not tracked, not shipped)
 ThorneTimer/Data/Backups/*
+# Note: Historical .tdb files in ThorneTimer/Data/ and ThorneTimer/Data/Archive/
+# are intentionally tracked in git for upgrade-path testing and provenance.
+# They are NOT included in the release zip — only Data\ThorneTimer.tdb is marked
+# as <Content> in ThorneTimer.csproj and copied to bin\Release\Data\.
 *.bak
 *.backup
 *.tmp
@@ -71,4 +72,3 @@ TestResults/
 publish/
 # Exclude local NuGet config
 NuGet.Config
-/ThorneTimer/Data/nul

@@ -192,10 +192,11 @@
     <None Include="..\.editorconfig">
       <Link>.editorconfig</Link>
     </None>
-    <None Include="Data\ThorneTimer_Draknare.tdb" />
-    <None Include="Data\ThorneTimer_Draknara.tdb" />
-    <None Include="Data\ThorneTimer_P99.tdb" />
-    <None Include="Data\ThorneTimer_THJ.tdb" />
+    <None Include="Data\ThorneTimer-v0.5.0.tdb" />
+    <None Include="Data\Archive\EQTimer.db" />
+    <None Include="Data\Archive\ThorneTimer_P99.tdb" />
+    <None Include="Data\Archive\ThorneTimer_TAKP.tdb" />
+    <None Include="Data\Archive\ThorneTimer_THJ.tdb" />
     <None Include="Docs\active-views\active-views-design.md" />
     <None Include="Docs\active-views\codebase-analysis.md" />
     <None Include="Docs\active-views\schema-migration.md" />
