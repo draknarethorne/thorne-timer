@@ -21,10 +21,13 @@ jobs:
       id: version
       run: |
         $tag = "${{ github.ref_name }}"
-        # Remove 'v' prefix: v0.1.0 -> 0.1.0
+        # Remove 'v' prefix: v0.1.0 -> 0.1.0, v0.6.0-beta -> 0.6.0-beta
         $version = $tag -replace '^v', ''
-        # Convert to 4-part version: 0.1.0 -> 0.1.0.0
-        $parts = $version -split '\.' | Select-Object -First 3
+        # AssemblyVersion must be purely numeric major.minor.build.revision,
+        # so strip any pre-release suffix (e.g. "-beta", "-rc1") before
+        # splitting. Display/release artifacts keep the full tag.
+        $numeric = $version -replace '-.*$', ''
+        $parts = $numeric -split '\.' | Select-Object -First 3
         while ($parts.Count -lt 4) { $parts += "0" }
         $assemblyVersion = $parts -join '.'
         echo "VERSION=$version" >> $env:GITHUB_OUTPUT
