@@ -205,7 +205,7 @@ namespace ThorneTimer
             this.labelTagline.Name = "labelTagline";
             this.labelTagline.Size = new System.Drawing.Size(424, 30);
             this.labelTagline.TabIndex = 20;
-            this.labelTagline.Text = "Built for the Project Quarm community by Draknar\u00E9 Thorne  \u2694\uFE0F See you in Norrath";
+            this.labelTagline.Text = "Built for the Project Quarm and TAKP communities by Draknar\u00E9 Thorne  \u2694\uFE0F See you in Norrath";
             this.labelTagline.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
             // 
             // buttonOk

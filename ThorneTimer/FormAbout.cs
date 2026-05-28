@@ -31,18 +31,22 @@ namespace ThorneTimer
             if (copyrightAttr != null)
                 labelCopyright.Text = copyrightAttr.Copyright;
 
-            // Feature highlights — concise summary pulled from README themes
+            // Feature highlights — concise summary aligned with the README
+            // Version History.  Keep in sync when adding major features.
             labelFeatures.Text =
-                "\u2022  Always-on-top timer overlays (Normal, Buff, Pet, Ping)\n" +
-                "\u2022  Real-time log parsing with start/end keyword matching\n" +
-                "\u2022  Text-to-speech and WAV sound alerts per timer\n" +
-                "\u2022  Multi-character tracking with automatic character switching\n" +
-                "\u2022  Portable Tome system \u2014 all data in a single .tdb file\n" +
-                "\u2022  Class-based timer filtering and compact view mode\n" +
-                "\u2022  Category system with zone-aware auto-activation";
+                "\u2022  Always-on-top timer overlays driven by user-editable Styles & Views\n" +
+                "\u2022  Real-time log parsing with start/end keyword matching and dependencies\n" +
+                "\u2022  Text-to-speech and WAV sound alerts per timer (200+ built-in sounds)\n" +
+                "\u2022  Multi-character tracking with automatic character switching and camp-out detection\n" +
+                "\u2022  World / Character / Character+ scopes and class-based timer filtering\n" +
+                "\u2022  Portable Tome system \u2014 all data in a single .tdb file with auto-migration\n" +
+                "\u2022  Tome Information dialog with sortable usage and breakdown lists";
 
-            // Runtime info
-            labelFramework.Text = "Runtime:  .NET Framework " + Environment.Version.ToString();
+            // Runtime info.  Environment.Version on .NET Framework reports the
+            // CLR build (4.0.30319.x), which is misleading — the framework
+            // moniker is what users actually recognize.  Detect the installed
+            // .NET Framework version from the Release key in the registry.
+            labelFramework.Text = "Runtime:  .NET Framework " + GetNetFrameworkVersion();
 
             // SQLite version
             string sqliteVersion = GetSQLiteVersion();
@@ -67,6 +71,49 @@ namespace ThorneTimer
             {
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Resolves the installed .NET Framework 4.x version from the
+        /// HKLM\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full Release key
+        /// as documented at
+        /// https://learn.microsoft.com/dotnet/framework/migration-guide/how-to-determine-which-versions-are-installed
+        /// Falls back to the CLR version if the registry lookup fails.
+        /// </summary>
+        private static string GetNetFrameworkVersion()
+        {
+            try
+            {
+                using (var key = Microsoft.Win32.RegistryKey
+                    .OpenBaseKey(Microsoft.Win32.RegistryHive.LocalMachine, Microsoft.Win32.RegistryView.Registry32)
+                    .OpenSubKey(@"SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full"))
+                {
+                    if (key != null)
+                    {
+                        var releaseObj = key.GetValue("Release");
+                        if (releaseObj is int release)
+                        {
+                            // Mapping from Release DWORD → marketing version.
+                            if (release >= 533320) return "4.8.1 or later";
+                            if (release >= 528040) return "4.8";
+                            if (release >= 461808) return "4.7.2";
+                            if (release >= 461308) return "4.7.1";
+                            if (release >= 460798) return "4.7";
+                            if (release >= 394802) return "4.6.2";
+                            if (release >= 394254) return "4.6.1";
+                            if (release >= 393295) return "4.6";
+                            if (release >= 379893) return "4.5.2";
+                            if (release >= 378675) return "4.5.1";
+                            if (release >= 378389) return "4.5";
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Fall through to CLR version.
+            }
+            return Environment.Version.ToString();
         }
 
         private void linkGitHub_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
