@@ -892,9 +892,9 @@
             this.grpMiniView.Controls.Add(this.lblWarnPickFore);
             this.grpMiniView.Controls.Add(this.lblWarningColors);
             this.grpMiniView.Controls.Add(this.lblFontSize);
-            this.grpMiniView.Location = new System.Drawing.Point(6, 184);
+            this.grpMiniView.Location = new System.Drawing.Point(299, 6);
             this.grpMiniView.Name = "grpMiniView";
-            this.grpMiniView.Size = new System.Drawing.Size(287, 217);
+            this.grpMiniView.Size = new System.Drawing.Size(287, 172);
             this.grpMiniView.TabIndex = 16;
             this.grpMiniView.TabStop = false;
             this.grpMiniView.Text = "Mini View Options";
@@ -1063,7 +1063,7 @@
             // txtWarningTime
             // 
             this.txtWarningTime.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.txtWarningTime.Location = new System.Drawing.Point(93, 187);
+            this.txtWarningTime.Location = new System.Drawing.Point(93, 145);
             this.txtWarningTime.Name = "txtWarningTime";
             this.txtWarningTime.Size = new System.Drawing.Size(43, 20);
             this.txtWarningTime.TabIndex = 20;
@@ -1073,7 +1073,7 @@
             // lblWarningTime
             // 
             this.lblWarningTime.AutoSize = true;
-            this.lblWarningTime.Location = new System.Drawing.Point(10, 191);
+            this.lblWarningTime.Location = new System.Drawing.Point(10, 149);
             this.lblWarningTime.Name = "lblWarningTime";
             this.lblWarningTime.Size = new System.Drawing.Size(76, 13);
             this.lblWarningTime.TabIndex = 19;
@@ -1084,7 +1084,7 @@
             this.lblWarnPickBack.AutoSize = true;
             this.lblWarnPickBack.BackColor = System.Drawing.Color.Red;
             this.lblWarnPickBack.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.lblWarnPickBack.Location = new System.Drawing.Point(113, 168);
+            this.lblWarnPickBack.Location = new System.Drawing.Point(113, 126);
             this.lblWarnPickBack.MinimumSize = new System.Drawing.Size(12, 12);
             this.lblWarnPickBack.Name = "lblWarnPickBack";
             this.lblWarnPickBack.Size = new System.Drawing.Size(12, 15);
@@ -1096,7 +1096,7 @@
             this.lblWarnPickFore.AutoSize = true;
             this.lblWarnPickFore.BackColor = System.Drawing.Color.White;
             this.lblWarnPickFore.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.lblWarnPickFore.Location = new System.Drawing.Point(95, 168);
+            this.lblWarnPickFore.Location = new System.Drawing.Point(95, 126);
             this.lblWarnPickFore.MinimumSize = new System.Drawing.Size(12, 12);
             this.lblWarnPickFore.Name = "lblWarnPickFore";
             this.lblWarnPickFore.Size = new System.Drawing.Size(12, 15);
@@ -1106,7 +1106,7 @@
             // lblWarningColors
             // 
             this.lblWarningColors.AutoSize = true;
-            this.lblWarningColors.Location = new System.Drawing.Point(4, 168);
+            this.lblWarningColors.Location = new System.Drawing.Point(4, 126);
             this.lblWarningColors.Name = "lblWarningColors";
             this.lblWarningColors.Size = new System.Drawing.Size(82, 13);
             this.lblWarningColors.TabIndex = 16;

@@ -40,7 +40,7 @@ namespace ThorneTimer
         /// </summary>
         private class ViewEntry
         {
-            public Database.ViewPositionData Data { get; set; }
+            public ViewPositionData Data { get; set; }
             public MiniView Form { get; set; }
         }
 
@@ -80,7 +80,7 @@ namespace ThorneTimer
 
             // Persist current positions before tearing down
             Dictionary<int, Point> positions = GetCurrentViewPositions();
-            Database.SaveViewPositions(con, positions);
+            ViewsRepository.SaveViewPositions(con, positions);
 
             DestroyMiniViews();
             CreateMiniViews(con, activeCharacterID);
@@ -119,7 +119,7 @@ namespace ThorneTimer
 
             if (row == null)
             {
-                List<MiniViews.GridData> data = Database.GetViews(con);
+                List<MiniViews.GridData> data = ViewsRepository.GetViews(con);
 
                 GridData gd = new MiniViews.GridData
                 {
@@ -143,9 +143,9 @@ namespace ThorneTimer
                 if (MessageBox.Show("Are you sure you want to delete this view?", "Delete View", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1) == System.Windows.Forms.DialogResult.Yes)
                 {
                     DataGridViewCell idCell = grdViews.Rows[grdViews.CurrentCell.RowIndex].Cells[grdViews.Columns["ID"].Index];
-                    Database.DeleteView(con, Convert.ToString(idCell.Value));
+                    ViewsRepository.DeleteView(con, Convert.ToString(idCell.Value));
 
-                    grdViews.DataSource = Database.GetViews(con);
+                    grdViews.DataSource = ViewsRepository.GetViews(con);
 
                     result = true;
                 }
@@ -195,12 +195,12 @@ namespace ThorneTimer
                 }
                 else
                 {
-                    var character = Database.GetCharacter(con, activeCharacterID);
+                    var character = CharactersRepository.GetCharacter(con, activeCharacterID);
                     activeCharacterName = string.IsNullOrEmpty(character.Name) ? "All Characters" : character.Name;
                 }
 
                 // Load view definitions from database
-                List<Database.ViewPositionData> views = Database.GetViewPositions(con);
+                List<ViewPositionData> views = ViewsRepository.GetViewPositions(con);
 
                 foreach (var viewData in views)
                 {
@@ -351,7 +351,7 @@ namespace ThorneTimer
             }
             else
             {
-                var character = Database.GetCharacter(con, activeCharacterID);
+                var character = CharactersRepository.GetCharacter(con, activeCharacterID);
                 activeCharacterName = string.IsNullOrEmpty(character.Name) ? "All Characters" : character.Name;
             }
 

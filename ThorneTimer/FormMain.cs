@@ -111,6 +111,10 @@ namespace ThorneTimer
 
             InitializeComponent();
 
+            // Cross-cutting form helpers
+            windowPositionManager = new WindowPositionManager(this);
+            recentDatabasesManager = new RecentDatabasesManager(openRecentToolStripMenuItem, OpenDatabase);
+
             // Migrate user settings from previous version on first run after upgrade
             if (Properties.Settings.Default.NeedsUpgrade)
             {
@@ -139,6 +143,13 @@ namespace ThorneTimer
             con = Database.Connection(dbPath);
             stylesRepository = new StylesRepository(con);
             miniViews.Styles = stylesRepository;
+            gridLayoutManager = new GridLayoutManager(con);
+            voiceManager = new VoiceManager(con, cboActiveVoice);
+            miniViewSettingsManager = new MiniViewSettingsManager(
+                con, miniViews,
+                tbOpacity, tbFontSize,
+                lblWarnPickFore, lblWarnPickBack,
+                txtWarningTime, colorDialogPicker);
             ThorneLog.Info("Database connection established");
 
             // Load log settings from DB now that connection is open
@@ -199,7 +210,16 @@ namespace ThorneTimer
         ViewsController viewsController;
         CategoriesRepository categoriesRepository;
         CategoriesController categoriesController;
+        CharactersRepository charactersRepository;
+        CharactersController charactersController;
         SQLiteConnection con;
+
+        // Cross-cutting form helpers (v0.6.0 polish)
+        RecentDatabasesManager recentDatabasesManager;
+        WindowPositionManager windowPositionManager;
+        GridLayoutManager gridLayoutManager;
+        VoiceManager voiceManager;
+        MiniViewSettingsManager miniViewSettingsManager;
 
         // UI indicator for browsing mode (viewing != actively logging character)
         private Label lblBrowsingIndicator;
@@ -545,19 +565,7 @@ namespace ThorneTimer
             this.RestoreWindowPosition();
 
             // v0.6.0: Load global mini view settings only
-            tbOpacity.Value = Math.Max(tbOpacity.Minimum, Math.Min(tbOpacity.Maximum, SafeParseInt(Database.GetSetting(con, "MiniViewOpacity"), 100)));
-            miniViews.mvOpacity = tbOpacity.Value;
-            tbFontSize.Value = Math.Max(tbFontSize.Minimum, Math.Min(tbFontSize.Maximum, SafeParseInt(Database.GetSetting(con, "MiniViewFontSize"), 8)));
-            miniViews.mvFontSize = tbFontSize.Value;
-
-            miniViews.mvWarnForeColor = SafeParseInt(Database.GetSetting(con, "MiniViewWarnFore"), Color.White.ToArgb());
-            lblWarnPickFore.BackColor = Color.FromArgb(miniViews.mvWarnForeColor);
-            miniViews.mvWarnBackColor = SafeParseInt(Database.GetSetting(con, "MiniViewWarnBack"), Color.Red.ToArgb());
-            lblWarnPickBack.BackColor = Color.FromArgb(miniViews.mvWarnBackColor);
-            miniViews.mvWarnTime = Database.GetSetting(con, "MiniViewWarnTime");
-            txtWarningTime.Text = miniViews.mvWarnTime;
-
-            UpdateMiniAppearance();
+            miniViewSettingsManager.LoadFromDatabase();
 
 
             activeVoice = Database.GetSetting(con, "ActiveVoice");
@@ -676,8 +684,8 @@ namespace ThorneTimer
 
             // Dump loaded reference data for diagnostics
             ThorneLog.DumpClasses("Startup", con);
-            ThorneLog.DumpCharacters("Startup", Database.GetActiveCharacters(con));
-            ThorneLog.DumpCategories("Startup", Database.GetCategories(con));
+            ThorneLog.DumpCharacters("Startup", CharactersRepository.GetActiveCharacters(con));
+            ThorneLog.DumpCategories("Startup", CategoriesRepository.GetCategories(con));
 
             // Hide the grid and suppress layout/auto-size for the entire
             // setup + data-load sequence so nothing paints until the end.
@@ -780,66 +788,12 @@ namespace ThorneTimer
 
         private void AddToRecentDatabases(string dbPath)
         {
-            var recent = Properties.Settings.Default.RecentDatabases;
-            if (recent == null)
-            {
-                recent = new System.Collections.Specialized.StringCollection();
-                Properties.Settings.Default.RecentDatabases = recent;
-            }
-
-            // Remove if already present (so it moves to top)
-            for (int i = recent.Count - 1; i >= 0; i--)
-            {
-                if (string.Equals(recent[i], dbPath, StringComparison.OrdinalIgnoreCase))
-                {
-                    recent.RemoveAt(i);
-                }
-            }
-
-            // Insert at the front
-            recent.Insert(0, dbPath);
-
-            // Keep at most 10 entries
-            while (recent.Count > 10)
-            {
-                recent.RemoveAt(recent.Count - 1);
-            }
-
-            Properties.Settings.Default.Save();
+            recentDatabasesManager.Add(dbPath);
         }
 
         private void PopulateRecentDatabases()
         {
-            openRecentToolStripMenuItem.DropDownItems.Clear();
-
-            var recent = Properties.Settings.Default.RecentDatabases;
-            if (recent == null || recent.Count == 0)
-            {
-                openRecentToolStripMenuItem.Enabled = false;
-                return;
-            }
-
-            openRecentToolStripMenuItem.Enabled = true;
-            foreach (string path in recent)
-            {
-                if (string.IsNullOrEmpty(path))
-                    continue;
-
-                ToolStripMenuItem item = new ToolStripMenuItem(path);
-                item.Click += (s, ev) =>
-                {
-                    if (File.Exists(path))
-                    {
-                        OpenDatabase(path);
-                    }
-                    else
-                    {
-                        MessageBox.Show("Tome not found:\n" + path, "Tome Not Found",
-                            MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    }
-                };
-                openRecentToolStripMenuItem.DropDownItems.Add(item);
-            }
+            recentDatabasesManager.Refresh();
         }
 
         private void OpenDatabase(string dbPath)
@@ -934,19 +888,8 @@ namespace ThorneTimer
         {
             ResetRepositories();
 
-            // Reload global settings from database
-            tbOpacity.Value = Math.Max(tbOpacity.Minimum, Math.Min(tbOpacity.Maximum, SafeParseInt(Database.GetSetting(con, "MiniViewOpacity"), 100)));
-            miniViews.mvOpacity = tbOpacity.Value;
-            tbFontSize.Value = Math.Max(tbFontSize.Minimum, Math.Min(tbFontSize.Maximum, SafeParseInt(Database.GetSetting(con, "MiniViewFontSize"), 8)));
-            miniViews.mvFontSize = tbFontSize.Value;
-
-            // v0.6.0: Warning colors still global (apply to all views when ShowWarning is enabled)
-            miniViews.mvWarnForeColor = SafeParseInt(Database.GetSetting(con, "MiniViewWarnFore"), Color.White.ToArgb());
-            lblWarnPickFore.BackColor = Color.FromArgb(miniViews.mvWarnForeColor);
-            miniViews.mvWarnBackColor = SafeParseInt(Database.GetSetting(con, "MiniViewWarnBack"), Color.Red.ToArgb());
-            lblWarnPickBack.BackColor = Color.FromArgb(miniViews.mvWarnBackColor);
-            miniViews.mvWarnTime = Database.GetSetting(con, "MiniViewWarnTime");
-            txtWarningTime.Text = miniViews.mvWarnTime;
+            // Reload global mini view settings from database
+            miniViewSettingsManager.LoadFromDatabase();
 
             UpdateMiniAppearance();
 
@@ -981,8 +924,6 @@ namespace ThorneTimer
             // Unhook event handlers before tearing down grids to prevent
             // validation firing against columns that no longer exist.
             grdTimers.RowValidating -= ValidateRowTimers;
-            grdCharacters.RowValidating -= ValidateRowCharacters;
-            grdCharacters.CellClick -= grdCharacters_CellClick;
             grdCategories.RowValidating -= ValidateRowCategories;
             grdViews.RowValidating -= ValidateRowViews;
 
@@ -1052,6 +993,14 @@ namespace ThorneTimer
             stylesRepository = new StylesRepository(con);
             viewsRepository = new ViewsRepository(con);
             categoriesRepository = new CategoriesRepository(con);
+            charactersRepository = new CharactersRepository(con);
+            gridLayoutManager = new GridLayoutManager(con);
+            voiceManager = new VoiceManager(con, cboActiveVoice);
+            miniViewSettingsManager = new MiniViewSettingsManager(
+                con, miniViews,
+                tbOpacity, tbFontSize,
+                lblWarnPickFore, lblWarnPickBack,
+                txtWarningTime, colorDialogPicker);
             miniViews.Styles = stylesRepository;
         }
 
@@ -1258,7 +1207,7 @@ namespace ThorneTimer
             ThorneLog.Info("FormClosing: saving character state");
             var closingStates = timerRuntime.SaveCharacterState();
             ThorneLog.Info($"FormClosing: saving timer states (charID={activeCharacterID}, {closingStates.Count} timer(s))");
-            Database.SaveTimerStates(con, closingStates, activeCharacterID);
+            TimerStateRepository.SaveTimerStates(con, closingStates, activeCharacterID);
             ThorneLog.Info("FormClosing: state persisted, stopping timers");
 
             // Stop remaining timers (World-scope) and log monitor gracefully
@@ -1268,81 +1217,27 @@ namespace ThorneTimer
             ThorneLog.Info("FormClosing: shutdown complete");
         }
 
-        /// <summary>
-        /// Returns true if the given rectangle is at least partially visible
-        /// on any connected monitor. Returns false only when 100% of the
-        /// window would be offscreen.
-        /// </summary>
+        /// <summary>Thin wrapper kept for MiniViews compatibility. See <see cref="WindowPositionManager.IsVisibleOnAnyScreen"/>.</summary>
         static public bool IsVisibleOnAnyScreen(Rectangle rect)
         {
-            foreach (Screen screen in Screen.AllScreens)
-            {
-                if (screen.WorkingArea.IntersectsWith(rect))
-                    return true;
-            }
-            return false;
+            return WindowPositionManager.IsVisibleOnAnyScreen(rect);
         }
 
-        /// <summary>
-        /// Ensures a window position is visible on at least one monitor.
-        /// If the window is entirely offscreen, clamps it to 10 pixels
-        /// inside the nearest screen's working area.
-        /// </summary>
+        /// <summary>Thin wrapper kept for MiniViews compatibility. See <see cref="WindowPositionManager.EnsureVisibleOnScreen"/>.</summary>
         static public Point EnsureVisibleOnScreen(Point location, Size size)
         {
-            Rectangle windowRect = new Rectangle(location, size);
-            if (IsVisibleOnAnyScreen(windowRect))
-                return location;
-
-            // Entirely offscreen — clamp to nearest screen with a small inset
-            const int inset = 10;
-            Screen nearest = Screen.FromPoint(location);
-            Rectangle area = nearest.WorkingArea;
-            int x = Math.Max(area.Left + inset, Math.Min(location.X, area.Right - size.Width - inset));
-            int y = Math.Max(area.Top + inset, Math.Min(location.Y, area.Bottom - size.Height - inset));
-            return new Point(x, y);
+            return WindowPositionManager.EnsureVisibleOnScreen(location, size);
         }
 
         private void RestoreWindowPosition()
         {
-            if (Properties.Settings.Default.HasSetDefaults)
-            {
-                this.WindowState = Properties.Settings.Default.WindowState;
-                Point loc = Properties.Settings.Default.Location;
-                Size sz = Properties.Settings.Default.Size;
-
-                // One-time nudge on version upgrade: bump saved size up to
-                // the new default so existing users see the improved layout.
-                // Only fires once — after that their chosen size is respected.
-                if (needsSizeNudge)
-                {
-                    bool isCompact = Database.GetSetting(con, "CompactView") == "1";
-                    // Always nudge height; only nudge width for full-view users
-                    // so compact-view users keep their narrower window.
-                    sz = new Size(
-                        isCompact ? sz.Width : Math.Max(sz.Width, DefaultFullViewWidth),
-                        Math.Max(sz.Height, 700));
-                }
-
-                this.Location = EnsureVisibleOnScreen(loc, sz);
-                this.Size = sz;
-            }
+            bool isCompact = Database.GetSetting(con, "CompactView") == "1";
+            windowPositionManager.Restore(needsSizeNudge, DefaultFullViewWidth, isCompact);
         }
 
         private void SaveProperties()
         {
-            Properties.Settings.Default.WindowState = this.WindowState;
-
-            if (this.WindowState == FormWindowState.Normal)
-            {
-                Properties.Settings.Default.Location = this.Location;
-                Properties.Settings.Default.Size = this.Size;
-            }
-            else
-            {
-                Properties.Settings.Default.Location = this.RestoreBounds.Location;
-                Properties.Settings.Default.Size = this.RestoreBounds.Size;
-            }
+            windowPositionManager.Save();
 
             Properties.Settings.Default.ParseLog = (bool)(tsbStartStopWatching.Text == stopWatchingText);
             Properties.Settings.Default.MiniView = miniViews.MiniViewsActive();
@@ -1355,7 +1250,6 @@ namespace ThorneTimer
                 Properties.Settings.Default.SortColumn = "Name";
             }
 
-            Properties.Settings.Default.HasSetDefaults = true;
             Properties.Settings.Default.Save();
 
             // Persist compact/full view widths
@@ -1372,53 +1266,12 @@ namespace ThorneTimer
         }
 
         /// <summary>
-        /// Applies saved column widths from the database to a grid.
-        /// Restores FillWeight for ALL columns so that Fill-mode
-        /// recalculations (EndGridUpdate, Shown toggle) preserve the
-        /// proportions the user had.  Also sets pixel Width for visible
-        /// columns so non-Fill columns get their exact saved size.
-        /// Silently skips columns that no longer exist.
+        /// Applies saved column widths/fill weights to <paramref name="grid"/>
+        /// via <see cref="GridLayoutManager"/>.  See that class for details.
         /// </summary>
         private void LoadColumnWidths(string gridName, DataGridView grid)
         {
-            try
-            {
-                Dictionary<string, int> widths = Database.GetColumnWidths(con, gridName);
-                Dictionary<string, float> fillWeights = Database.GetColumnFillWeights(con, gridName);
-
-                // Restore FillWeights for ALL columns (visible and hidden)
-                // so that Fill-mode recalculations use the saved proportions.
-                foreach (var kvp in fillWeights)
-                {
-                    if (grid.Columns.Contains(kvp.Key))
-                    {
-                        DataGridViewColumn col = grid.Columns[kvp.Key];
-                        if (kvp.Value > 0)
-                        {
-                            col.FillWeight = kvp.Value;
-                        }
-                    }
-                }
-
-                // Set pixel Width for visible columns — this is the
-                // authoritative size for non-Fill columns (AutoSizeMode
-                // = None, AllCellsExceptHeader, ColumnHeader).
-                foreach (var kvp in widths)
-                {
-                    if (grid.Columns.Contains(kvp.Key))
-                    {
-                        DataGridViewColumn col = grid.Columns[kvp.Key];
-                        if (col.Visible && kvp.Value >= col.MinimumWidth)
-                        {
-                            col.Width = kvp.Value;
-                        }
-                    }
-                }
-            }
-            catch (Exception)
-            {
-                // Database may not have the table yet; ignore
-            }
+            gridLayoutManager.LoadColumnWidths(gridName, grid);
         }
 
         /// <summary>
@@ -1428,27 +1281,11 @@ namespace ThorneTimer
         /// </summary>
         private void LoadSortState(string gridName, DataGridView grid)
         {
-            try
+            if (gridLayoutManager.TryLoadSortState(gridName, grid))
             {
-                var sorts = Database.GetSortState(con, gridName);
-                if (sorts.Count > 0)
-                {
-                    var list = grid.DataSource as SortableBindingList<Timers.GridData>;
-                    if (list != null)
-                    {
-                        var tuples = sorts
-                            .Select(s => (s.Item1, s.Item2))
-                            .ToArray();
-                        list.ApplyMultiSort(tuples);
-                        UpdateSortGlyphs();
-                        UpdateGroupSortCheckedState();
-                        return;
-                    }
-                }
-            }
-            catch (Exception)
-            {
-                // Database may not have the table yet; fall through to default
+                UpdateSortGlyphs();
+                UpdateGroupSortCheckedState();
+                return;
             }
 
             // No saved sort state — apply the default sort
@@ -1628,76 +1465,20 @@ namespace ThorneTimer
 
         private void SetupActiveVoice()
         {
-            ThorneLog.Info("SetupActiveVoice: starting voice setup");
-
-            // OneCore → SAPI registry attempt disabled for now — native "natural" voices
-            // on Windows 11 are not reliably exposed via this hack and it requires admin.
-            ThorneLog.Debug("SetupActiveVoice: OneCore->SAPI registry hack is disabled (commented out)");
-
-            cboActiveVoice.Items.Clear();
-
-            try
-            {
-                using (SpeechSynthesizer synthesizer = new SpeechSynthesizer())
-                {
-                    var installed = synthesizer.GetInstalledVoices();
-                    ThorneLog.Info($"SetupActiveVoice: enumerating {installed.Count} installed voice(s)");
-
-                    int added = 0;
-                    foreach (InstalledVoice voice in installed)
-                    {
-                        try
-                        {
-                            VoiceInfo info = voice.VoiceInfo;
-                            string cultureName = info.Culture != null ? info.Culture.Name : "<null>";
-                            string cultureTwo = info.Culture != null ? info.Culture.TwoLetterISOLanguageName : "<null>";
-                            ThorneLog.Debug($"SetupActiveVoice: found voice Name='{info.Name}', Id='{info.Id}', Description='{info.Description}', Culture='{cultureName}'");
-
-                            bool isEnglish = info.Culture != null && info.Culture.TwoLetterISOLanguageName == "en";
-                            if (isEnglish)
-                            {
-                                cboActiveVoice.Items.Add(info.Name);
-                                added++;
-                                ThorneLog.Info($"SetupActiveVoice: added voice '{info.Name}' (English)");
-                            }
-                            else
-                            {
-                                ThorneLog.Debug($"SetupActiveVoice: skipped voice '{info.Name}' (not English: {cultureTwo})");
-                            }
-                        }
-                        catch (Exception exVoice)
-                        {
-                            ThorneLog.Warn($"SetupActiveVoice: error processing a voice: {exVoice.Message}");
-                        }
-                    }
-
-                    ThorneLog.Info($"SetupActiveVoice: completed enumeration. Added {added} English voice(s) to combo box");
-                }
-            }
-            catch (Exception ex)
-            {
-                ThorneLog.Error($"SetupActiveVoice: failed to enumerate installed voices: {ex.Message}");
-            }
-
-            // Try to select previously saved voice
-            if (!string.IsNullOrEmpty(activeVoice) && cboActiveVoice.Items.Contains(activeVoice))
-            {
-                cboActiveVoice.SelectedItem = activeVoice;
-                ThorneLog.Info($"SetupActiveVoice: selected saved voice '{activeVoice}'");
-            }
-            else
-            {
-                if (!string.IsNullOrEmpty(activeVoice))
-                    ThorneLog.Warn($"SetupActiveVoice: saved voice '{activeVoice}' not found in current list");
-                cboActiveVoice.SelectedItem = activeVoice; // keep behavior unchanged
-            }
+            // VoiceManager owns enumeration + selection logic.  Mirror the
+            // field state so existing timer-alert call sites continue to work.
+            voiceManager.LoadFromDatabase();
+            voiceManager.PopulateVoiceCombo();
+            activeVoice = voiceManager.ActiveVoice;
+            voiceRate = voiceManager.Rate;
+            voiceVolume = voiceManager.Volume;
         }
 
         private void SetupActiveCharacters()
         {
             string oldActiveCharacterID = activeCharacterID;
 
-            var characters = Database.GetActiveCharacters(con);
+            var characters = CharactersRepository.GetActiveCharacters(con);
 
             // Add "All Characters" option at the beginning for watching all character log files
             characters.Insert(0, new ComboBoxItem { Value = 0, Text = "All Characters" });
@@ -1717,7 +1498,7 @@ namespace ThorneTimer
         private void RefreshGridCategorySource()
         {
             DataGridViewComboBoxColumn cboCategory = (DataGridViewComboBoxColumn)grdTimers.Columns[grdTimers.Columns["CategoryID"].Index];
-            cboCategory.DataSource = Database.GetGridCategories(con);
+            cboCategory.DataSource = CategoriesRepository.GetGridCategories(con);
         }
 
         private void SetupTimerGrid()
@@ -1756,7 +1537,7 @@ namespace ThorneTimer
                 ValueType = typeof(ComboBoxItem),
                 DisplayMember = "Text",
                 ValueMember = "Value",
-                DataSource = Database.GetGridCategories(con),
+                DataSource = CategoriesRepository.GetGridCategories(con),
                 FlatStyle = FlatStyle.Flat
             };
             grdTimers.Columns.Add(cboCategory);
@@ -1846,7 +1627,7 @@ namespace ThorneTimer
                 ValueType = typeof(ComboBoxItem),
                 DisplayMember = "Text",
                 ValueMember = "Value",
-                DataSource = Database.GetGridClasses(con),
+                DataSource = ClassesRepository.GetGridClasses(con),
                 FlatStyle = FlatStyle.Flat
             };
             grdTimers.Columns.Add(cboClass);
@@ -1910,14 +1691,14 @@ namespace ThorneTimer
             grdTimers.Columns["Count"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             grdTimers.Columns["Count"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCellsExceptHeader;
 
-            grdTimers.DataSource = Database.GetTimers(con);
+            grdTimers.DataSource = TimersRepository.GetTimers(con);
 
             // Register display-name resolvers so sorting uses the visible name
             // (e.g. "Necromancer") instead of the raw numeric ID.
             var timerList = grdTimers.DataSource as SortableBindingList<Timers.GridData>;
             if (timerList != null)
             {
-                var categories = Database.GetGridCategories(con);
+                var categories = CategoriesRepository.GetGridCategories(con);
                 var catLookup = new Dictionary<long, string>();
                 foreach (var c in categories) catLookup[c.Value] = c.Text;
                 timerList.RegisterDisplayResolver("CategoryID", raw =>
@@ -1927,7 +1708,7 @@ namespace ThorneTimer
                     return raw?.ToString() ?? "";
                 });
 
-                var classes = Database.GetGridClasses(con);
+                var classes = ClassesRepository.GetGridClasses(con);
                 var clsLookup = new Dictionary<long, string>();
                 foreach (var c in classes) clsLookup[c.Value] = c.Text;
                 timerList.RegisterDisplayResolver("ClassID", raw =>
@@ -1947,69 +1728,39 @@ namespace ThorneTimer
 
         private void SetupCharacterGrid()
         {
-            grdCharacters.Columns.Add("ID", "ID");
-            grdCharacters.Columns[0].DataPropertyName = grdCharacters.Columns[0].Name;
-            grdCharacters.Columns[0].Visible = false;
-            grdCharacters.Columns.Add("Name", "Name");
-            grdCharacters.Columns[1].DataPropertyName = grdCharacters.Columns[1].Name;
-            grdCharacters.Columns[1].FillWeight = 100;
-            grdCharacters.Columns.Add("LogFile", "Log File");
-            grdCharacters.Columns[2].DataPropertyName = grdCharacters.Columns[2].Name;
-            grdCharacters.Columns[2].Width = 600;
-            grdCharacters.Columns[2].FillWeight = 300;
-            grdCharacters.Columns.Add("MiniViewX", "MiniViewX");
-            grdCharacters.Columns[3].DataPropertyName = grdCharacters.Columns[3].Name;
-            grdCharacters.Columns[3].Visible = false;
-            grdCharacters.Columns.Add("MiniViewY", "MiniViewY");
-            grdCharacters.Columns[4].DataPropertyName = grdCharacters.Columns[4].Name;
-            grdCharacters.Columns[4].Visible = false;
+            if (charactersRepository == null)
+                charactersRepository = new CharactersRepository(con);
 
-            DataGridViewComboBoxColumn cboCharClass = new DataGridViewComboBoxColumn
+            charactersController?.Dispose();
+            charactersController = new CharactersController(charactersRepository, OnCharactersChanged)
             {
-                HeaderText = "Class",
-                Name = "ClassID",
-                DataPropertyName = "ClassID",
-                ValueType = typeof(ComboBoxItem),
-                DisplayMember = "Text",
-                ValueMember = "Value",
-                DataSource = Database.GetGridClasses(con),
-                FlatStyle = FlatStyle.Flat
+                BeforeRowSave = SyncMiniViewPositionToCharacterRow
             };
-            grdCharacters.Columns.Add(cboCharClass);
-            grdCharacters.Columns["ClassID"].Width = 120;
-            grdCharacters.Columns["ClassID"].MinimumWidth = 80;
+            charactersController.Initialize(grdCharacters);
+        }
 
-            grdCharacters.RowValidating += ValidateRowCharacters;
+        /// <summary>
+        /// Pre-save hook: if mini views are active and this row represents the
+        /// active character, copy the live mini-view location into the row's
+        /// MiniViewX / MiniViewY cells so the controller persists it.
+        /// </summary>
+        private void SyncMiniViewPositionToCharacterRow(DataGridViewRow row)
+        {
+            if (!miniViews.MiniViewsActive()) return;
 
-            DataGridViewButtonColumn buttonLogFile = new DataGridViewButtonColumn
-            {
-                HeaderText = "",
-                Name = "LOG",
-                Text = "...",
-                UseColumnTextForButtonValue = true
-            };
-            grdCharacters.Columns.Add(buttonLogFile);
+            var character = CharactersRepository.GetCharacter(con, activeCharacterID);
+            DataGridViewCell Name = row.Cells[grdCharacters.Columns["Name"].Index];
+            if (character.Name != Convert.ToString(Name.Value)) return;
 
-            grdCharacters.Columns["LOG"].Width = 30;
-            grdCharacters.Columns["LOG"].MinimumWidth = 30;
-            grdCharacters.Columns["LOG"].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
-            grdCharacters.Columns["LOG"].Resizable = DataGridViewTriState.False;
+            row.Cells[grdCharacters.Columns["MiniViewX"].Index].Value = miniViews.MV().Location.X;
+            row.Cells[grdCharacters.Columns["MiniViewY"].Index].Value = miniViews.MV().Location.Y;
+        }
 
-            grdCharacters.DataSource = Database.GetCharacters(con);
-
-            // Explicit column display order (set after DataSource binding):
-            // Visible: Name, Class, LogFile, LOG(...)
-            // Hidden: ID, MiniViewX, MiniViewY
-            int ci = 0;
-            grdCharacters.Columns["ID"].DisplayIndex = ci++;
-            grdCharacters.Columns["Name"].DisplayIndex = ci++;
-            grdCharacters.Columns["ClassID"].DisplayIndex = ci++;
-            grdCharacters.Columns["LogFile"].DisplayIndex = ci++;
-            grdCharacters.Columns["MiniViewX"].DisplayIndex = ci++;
-            grdCharacters.Columns["MiniViewY"].DisplayIndex = ci++;
-            grdCharacters.Columns["LOG"].DisplayIndex = ci++;
-
-            grdCharacters.CellClick += new DataGridViewCellEventHandler(grdCharacters_CellClick);
+        private void OnCharactersChanged()
+        {
+            tscActiveCharacter.SelectedIndexChanged -= tscActiveCharacter_SelectedIndexChanged;
+            SetupActiveCharacters();
+            tscActiveCharacter.SelectedIndexChanged += tscActiveCharacter_SelectedIndexChanged;
         }
 
         private void SetupCategoriesGrid()
@@ -2251,10 +2002,7 @@ namespace ThorneTimer
             SaveDataCategories();
         }
 
-        void ValidateRowCharacters(object sender, DataGridViewCellCancelEventArgs data)
-        {
-            SaveDataCharacters();
-        }
+
 
         void SaveDataCategories()
         {
@@ -2264,33 +2012,13 @@ namespace ThorneTimer
 
         void SaveDataCharacters()
         {
-            Characters.GridData character = Database.GetCharacter(con, activeCharacterID);
-
-            for (int r = 0; r < grdCharacters.Rows.Count; r++)
-            {
-                DataGridViewRow row = grdCharacters.Rows[r];
-
-                if (miniViews.MiniViewsActive())
-                {
-                    DataGridViewCell Name = row.Cells[grdCharacters.Columns["Name"].Index];
-                    DataGridViewCell MiniViewX = row.Cells[grdCharacters.Columns["MiniViewX"].Index];
-                    DataGridViewCell MiniViewY = row.Cells[grdCharacters.Columns["MiniViewY"].Index];
-
-                    if (character.Name == Convert.ToString(Name.Value))
-                    {
-                        MiniViewX.Value = miniViews.MV().Location.X;
-                        MiniViewY.Value = miniViews.MV().Location.Y;
-                    }
-                }
-
-                Database.SaveCharacter(con, grdCharacters, row);
-            }
+            charactersController?.SaveAll();
 
             // Save all view positions to the miniviews table
             if (miniViews.MiniViewsActive())
             {
                 Dictionary<int, Point> positions = miniViews.GetCurrentViewPositions();
-                Database.SaveViewPositions(con, positions);
+                ViewsRepository.SaveViewPositions(con, positions);
             }
 
             // Detach SelectedIndexChanged before refreshing the combo box to
@@ -2306,7 +2034,7 @@ namespace ThorneTimer
             {
                 DataGridViewRow row = grdTimers.Rows[r];
                 grdTimers.EndEdit();
-                Database.SaveTimer(con, grdTimers, row);
+                TimersRepository.SaveTimer(con, grdTimers, row);
             }
 
             timerRuntime.SyncTimerFieldsFromGrid(grdTimers);
@@ -2406,28 +2134,7 @@ namespace ThorneTimer
             }
         }
 
-        void FindLogFile(int rowIndex)
-        {
-            OpenFileDialog openFileDialog = new OpenFileDialog
-            {
-                Multiselect = false,
-                Filter = "Log files (*.txt)|*.txt|All files (*.*)|*.*",
-                DereferenceLinks = false,
-                AutoUpgradeEnabled = true
-            };
 
-            if (openFileDialog.ShowDialog() == DialogResult.OK)
-            {
-
-                DataGridViewCell logFileCell = (DataGridViewCell)grdCharacters.Rows[rowIndex].Cells[grdCharacters.Columns["LogFile"].Index];
-
-                foreach (string filename in openFileDialog.FileNames)
-                {
-                    logFileCell.Value = filename;// Path.GetFileName(filename);
-                    break;
-                }
-            }
-        }
 
         void grdTimers_CellClick(object sender, DataGridViewCellEventArgs e)
         {
@@ -2476,17 +2183,7 @@ namespace ThorneTimer
             }
         }
 
-        void grdCharacters_CellClick(object sender, DataGridViewCellEventArgs e)
-        {
-            // Ignore clicks that are not on button cells. 
-            if (e.RowIndex < 0 || (e.ColumnIndex != grdCharacters.Columns["LOG"].Index)) return;
 
-
-            if (e.ColumnIndex == grdCharacters.Columns["LOG"].Index)
-            {
-                FindLogFile(e.RowIndex);
-            }
-        }
 
         private void ResetTimerCounts()
         {
@@ -2503,7 +2200,7 @@ namespace ThorneTimer
         {
             // Capture running state before stopping
             var states = timerRuntime.SaveCharacterState();
-            Database.SaveTimerStates(con, states, activeCharacterID);
+            TimerStateRepository.SaveTimerStates(con, states, activeCharacterID);
 
             timerRuntime.StopAllTimers();
             SyncRuntimeToGrid();
@@ -2524,7 +2221,7 @@ namespace ThorneTimer
         private void StartLog()
         {
             // Build file state list from all registered characters
-            var allCharacters = Database.GetCharacters(con);
+            var allCharacters = CharactersRepository.GetCharacters(con);
             var fileStates = new List<CharacterFileState>();
             long activeID = 0;
             long.TryParse(activeCharacterID, out activeID);
@@ -2597,7 +2294,7 @@ namespace ThorneTimer
             try
             {
                 // Get character's log file path from database
-                var characters = Database.GetCharacters(con);
+                var characters = CharactersRepository.GetCharacters(con);
                 var character = characters.FirstOrDefault(c => c.ID == characterID);
                 if (character == null || string.IsNullOrEmpty(character.LogFile))
                 {
@@ -2847,7 +2544,7 @@ namespace ThorneTimer
         private long GetActiveCharacterClassID()
         {
             if (string.IsNullOrEmpty(activeCharacterID)) return 0;
-            var character = Database.GetCharacter(con, activeCharacterID);
+            var character = CharactersRepository.GetCharacter(con, activeCharacterID);
             return character.ClassID;
         }
 
@@ -2933,7 +2630,7 @@ namespace ThorneTimer
 
             // Save outgoing character's timer state
             var outgoingStates = timerRuntime.SaveCharacterState();
-            Database.SaveTimerStates(con, outgoingStates, activeCharacterID);
+            TimerStateRepository.SaveTimerStates(con, outgoingStates, activeCharacterID);
 
             // Update active character
             activeCharacterID = e.NewCharacterID.ToString();
@@ -3006,7 +2703,7 @@ namespace ThorneTimer
 
             // Save outgoing character's timer state
             var outgoingStates = timerRuntime.SaveCharacterState();
-            Database.SaveTimerStates(con, outgoingStates, activeCharacterID);
+            TimerStateRepository.SaveTimerStates(con, outgoingStates, activeCharacterID);
 
             // Set active character to "None" (0)
             activeCharacterID = "0";
@@ -3076,10 +2773,10 @@ namespace ThorneTimer
         {
             ThorneLog.Info($"LoadTimerRuntime: activeCharacterID={activeCharacterID}");
 
-            var timerData = Database.GetTimers(con);
+            var timerData = TimersRepository.GetTimers(con);
             timerRuntime.LoadTimers(timerData);
 
-            var catData = Database.GetCategories(con);
+            var catData = CategoriesRepository.GetCategories(con);
             timerRuntime.LoadCategories(catData);
 
             // Determine if this character is actually active in LogMonitor
@@ -3091,7 +2788,7 @@ namespace ThorneTimer
 
             // Restore persisted Character-scope timer state
             ThorneLog.Debug($"LoadTimerRuntime: calling LoadTimerStates for charID={activeCharacterID}");
-            var savedStates = Database.LoadTimerStates(con, activeCharacterID);
+            var savedStates = TimerStateRepository.LoadTimerStates(con, activeCharacterID);
             ThorneLog.Debug($"LoadTimerRuntime: calling RestoreCharacterState with {savedStates.Count} saved states, isActive={isActive}");
             timerRuntime.RestoreCharacterState(savedStates, isActive);
             ThorneLog.Debug("LoadTimerRuntime: calling SyncRuntimeToGrid");
@@ -3292,7 +2989,7 @@ namespace ThorneTimer
                     {
                         if (tsPersist.Scope == "Character" || tsPersist.Scope == "Character+")
                             ThorneLog.Debug($"HandleStateChanged PERSIST TID={e.TimerID} Scope={tsPersist.Scope} charID={activeCharacterID} Btn={tsPersist.ButtonState} Rem={tsPersist.Remaining} Act={tsPersist.ActiveYn}");
-                        Database.SaveSingleTimerState(con, tsPersist, activeCharacterID);
+                        TimerStateRepository.SaveSingleTimerState(con, tsPersist, activeCharacterID);
                     }
                 }
             }
@@ -3382,7 +3079,7 @@ namespace ThorneTimer
                     // Stop this specific timer if running, via TimerRuntime
                     timerRuntime.StopTimer(timerID);
 
-                    Database.DeleteTimer(con, Convert.ToString(timerID));
+                    TimersRepository.DeleteTimer(con, Convert.ToString(timerID));
 
                     // Remove from existing data source — preserves sort/filter
                     timerRuntime.RemoveTimerState(timerID);
@@ -3442,7 +3139,7 @@ namespace ThorneTimer
                 // Save immediately to get a real DB ID
                 DataGridViewRow newRow = grdTimers.Rows[newRowIndex];
                 grdTimers.EndEdit();
-                Database.SaveTimer(con, grdTimers, newRow);
+                TimersRepository.SaveTimer(con, grdTimers, newRow);
 
                 // Register in the runtime with the real ID
                 timerRuntime.AddTimerState(gd);
@@ -3459,42 +3156,12 @@ namespace ThorneTimer
 
         private void btnDeleteCharacter_Click(object sender, EventArgs e)
         {
-            if (grdCharacters.CurrentCell != null)
-            {
-                if (MessageBox.Show("Are you sure you want to delete this character?", "Delete Character", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1) == System.Windows.Forms.DialogResult.Yes)
-                {
-                    DataGridViewCell idCell = grdCharacters.Rows[grdCharacters.CurrentCell.RowIndex].Cells[grdCharacters.Columns["ID"].Index];
-                    Database.DeleteCharacter(con, Convert.ToString(idCell.Value));
-
-                    grdCharacters.DataSource = Database.GetCharacters(con);
-                    tscActiveCharacter.SelectedIndexChanged -= tscActiveCharacter_SelectedIndexChanged;
-                    SetupActiveCharacters();
-                    tscActiveCharacter.SelectedIndexChanged += tscActiveCharacter_SelectedIndexChanged;
-                }
-            }
+            charactersController?.DeleteCurrentCharacter();
         }
 
         private void btnAddCharacter_Click(object sender, EventArgs e)
         {
-            DataGridViewRow row = grdCharacters.CurrentRow;
-
-            //if (row == null)
-            {
-                List<Characters.GridData> data = Database.GetCharacters(con);
-
-                Characters.GridData gd = new Characters.GridData
-                {
-                    ID = -1,
-                    MiniViewX = 100,
-                    MiniViewY = 100
-                };
-                data.Add(gd);
-
-                grdCharacters.DataSource = data;
-
-                grdCharacters.CurrentCell = grdCharacters.Rows[grdCharacters.Rows.Count - 1].Cells[grdCharacters.Columns["Name"].Index];
-                grdCharacters.BeginEdit(true);
-            }
+            charactersController?.AddCharacter();
         }
 
         private void tscActiveCharacter_SelectedIndexChanged(object sender, EventArgs e)
@@ -3514,7 +3181,7 @@ namespace ThorneTimer
             // Save outgoing character's timer state before switching
             // This saves Character/Character+ timer state to DB for the OLD character
             var outgoingStates = timerRuntime.SaveCharacterState();
-            Database.SaveTimerStates(con, outgoingStates, activeCharacterID);
+            TimerStateRepository.SaveTimerStates(con, outgoingStates, activeCharacterID);
 
             activeCharacterID = (tscActiveCharacter.SelectedItem as ComboBoxItem).Value.ToString();
             ThorneLog.Info($"Switch TO charID={activeCharacterID}");
@@ -3577,8 +3244,8 @@ namespace ThorneTimer
                 else if (loggingCharID > 0 && loggingCharID != newCharID)
                 {
                     // Browsing mode: viewing different character than actively logging one
-                    var loggingChar = Database.GetCharacter(con, loggingCharID.ToString());
-                    var viewingChar = Database.GetCharacter(con, activeCharacterID);
+                    var loggingChar = CharactersRepository.GetCharacter(con, loggingCharID.ToString());
+                    var viewingChar = CharactersRepository.GetCharacter(con, activeCharacterID);
                     statusParsing.Text = $"Active: {loggingChar.Name} | Viewing: {viewingChar.Name}";
                     lblBrowsingIndicator.Text = $"⚠ Browsing Mode — {loggingChar.Name} is actively logging. Character-scope timers for {viewingChar.Name} are paused.";
                     lblBrowsingIndicator.Visible = true;
@@ -3694,80 +3361,32 @@ namespace ThorneTimer
 
         private void tbFontSize_Scroll(object sender, EventArgs e)
         {
-            miniViews.mvFontSize = tbFontSize.Value;
-            Database.SetSetting(con, "MiniViewFontSize", miniViews.mvFontSize);
-            UpdateMiniAppearance();
+            miniViewSettingsManager.OnFontSizeChanged();
         }
 
         private void lblWarnPickFore_Click(object sender, EventArgs e)
         {
-            colorDialogPicker.Color = lblWarnPickFore.BackColor;
-            colorDialogPicker.ShowDialog();
-            lblWarnPickFore.BackColor = colorDialogPicker.Color;
-
-            miniViews.mvWarnForeColor = lblWarnPickFore.BackColor.ToArgb();
-            Database.SetSetting(con, "MiniViewWarnFore", miniViews.mvWarnForeColor);
-            UpdateMiniAppearance();
+            miniViewSettingsManager.PickWarningForeColor();
         }
 
         private void lblWarnPickBack_Click(object sender, EventArgs e)
         {
-            colorDialogPicker.Color = lblWarnPickBack.BackColor;
-            colorDialogPicker.ShowDialog();
-            lblWarnPickBack.BackColor = colorDialogPicker.Color;
-
-            miniViews.mvWarnBackColor = lblWarnPickBack.BackColor.ToArgb();
-            Database.SetSetting(con, "MiniViewWarnBack", miniViews.mvWarnBackColor);
-            UpdateMiniAppearance();
+            miniViewSettingsManager.PickWarningBackColor();
         }
 
         private void WarningTime_LostFocus(object sender, EventArgs e)
         {
-            if (!ValidTime(txtWarningTime.Text))
+            if (!miniViewSettingsManager.TryCommitWarningTime())
             {
                 MessageBox.Show("Invalid Warning Time Format. Use 'MM:SS'", "Error");
-
                 tabCtrlMain.SelectedIndex = 3;
                 txtWarningTime.Focus();
             }
-            else
-            {
-                miniViews.mvWarnTime = txtWarningTime.Text;
-                Database.SetSetting(con, "MiniViewWarnTime", miniViews.mvWarnTime);
-                UpdateMiniAppearance();
-            }
-        }
-
-        bool ValidTime(string theTime)
-        {
-            if (theTime.Length != 5)
-            {
-                return false;
-            }
-
-            if (theTime.Substring(2, 1) != ":")
-            {
-                return false;
-            }
-
-            string s1 = theTime.Substring(0, 2);
-            string s2 = theTime.Substring(3, 2);
-            bool r1 = int.TryParse(s1, out _);
-            bool r2 = int.TryParse(s2, out _);
-
-            if (r1 == false || r2 == false)
-            {
-                return false;
-            }
-
-            return true;
         }
 
         private void tbOpacity_Scroll(object sender, EventArgs e)
         {
-            miniViews.mvOpacity = tbOpacity.Value;
-            Database.SetSetting(con, "MiniViewOpacity", miniViews.mvOpacity);
-            UpdateMiniAppearance();
+            miniViewSettingsManager.OnOpacityChanged();
         }
 
         private void tbVolume_Scroll(object sender, EventArgs e)
