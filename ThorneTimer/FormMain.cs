@@ -2681,6 +2681,11 @@ namespace ThorneTimer
                     grdTimers.DataSource = _visibleTimers;
                 }
 
+                // Re-apply column DisplayIndex order — DataGridView resets
+                // DisplayIndex to the property-declaration order whenever
+                // DataSource is reassigned.
+                ResetTimersGridColumns();
+
                 // Restore prior sort if any.
                 if (oldSort != null && oldSort.Count > 0)
                 {
