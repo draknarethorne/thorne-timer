@@ -875,6 +875,10 @@ namespace ThorneTimer
                 SeedDefaultViews(con);
             }
 
+            // Always ensure tome metadata (version stamps) — runs on every open,
+            // both for new and existing tomes.
+            EnsureMetaSchema(con);
+
             return con;
         }
 
@@ -1254,607 +1258,20 @@ namespace ThorneTimer
             cmd.ExecuteNonQuery();
         }
 
-        static public void SaveTimer(SQLiteConnection con, DataGridView dataGridView, DataGridViewRow row)
-        {
-            DataGridViewCell ID = row.Cells[dataGridView.Columns["ID"].Index];
-            DataGridViewCell Name = row.Cells[dataGridView.Columns["Name"].Index];
-            DataGridViewCell CategoryID = row.Cells[dataGridView.Columns["CategoryID"].Index];
-            DataGridViewCell StartKeyword = row.Cells[dataGridView.Columns["StartKeyword"].Index];
-            DataGridViewCell EndKeyword = row.Cells[dataGridView.Columns["EndKeyword"].Index];
-            DataGridViewCell WAVFile = row.Cells[dataGridView.Columns["WAVFile"].Index];
-            DataGridViewCell Speech = row.Cells[dataGridView.Columns["Speech"].Index];
-            DataGridViewCell Duration = row.Cells[dataGridView.Columns["Duration"].Index];
-            DataGridViewCell ActiveYn = row.Cells[dataGridView.Columns["ActiveYn"].Index];
-            DataGridViewCell CaseYn = row.Cells[dataGridView.Columns["CaseYn"].Index];
-            DataGridViewCell EndlessYn = row.Cells[dataGridView.Columns["EndlessYn"].Index];
-            DataGridViewCell Style = row.Cells[dataGridView.Columns["Style"].Index];
-            DataGridViewCell Scope = row.Cells[dataGridView.Columns["Scope"].Index];
-            DataGridViewCell DependsOnTimer = row.Cells[dataGridView.Columns["DependsOnTimer"].Index];
-            DataGridViewCell DependsOnDelay = row.Cells[dataGridView.Columns["DependsOnDelay"].Index];
-            DataGridViewCell ClassIDCell = row.Cells[dataGridView.Columns["ClassID"].Index];
-
-            SQLiteCommand cmd = new SQLiteCommand(con);
-
-            if (Convert.ToString(ID.Value) == "-1")
-            {
-                cmd.CommandText = "INSERT INTO timers (Name, CategoryID, StartKeyword, EndKeyword, WAVFile, Speech, Duration, ActiveYn, CaseYn, EndlessYn, Style, Scope, DependsOnTimer, DependsOnDelay, ClassID) VALUES (@name, @categoryID, @startKeyword, @endKeyword, @wavFile, @speech, @duration, @activeYn, @caseYn, @endlessYn, @style, @scope, @dependsOnTimer, @dependsOnDelay, @classID)";
-            }
-            else
-            {
-                cmd.CommandText = "UPDATE timers SET Name = @name, CategoryID = @categoryID, StartKeyword = @startKeyword, EndKeyword = @endKeyword, WAVFile = @wavFile, Speech = @speech, Duration = @duration, ActiveYn = @activeYn, CaseYn = @caseYn, EndlessYn = @endlessYn, Style = @style, Scope = @scope, DependsOnTimer = @dependsOnTimer, DependsOnDelay = @dependsOnDelay, ClassID = @classID WHERE ID = @id";
-                cmd.Parameters.AddWithValue("@id", Convert.ToInt32(ID.Value));
-            }
-
-            cmd.Parameters.AddWithValue("@name", Convert.ToString(Name.Value));
-            cmd.Parameters.AddWithValue("@categoryID", Convert.ToInt32(CategoryID.Value));
-            cmd.Parameters.AddWithValue("@startKeyword", Convert.ToString(StartKeyword.Value));
-            cmd.Parameters.AddWithValue("@endKeyword", Convert.ToString(EndKeyword.Value));
-            cmd.Parameters.AddWithValue("@wavFile", Convert.ToString(WAVFile.Value));
-            cmd.Parameters.AddWithValue("@speech", Convert.ToString(Speech.Value));
-            cmd.Parameters.AddWithValue("@duration", Convert.ToString(Duration.Value));
-
-            // For Character / Character+ scopes, ActiveYn is per-character and
-            // stored in timer_runtime_state.  Always write 0 to the global timers
-            // table so it doesn't bleed to other characters on reload.
-            // World-scope ActiveYn is global and written as-is.
-            string scopeValue = Convert.ToString(Scope.Value);
-            int globalActiveYn = (scopeValue == "Character" || scopeValue == "Character+")
-                ? 0
-                : Convert.ToInt32(ActiveYn.Value);
-            cmd.Parameters.AddWithValue("@activeYn", globalActiveYn);
-            cmd.Parameters.AddWithValue("@caseYn", Convert.ToInt32(CaseYn.Value));
-            cmd.Parameters.AddWithValue("@endlessYn", Convert.ToInt32(EndlessYn.Value));
-            cmd.Parameters.AddWithValue("@style", Convert.ToString(Style.Value));
-            cmd.Parameters.AddWithValue("@scope", Convert.ToString(Scope.Value));
-            cmd.Parameters.AddWithValue("@dependsOnTimer", Convert.ToString(DependsOnTimer.Value));
-            cmd.Parameters.AddWithValue("@dependsOnDelay", Convert.ToInt32(DependsOnDelay.Value));
-            cmd.Parameters.AddWithValue("@classID", ClassIDCell.Value == null || ClassIDCell.Value == DBNull.Value || Convert.ToInt64(ClassIDCell.Value) == 0 ? (object)DBNull.Value : Convert.ToInt64(ClassIDCell.Value));
-            cmd.ExecuteNonQuery();
-
-            // Update ID in Grid When INSERTing
-            if (Convert.ToString(ID.Value) == "-1")
-            {
-                cmd.CommandText = "SELECT last_insert_rowid()";
-                cmd.Parameters.Clear();
-                row.Cells[dataGridView.Columns["ID"].Index].Value = (long)cmd.ExecuteScalar();
-            }
-        }
-
-        static public void DeleteTimer(SQLiteConnection con, string ID)
-        {
-            if (!int.TryParse(ID, out int idValue)) return;
-            SQLiteCommand cmd = new SQLiteCommand(con)
-            {
-                CommandText = "DELETE FROM timers WHERE ID = @id"
-            };
-            cmd.Parameters.AddWithValue("@id", idValue);
-            cmd.ExecuteNonQuery();
-        }
-
-
-        static public SortableBindingList<Timers.GridData> GetTimers(SQLiteConnection con)
-        {
-            SortableBindingList<Timers.GridData> gridData = new SortableBindingList<Timers.GridData>();
-
-            // Suppress per-item ListChanged events during bulk load
-            gridData.RaiseListChangedEvents = false;
-
-            SQLiteCommand cmd = new SQLiteCommand(con)
-            {
-                CommandText = "SELECT * from timers" // ORDER BY ActiveYn DESC";
-            };
-            SQLiteDataReader rdr = cmd.ExecuteReader();
-
-            bool hasScope = isFieldExist(con, "timers", "Scope");
-            int scopeOrdinal = hasScope ? -1 : -1;
-
-            bool hasDependsOn = isFieldExist(con, "timers", "DependsOnTimer");
-
-            bool hasClassID = isFieldExist(con, "timers", "ClassID");
-
-            while (rdr.Read())
-            {
-                try
-                {
-                    if (hasScope && scopeOrdinal < 0)
-                        scopeOrdinal = rdr.GetOrdinal("Scope");
-
-                    Timers.GridData data = new Timers.GridData
-                    {
-                        ID = rdr.GetInt32(rdr.GetOrdinal("ID")),
-                        Name = rdr.GetString(rdr.GetOrdinal("Name")),
-                        CategoryID = rdr.GetInt32(rdr.GetOrdinal("CategoryID")),
-                        StartKeyword = rdr.GetString(rdr.GetOrdinal("StartKeyword")),
-                        EndKeyword = rdr.GetString(rdr.GetOrdinal("EndKeyword")),
-                        WAVFile = rdr.GetString(rdr.GetOrdinal("WAVFile")),
-                        Speech = rdr.GetString(rdr.GetOrdinal("Speech")),
-                        Duration = rdr.GetString(rdr.GetOrdinal("Duration")),
-                        ActiveYn = rdr.GetInt32(rdr.GetOrdinal("ActiveYn")),
-                        CaseYn = rdr.GetInt32(rdr.GetOrdinal("CaseYn")),
-                        EndlessYn = rdr.GetInt32(rdr.GetOrdinal("EndlessYn")),
-                        Style = rdr.IsDBNull(rdr.GetOrdinal("Style")) ? "Normal" : rdr.GetString(rdr.GetOrdinal("Style")),
-                        Scope = (hasScope && scopeOrdinal >= 0 && !rdr.IsDBNull(scopeOrdinal)) ? rdr.GetString(scopeOrdinal) : "World",
-                        DependsOnTimer = hasDependsOn && !rdr.IsDBNull(rdr.GetOrdinal("DependsOnTimer")) ? rdr.GetString(rdr.GetOrdinal("DependsOnTimer")) : "",
-                        DependsOnDelay = hasDependsOn && !rdr.IsDBNull(rdr.GetOrdinal("DependsOnDelay")) ? rdr.GetInt32(rdr.GetOrdinal("DependsOnDelay")) : 0,
-                        ClassID = hasClassID && !rdr.IsDBNull(rdr.GetOrdinal("ClassID")) ? rdr.GetInt64(rdr.GetOrdinal("ClassID")) : 0,
-                        Remaining = ""
-                    };
-
-                    gridData.Add(data);
-                }
-                catch (Exception)
-                {
-                    // Schema might be partial; skip malformed row
-                    continue;
-                }
-            }
-
-            rdr.Close();
-
-            // Re-enable events and notify that the list is ready
-            gridData.RaiseListChangedEvents = true;
-            gridData.ResetBindings();
-
-            return gridData;
-        }
-
-        static public Characters.GridData GetCharacter(SQLiteConnection con, string ID)
-        {
-            Characters.GridData data = new Characters.GridData();
-
-            if (!int.TryParse(ID, out int idValue))
-            {
-                // Invalid ID supplied; return empty data
-                return data;
-            }
-
-            SQLiteCommand cmd = new SQLiteCommand(con)
-            {
-                CommandText = "SELECT * from characters WHERE ID = @id"
-            };
-            cmd.Parameters.AddWithValue("@id", idValue);
-            SQLiteDataReader rdr = cmd.ExecuteReader();
-
-            while (rdr.Read())
-            {
-                data.ID = rdr.GetInt32(rdr.GetOrdinal("ID"));
-                data.Name = rdr.GetString(rdr.GetOrdinal("Name"));
-                data.LogFile = rdr.GetString(rdr.GetOrdinal("LogFile"));
-                data.MiniViewX = rdr.GetInt32(rdr.GetOrdinal("MiniViewX"));
-                data.MiniViewY = rdr.GetInt32(rdr.GetOrdinal("MiniViewY"));
-                int classOrdinal = -1;
-                try { classOrdinal = rdr.GetOrdinal("ClassID"); } catch { }
-                data.ClassID = classOrdinal >= 0 && !rdr.IsDBNull(classOrdinal) ? rdr.GetInt64(classOrdinal) : 0;
-            }
-
-            try { rdr.Close(); } catch { }
-
-            return data;
-        }
-
-        static public List<ComboBoxItem> GetActiveCharacters(SQLiteConnection con)
-        {
-            List<ComboBoxItem> cboData = new List<ComboBoxItem>();
-
-            SQLiteCommand cmd = new SQLiteCommand(con)
-            {
-                CommandText = "SELECT * from characters ORDER BY Name"
-            };
-            SQLiteDataReader rdr = cmd.ExecuteReader();
-
-            while (rdr.Read())
-            {
-                ComboBoxItem data = new ComboBoxItem
-                {
-                    Value = rdr.GetInt32(rdr.GetOrdinal("ID")),
-                    Text = rdr.GetString(rdr.GetOrdinal("Name"))
-                };
-
-                cboData.Add(data);
-            }
-
-            rdr.Close();
-
-            return cboData;
-        }
-
-        static public List<Characters.GridData> GetCharacters(SQLiteConnection con)
-        {
-            List<Characters.GridData> gridData = new List<Characters.GridData>();
-
-            SQLiteCommand cmd = new SQLiteCommand(con)
-            {
-                CommandText = "SELECT * from characters ORDER BY Name"
-            };
-            SQLiteDataReader rdr = cmd.ExecuteReader();
-
-            while (rdr.Read())
-            {
-                Characters.GridData data = new Characters.GridData
-                {
-                    ID = rdr.GetInt32(rdr.GetOrdinal("ID")),
-                    Name = rdr.GetString(rdr.GetOrdinal("Name")),
-                    LogFile = rdr.GetString(rdr.GetOrdinal("LogFile")),
-                    MiniViewX = rdr.GetInt32(rdr.GetOrdinal("MiniViewX")),
-                    MiniViewY = rdr.GetInt32(rdr.GetOrdinal("MiniViewY"))
-                };
-                int classOrdinal = -1;
-                try { classOrdinal = rdr.GetOrdinal("ClassID"); } catch { }
-                data.ClassID = classOrdinal >= 0 && !rdr.IsDBNull(classOrdinal) ? rdr.GetInt64(classOrdinal) : 0;
-
-                gridData.Add(data);
-            }
-
-            rdr.Close();
-
-            return gridData;
-        }
-
-        static public void DeleteCharacter(SQLiteConnection con, string ID)
-        {
-            if (!int.TryParse(ID, out int idValue)) return;
-
-            // Delete persisted timer runtime state for this character
-            SQLiteCommand cmdState = new SQLiteCommand(con)
-            {
-                CommandText = "DELETE FROM timer_runtime_state WHERE CharacterID = @id"
-            };
-            cmdState.Parameters.AddWithValue("@id", idValue);
-            int stateRows = cmdState.ExecuteNonQuery();
-            ThorneLog.Info($"DeleteCharacter ID={idValue}: removed {stateRows} timer_runtime_state row(s)");
-
-            // Delete the character record
-            SQLiteCommand cmd = new SQLiteCommand(con)
-            {
-                CommandText = "DELETE FROM characters WHERE ID = @id"
-            };
-            cmd.Parameters.AddWithValue("@id", idValue);
-            cmd.ExecuteNonQuery();
-            ThorneLog.Info($"DeleteCharacter ID={idValue}: character deleted");
-        }
-
-        static public void SaveCharacter(SQLiteConnection con, DataGridView dataGridView, DataGridViewRow row)
-        {
-            DataGridViewCell ID = row.Cells[dataGridView.Columns["ID"].Index];
-            DataGridViewCell Name = row.Cells[dataGridView.Columns["Name"].Index];
-            DataGridViewCell LogFile = row.Cells[dataGridView.Columns["LogFile"].Index];
-            DataGridViewCell MiniViewX = row.Cells[dataGridView.Columns["MiniViewX"].Index];
-            DataGridViewCell MiniViewY = row.Cells[dataGridView.Columns["MiniViewY"].Index];
-            DataGridViewCell ClassIDCell = row.Cells[dataGridView.Columns["ClassID"].Index];
-
-            SQLiteCommand cmd = new SQLiteCommand(con);
-
-            if (Convert.ToString(ID.Value) == "-1")
-            {
-                cmd.CommandText = "INSERT INTO characters (Name, LogFile, MiniViewX, MiniViewY, ClassID) VALUES (@name, @logFile, @miniViewX, @miniViewY, @classID)";
-            }
-            else
-            {
-                cmd.CommandText = "UPDATE characters SET Name = @name, LogFile = @logFile, MiniViewX = @miniViewX, MiniViewY = @miniViewY, ClassID = @classID WHERE ID = @id";
-                cmd.Parameters.AddWithValue("@id", Convert.ToInt32(ID.Value));
-            }
-
-            cmd.Parameters.AddWithValue("@name", Convert.ToString(Name.Value));
-            cmd.Parameters.AddWithValue("@logFile", Convert.ToString(LogFile.Value));
-            cmd.Parameters.AddWithValue("@miniViewX", Convert.ToInt32(MiniViewX.Value));
-            cmd.Parameters.AddWithValue("@miniViewY", Convert.ToInt32(MiniViewY.Value));
-            cmd.Parameters.AddWithValue("@classID", ClassIDCell.Value == null || ClassIDCell.Value == DBNull.Value || Convert.ToInt64(ClassIDCell.Value) == 0 ? (object)DBNull.Value : Convert.ToInt64(ClassIDCell.Value));
-            cmd.ExecuteNonQuery();
-
-            // Update ID in Grid When INSERTing
-            if (Convert.ToString(ID.Value) == "-1")
-            {
-                cmd.CommandText = "SELECT last_insert_rowid()";
-                cmd.Parameters.Clear();
-                row.Cells[dataGridView.Columns["ID"].Index].Value = (long)cmd.ExecuteScalar();
-            }
-        }
-
-        static public List<ComboBoxItem> GetGridCategories(SQLiteConnection con)
-        {
-            List<ComboBoxItem> cboData = new List<ComboBoxItem>();
-
-            ComboBoxItem blankData = new ComboBoxItem
-            {
-                Value = 0,
-                Text = "--"
-            };
-            cboData.Add(blankData);
-
-            SQLiteCommand cmd = new SQLiteCommand(con)
-            {
-                CommandText = "SELECT * from categories ORDER BY Name"
-            };
-            SQLiteDataReader rdr = cmd.ExecuteReader();
-
-            while (rdr.Read())
-            {
-                ComboBoxItem data = new ComboBoxItem
-                {
-                    Value = rdr.GetInt32(rdr.GetOrdinal("ID")),
-                    Text = rdr.GetString(rdr.GetOrdinal("Name"))
-                };
-
-                cboData.Add(data);
-            }
-
-            rdr.Close();
-
-            return cboData;
-        }
-
-        static public List<ComboBoxItem> GetGridClasses(SQLiteConnection con)
-        {
-            List<ComboBoxItem> cboData = new List<ComboBoxItem>();
-
-            ComboBoxItem globalData = new ComboBoxItem
-            {
-                Value = 0,
-                Text = "All"
-            };
-            cboData.Add(globalData);
-
-            if (!isTableExist(con, "classes")) return cboData;
-
-            SQLiteCommand cmd = new SQLiteCommand(con)
-            {
-                CommandText = "SELECT * from classes ORDER BY Name"
-            };
-            SQLiteDataReader rdr = cmd.ExecuteReader();
-
-            while (rdr.Read())
-            {
-                ComboBoxItem data = new ComboBoxItem
-                {
-                    Value = rdr.GetInt64(rdr.GetOrdinal("ID")),
-                    Text = rdr.GetString(rdr.GetOrdinal("Name"))
-                };
-
-                cboData.Add(data);
-            }
-
-            rdr.Close();
-
-            return cboData;
-        }
-
-        static public List<Categories.GridData> GetCategories(SQLiteConnection con)
-        {
-            List<Categories.GridData> gridData = new List<Categories.GridData>();
-
-            SQLiteCommand cmd = new SQLiteCommand(con)
-            {
-                CommandText = "SELECT * from categories ORDER BY Name"
-            };
-            SQLiteDataReader rdr = cmd.ExecuteReader();
-
-            while (rdr.Read())
-            {
-                Categories.GridData data = new Categories.GridData
-                {
-                    ID = rdr.GetInt32(rdr.GetOrdinal("ID")),
-                    Name = rdr.GetString(rdr.GetOrdinal("Name")),
-                    StartKeyword = rdr.GetString(rdr.GetOrdinal("StartKeyword")),
-                    EndKeyword = rdr.GetString(rdr.GetOrdinal("EndKeyword")),
-                    AutoStop = rdr.GetInt32(rdr.GetOrdinal("AutoStop"))
-                };
-
-                gridData.Add(data);
-            }
-
-            rdr.Close();
-
-            return gridData;
-        }
-
-        static public void DeleteCategory(SQLiteConnection con, string ID)
-        {
-            if (!int.TryParse(ID, out int idValue)) return;
-            SQLiteCommand cmd = new SQLiteCommand(con)
-            {
-                CommandText = "DELETE FROM categories WHERE ID = @id"
-            };
-            cmd.Parameters.AddWithValue("@id", idValue);
-            cmd.ExecuteNonQuery();
-        }
-
-        static public void SaveCategory(SQLiteConnection con, DataGridView dataGridView, DataGridViewRow row)
-        {
-            DataGridViewCell ID = row.Cells[dataGridView.Columns["ID"].Index];
-            DataGridViewCell Name = row.Cells[dataGridView.Columns["Name"].Index];
-            DataGridViewCell StartKeyword = row.Cells[dataGridView.Columns["StartKeyword"].Index];
-            DataGridViewCell EndKeyword = row.Cells[dataGridView.Columns["EndKeyword"].Index];
-            DataGridViewCell AutoStop = row.Cells[dataGridView.Columns["AutoStop"].Index];
-
-            SQLiteCommand cmd = new SQLiteCommand(con);
-
-            if (Convert.ToString(ID.Value) == "-1")
-            {
-                cmd.CommandText = "INSERT INTO categories (Name, StartKeyword, EndKeyword, AutoStop) VALUES (@name, @startKeyword, @endKeyword, @autoStop)";
-            }
-            else
-            {
-                cmd.CommandText = "UPDATE categories SET Name = @name, StartKeyword = @startKeyword, EndKeyword = @endKeyword, AutoStop = @autoStop WHERE ID = @id";
-                cmd.Parameters.AddWithValue("@id", Convert.ToInt32(ID.Value));
-            }
-
-            cmd.Parameters.AddWithValue("@name", Convert.ToString(Name.Value));
-            cmd.Parameters.AddWithValue("@startKeyword", Convert.ToString(StartKeyword.Value));
-            cmd.Parameters.AddWithValue("@endKeyword", Convert.ToString(EndKeyword.Value));
-            cmd.Parameters.AddWithValue("@autoStop", Convert.ToInt32(AutoStop.Value));
-            cmd.ExecuteNonQuery();
-
-            // Update ID in Grid When INSERTing
-            if (Convert.ToString(ID.Value) == "-1")
-            {
-                cmd.CommandText = "SELECT last_insert_rowid()";
-                cmd.Parameters.Clear();
-                row.Cells[dataGridView.Columns["ID"].Index].Value = (long)cmd.ExecuteScalar();
-            }
-        }
-
-        static public List<MiniViews.GridData> GetViews(SQLiteConnection con)
-        {
-            List<MiniViews.GridData> gridData = new List<MiniViews.GridData>();
-
-            SQLiteCommand cmd = new SQLiteCommand(con)
-            {
-                CommandText = "SELECT ID, Name, ActiveYn, StyleFilter, PositionX, PositionY, SortOrder, ForeColor, BackColor, ShowWarning, EmptyBehavior FROM miniviews ORDER BY SortOrder, Name"
-            };
-            SQLiteDataReader rdr = cmd.ExecuteReader();
-
-            while (rdr.Read())
-            {
-                MiniViews.GridData data = new MiniViews.GridData
-                {
-                    ID = rdr.GetInt32(rdr.GetOrdinal("ID")),
-                    Name = rdr.IsDBNull(rdr.GetOrdinal("Name")) ? "" : rdr.GetString(rdr.GetOrdinal("Name")),
-                    ActiveYn = rdr.IsDBNull(rdr.GetOrdinal("ActiveYn")) ? 1 : rdr.GetInt32(rdr.GetOrdinal("ActiveYn")),
-                    StyleFilter = rdr.IsDBNull(rdr.GetOrdinal("StyleFilter")) ? "Normal" : rdr.GetString(rdr.GetOrdinal("StyleFilter")),
-                    PositionX = rdr.IsDBNull(rdr.GetOrdinal("PositionX")) ? 100 : rdr.GetInt32(rdr.GetOrdinal("PositionX")),
-                    PositionY = rdr.IsDBNull(rdr.GetOrdinal("PositionY")) ? 100 : rdr.GetInt32(rdr.GetOrdinal("PositionY")),
-                    SortOrder = rdr.IsDBNull(rdr.GetOrdinal("SortOrder")) ? 0 : rdr.GetInt32(rdr.GetOrdinal("SortOrder")),
-                    ForeColor = rdr.IsDBNull(rdr.GetOrdinal("ForeColor")) ? Color.Yellow.ToArgb() : rdr.GetInt32(rdr.GetOrdinal("ForeColor")),
-                    BackColor = rdr.IsDBNull(rdr.GetOrdinal("BackColor")) ? Color.Black.ToArgb() : rdr.GetInt32(rdr.GetOrdinal("BackColor")),
-                    ShowWarning = rdr.IsDBNull(rdr.GetOrdinal("ShowWarning")) ? 1 : rdr.GetInt32(rdr.GetOrdinal("ShowWarning")),
-                    EmptyBehavior = rdr.IsDBNull(rdr.GetOrdinal("EmptyBehavior")) ? "ViewName" : rdr.GetString(rdr.GetOrdinal("EmptyBehavior"))
-                };
-
-                gridData.Add(data);
-            }
-
-            rdr.Close();
-
-            return gridData;
-        }
-
-        static public void DeleteView(SQLiteConnection con, string ID)
-        {
-            if (!int.TryParse(ID, out int idValue)) return;
-            SQLiteCommand cmd = new SQLiteCommand(con)
-            {
-                CommandText = "DELETE FROM miniviews WHERE ID = @id"
-            };
-            cmd.Parameters.AddWithValue("@id", idValue);
-            cmd.ExecuteNonQuery();
-        }
-
-        static public void SaveView(SQLiteConnection con, DataGridView dataGridView, DataGridViewRow row)
-        {
-            DataGridViewCell ID = row.Cells[dataGridView.Columns["ID"].Index];
-            DataGridViewCell Name = row.Cells[dataGridView.Columns["Name"].Index];
-            DataGridViewCell ActiveYn = row.Cells[dataGridView.Columns["ActiveYn"].Index];
-            DataGridViewCell StyleFilter = row.Cells[dataGridView.Columns["StyleFilter"].Index];
-            DataGridViewCell ShowWarning = row.Cells[dataGridView.Columns["ShowWarning"].Index];
-            DataGridViewCell EmptyBehavior = row.Cells[dataGridView.Columns["EmptyBehavior"].Index];
-
-            SQLiteCommand cmd = new SQLiteCommand(con);
-
-            if (Convert.ToString(ID.Value) == "-1")
-            {
-                cmd.CommandText = "INSERT INTO miniviews (Name, ActiveYn, StyleFilter, ShowWarning, EmptyBehavior, PositionX, PositionY, SortOrder) VALUES (@name, @active, @style, @warn, @empty, 100, 100, 0)";
-                cmd.Parameters.AddWithValue("@name", Convert.ToString(Name.Value));
-                cmd.Parameters.AddWithValue("@active", Convert.ToInt32(ActiveYn.Value));
-                cmd.Parameters.AddWithValue("@style", Convert.ToString(StyleFilter.Value));
-                cmd.Parameters.AddWithValue("@warn", Convert.ToInt32(ShowWarning.Value ?? 1));
-                cmd.Parameters.AddWithValue("@empty", Convert.ToString(EmptyBehavior.Value ?? "ViewName"));
-                cmd.ExecuteNonQuery();
-                cmd.Parameters.Clear();
-            }
-            else
-            {
-                cmd.CommandText = "UPDATE miniviews SET Name = @name, ActiveYn = @active, StyleFilter = @style, ShowWarning = @warn, EmptyBehavior = @empty WHERE ID = @id";
-                cmd.Parameters.AddWithValue("@name", Convert.ToString(Name.Value));
-                cmd.Parameters.AddWithValue("@active", Convert.ToInt32(ActiveYn.Value));
-                cmd.Parameters.AddWithValue("@style", Convert.ToString(StyleFilter.Value));
-                cmd.Parameters.AddWithValue("@warn", Convert.ToInt32(ShowWarning.Value ?? 1));
-                cmd.Parameters.AddWithValue("@empty", Convert.ToString(EmptyBehavior.Value ?? "ViewName"));
-                cmd.Parameters.AddWithValue("@id", Convert.ToInt32(ID.Value));
-                cmd.ExecuteNonQuery();
-                cmd.Parameters.Clear();
-            }
-
-            // Update ID in Grid When INSERTing
-            if (Convert.ToString(ID.Value) == "-1")
-            {
-                cmd.CommandText = "SELECT last_insert_rowid()";
-                row.Cells[dataGridView.Columns["ID"].Index].Value = (long)cmd.ExecuteScalar();
-            }
-        }
-
-        /// <summary>
-        /// Data class for view position information
-        /// </summary>
-        public class ViewPositionData
-        {
-            public int ID { get; set; }
-            public string Name { get; set; }
-            public int PositionX { get; set; }
-            public int PositionY { get; set; }
-            public int SortOrder { get; set; }
-            public int ActiveYn { get; set; }
-            public string StyleFilter { get; set; }
-            public int ForeColor { get; set; }      // v0.6.0: Per-view foreground color
-            public int BackColor { get; set; }      // v0.6.0: Per-view background color
-            public int ShowWarning { get; set; }    // v0.6.0: Per-view warning color control
-            public string EmptyBehavior { get; set; }  // v0.6.0: Per-view empty display behavior
-        }
-
-        /// <summary>
-        /// Gets all view definitions from the database, ordered by SortOrder.
-        /// </summary>
-        static public List<ViewPositionData> GetViewPositions(SQLiteConnection con)
-        {
-            List<ViewPositionData> views = new List<ViewPositionData>();
-
-            SQLiteCommand cmd = new SQLiteCommand(con)
-            {
-                CommandText = "SELECT ID, Name, PositionX, PositionY, SortOrder, ActiveYn, StyleFilter, ForeColor, BackColor, ShowWarning, EmptyBehavior FROM miniviews ORDER BY SortOrder"
-            };
-
-            using (SQLiteDataReader rdr = cmd.ExecuteReader())
-            {
-                while (rdr.Read())
-                {
-                    ViewPositionData data = new ViewPositionData
-                    {
-                        ID = rdr.GetInt32(rdr.GetOrdinal("ID")),
-                        Name = rdr.IsDBNull(rdr.GetOrdinal("Name")) ? "" : rdr.GetString(rdr.GetOrdinal("Name")),
-                        PositionX = rdr.IsDBNull(rdr.GetOrdinal("PositionX")) ? 100 : rdr.GetInt32(rdr.GetOrdinal("PositionX")),
-                        PositionY = rdr.IsDBNull(rdr.GetOrdinal("PositionY")) ? 100 : rdr.GetInt32(rdr.GetOrdinal("PositionY")),
-                        SortOrder = rdr.IsDBNull(rdr.GetOrdinal("SortOrder")) ? 0 : rdr.GetInt32(rdr.GetOrdinal("SortOrder")),
-                        ActiveYn = rdr.IsDBNull(rdr.GetOrdinal("ActiveYn")) ? 1 : rdr.GetInt32(rdr.GetOrdinal("ActiveYn")),
-                        StyleFilter = rdr.IsDBNull(rdr.GetOrdinal("StyleFilter")) ? "Normal" : rdr.GetString(rdr.GetOrdinal("StyleFilter")),
-                        ForeColor = rdr.IsDBNull(rdr.GetOrdinal("ForeColor")) ? Color.Yellow.ToArgb() : rdr.GetInt32(rdr.GetOrdinal("ForeColor")),
-                        BackColor = rdr.IsDBNull(rdr.GetOrdinal("BackColor")) ? Color.Black.ToArgb() : rdr.GetInt32(rdr.GetOrdinal("BackColor")),
-                        ShowWarning = rdr.IsDBNull(rdr.GetOrdinal("ShowWarning")) ? 1 : rdr.GetInt32(rdr.GetOrdinal("ShowWarning")),
-                        EmptyBehavior = rdr.IsDBNull(rdr.GetOrdinal("EmptyBehavior")) ? "ViewName" : rdr.GetString(rdr.GetOrdinal("EmptyBehavior"))
-                    };
-
-                    views.Add(data);
-                }
-            }
-
-            return views;
-        }
-
-        /// <summary>
-        /// Saves view positions to the database by ID.
-        /// </summary>
-        static public void SaveViewPositions(SQLiteConnection con, Dictionary<int, Point> positions)
-        {
-            SQLiteCommand cmd = new SQLiteCommand(con);
-
-            foreach (var kvp in positions)
-            {
-                cmd.CommandText = "UPDATE miniviews SET PositionX = @x, PositionY = @y WHERE ID = @id";
-                cmd.Parameters.Clear();
-                cmd.Parameters.AddWithValue("@x", kvp.Value.X);
-                cmd.Parameters.AddWithValue("@y", kvp.Value.Y);
-                cmd.Parameters.AddWithValue("@id", kvp.Key);
-                cmd.ExecuteNonQuery();
-            }
-        }
+        // ---------------------------------------------------------------
+        // The CRUD/data-loading methods for timers, characters, categories,
+        // views, and timer runtime state previously lived here.  They were
+        // extracted in v0.6.0 into dedicated repository classes:
+        //   • TimersRepository           (timers table)
+        //   • CharactersRepository       (characters + classes lookup)
+        //   • CategoriesRepository       (categories + category combo)
+        //   • ViewsRepository            (miniviews + ViewPositionData)
+        //   • TimerStateRepository       (timer_runtime_state table)
+        //   • TomeStatisticsRepository   (Tome Information stats / db_meta)
+        // Database.cs now owns only: connection, schema/migrations, settings,
+        // grid layout persistence (column widths, sort state, fill weights),
+        // and the db_meta key/value helpers used by Tome metadata stamping.
+        // ---------------------------------------------------------------
 
         /// <summary>
         /// Gets saved column widths for a grid from the database.
@@ -2002,317 +1419,80 @@ namespace ThorneTimer
         }
 
         /// <summary>
-        /// Saves runtime timer state (counts, remaining, button state) for a character.
-        /// Uses INSERT OR REPLACE to upsert on the (TimerID, CharacterID) unique key.
+        /// Current tome schema version.  Bump this when the on-disk schema
+        /// changes in a way migrations care about.  v1 corresponds to v0.6.0.
         /// </summary>
-        static public void SaveTimerStates(SQLiteConnection con, List<TimerState> states, string characterID)
+        public const string CurrentSchemaVersion = "1";
+
+        /// <summary>
+        /// Ensures the db_meta key/value table exists and stamps the running
+        /// application version (and schema version) into it.  CreatedByVersion
+        /// is written once on first creation; LastWrittenByVersion is updated
+        /// on every connection so users can see when the tome was last touched.
+        /// </summary>
+        static public void EnsureMetaSchema(SQLiteConnection con)
         {
-            if (!isTableExist(con, "timer_runtime_state")) return;
-
-            ThorneLog.Info($"SaveTimerStates called: characterID={characterID}, stateCount={states.Count}");
-
-            // Wipe-and-replace: delete ALL rows for the scopes being saved,
-            // then insert fresh data.  This eliminates stale rows left behind
-            // when a timer's scope changes (e.g. World → Character → World)
-            // or when timers are deleted from the timers table.
-            using (var txn = con.BeginTransaction())
+            if (!isTableExist(con, "db_meta"))
             {
-                SQLiteCommand cmd = new SQLiteCommand(con);
-
-                // Clear all World-scope rows (CharacterID IS NULL)
-                cmd.CommandText = "DELETE FROM timer_runtime_state WHERE CharacterID IS NULL";
-                int worldDeleted = cmd.ExecuteNonQuery();
-                ThorneLog.Debug($"  Bulk-delete: {worldDeleted} World (NULL) rows removed");
-
-                // Clear all rows for this character
-                if (!string.IsNullOrEmpty(characterID))
+                using (var cmd = new SQLiteCommand(
+                    "CREATE TABLE db_meta(Key TEXT PRIMARY KEY, Value TEXT)", con))
                 {
-                    cmd.CommandText = "DELETE FROM timer_runtime_state WHERE CharacterID = @delCharID";
-                    cmd.Parameters.Clear();
-                    cmd.Parameters.AddWithValue("@delCharID", characterID);
-                    int charDeleted = cmd.ExecuteNonQuery();
-                    ThorneLog.Debug($"  Bulk-delete: {charDeleted} Character (charID={characterID}) rows removed");
-                }
-
-                // Insert fresh rows for every timer
-                foreach (var ts in states)
-                {
-                    // World timers are global — always store with NULL CharacterID
-                    // so they load regardless of which character is active.
-                    // Character / Character+ timers store per-character.
-                    string effectiveCharID = (ts.Scope == "World") ? null : characterID;
-
-                    // Log every timer that has non-default state (running, remaining, non-zero count)
-                    if (ts.IsRunning || !string.IsNullOrEmpty(ts.Remaining) || ts.ButtonState != Timers.btnStart || ts.Count > 0)
-                        ThorneLog.Debug($"  SAVE TID={ts.TimerID} \"{ts.Name}\" Scope={ts.Scope} effCID={effectiveCharID ?? "NULL"} Btn={ts.ButtonState} Rem={ts.Remaining} Act={ts.ActiveYn} IsRunning={ts.IsRunning} Count={ts.Count}");
-
-                    cmd.CommandText = "INSERT INTO timer_runtime_state (TimerID, CharacterID, Remaining, ButtonState, Count, SavedAtUtc, ActiveYn) VALUES (@timerID, @charID, @remaining, @btnState, @count, @savedAtUtc, @activeYn)";
-                    cmd.Parameters.Clear();
-                    cmd.Parameters.AddWithValue("@timerID", ts.TimerID);
-                    cmd.Parameters.AddWithValue("@charID", string.IsNullOrEmpty(effectiveCharID) ? (object)DBNull.Value : (object)effectiveCharID);
-                    cmd.Parameters.AddWithValue("@remaining", ts.Remaining ?? "");
-                    cmd.Parameters.AddWithValue("@btnState", ts.ButtonState ?? Timers.btnStart);
-                    cmd.Parameters.AddWithValue("@count", ts.Count);
-
-                    // Only persist SavedAtUtc for scopes that use offline adjustment
-                    // (Character+ and World).  Character-scope timers pause on switch
-                    // and resume with their saved remaining — no offline adjustment.
-                    // This prevents stale SavedAtUtc values from causing incorrect
-                    // time subtraction if a timer's scope is later changed.
-                    bool needsSavedAtUtc = ts.IsRunning
-                        && (ts.Scope == "Character+" || ts.Scope == "World");
-                    cmd.Parameters.AddWithValue("@savedAtUtc",
-                        needsSavedAtUtc ? (object)DateTime.UtcNow.ToString("o") : (object)DBNull.Value);
-
-                    cmd.Parameters.AddWithValue("@activeYn", ts.ActiveYn);
                     cmd.ExecuteNonQuery();
                 }
-
-                txn.Commit();
-            }
-        }
-
-        /// <summary>
-        /// Persists a single timer's runtime state for the given character.
-        /// Used to immediately record state changes (e.g. user stops a timer)
-        /// so the database stays in sync with the UI without waiting for a
-        /// full save cycle (character switch or app close).
-        /// </summary>
-        static public void SaveSingleTimerState(SQLiteConnection con, TimerState ts, string characterID)
-        {
-            if (!isTableExist(con, "timer_runtime_state")) return;
-
-            // World timers are global — always store with NULL CharacterID
-            // so they load regardless of which character is active.
-            string effectiveCharID = (ts.Scope == "World") ? null : characterID;
-
-            ThorneLog.Debug($"SaveSingleTimerState TID={ts.TimerID} \"{ts.Name}\" Scope={ts.Scope} charID={characterID} effCID={effectiveCharID ?? "NULL"} Btn={ts.ButtonState} Rem={ts.Remaining} Act={ts.ActiveYn} IsRunning={ts.IsRunning} Count={ts.Count}");
-
-            SQLiteCommand cmd = new SQLiteCommand(con);
-
-            // Always delete both scope variants for this TimerID to prevent
-            // stale rows when a timer's scope changes (e.g. World → Character).
-            // The NULL row handles World scope; the charID row handles Character scope.
-            cmd.CommandText = "DELETE FROM timer_runtime_state WHERE TimerID = @delTID AND CharacterID IS NULL";
-            cmd.Parameters.AddWithValue("@delTID", ts.TimerID);
-            cmd.ExecuteNonQuery();
-
-            if (!string.IsNullOrEmpty(characterID))
-            {
-                cmd.CommandText = "DELETE FROM timer_runtime_state WHERE TimerID = @delTID2 AND CharacterID = @delCharID";
-                cmd.Parameters.Clear();
-                cmd.Parameters.AddWithValue("@delTID2", ts.TimerID);
-                cmd.Parameters.AddWithValue("@delCharID", characterID);
-                cmd.ExecuteNonQuery();
             }
 
-            cmd.CommandText = "INSERT INTO timer_runtime_state (TimerID, CharacterID, Remaining, ButtonState, Count, SavedAtUtc, ActiveYn) VALUES (@timerID, @charID, @remaining, @btnState, @count, @savedAtUtc, @activeYn)";
-            cmd.Parameters.Clear();
-            cmd.Parameters.AddWithValue("@timerID", ts.TimerID);
-            cmd.Parameters.AddWithValue("@charID", string.IsNullOrEmpty(effectiveCharID) ? (object)DBNull.Value : (object)effectiveCharID);
-            cmd.Parameters.AddWithValue("@remaining", ts.Remaining ?? "");
-            cmd.Parameters.AddWithValue("@btnState", ts.ButtonState ?? Timers.btnStart);
-            cmd.Parameters.AddWithValue("@count", ts.Count);
-
-            bool needsSavedAtUtc = ts.IsRunning
-                && (ts.Scope == "Character+" || ts.Scope == "World");
-            cmd.Parameters.AddWithValue("@savedAtUtc",
-                needsSavedAtUtc ? (object)DateTime.UtcNow.ToString("o") : (object)DBNull.Value);
-
-            cmd.Parameters.AddWithValue("@activeYn", ts.ActiveYn);
-            cmd.ExecuteNonQuery();
-        }
-
-        /// <summary>
-        /// Loads saved timer runtime state for a character.
-        /// Returns a dictionary keyed by TimerID.
-        /// </summary>
-        static public Dictionary<long, TimerState> LoadTimerStates(SQLiteConnection con, string characterID)
-        {
-            var result = new Dictionary<long, TimerState>();
-            if (!isTableExist(con, "timer_runtime_state")) return result;
-
-            // Load World-scope rows first (CharacterID IS NULL), then
-            // character-specific rows.  Character-specific rows overwrite
-            // any matching TimerID from the World query, so per-character
-            // state always takes precedence.
-            SQLiteCommand cmd = new SQLiteCommand(con);
-
-            string worldQuery = "SELECT * FROM timer_runtime_state WHERE CharacterID IS NULL";
-            string charQuery;
-            if (string.IsNullOrEmpty(characterID))
-            {
-                charQuery = null; // no character-specific rows to load
-            }
-            else
-            {
-                charQuery = "SELECT * FROM timer_runtime_state WHERE CharacterID = @charID";
-            }
-
-            // Pass 1: World rows
-            cmd.CommandText = worldQuery;
-            ReadTimerStateRows(cmd, result);
-
-            // Pass 2: Character-specific rows (overwrite on conflict)
-            if (charQuery != null)
-            {
-                cmd.CommandText = charQuery;
-                cmd.Parameters.Clear();
-                cmd.Parameters.AddWithValue("@charID", characterID);
-                ReadTimerStateRows(cmd, result);
-            }
-
-            ThorneLog.DumpSavedStates($"LoadTimerStates charID={characterID}", result);
-
-            return result;
-        }
-
-        /// <summary>
-        /// Reads timer_runtime_state rows from the given command into the dictionary.
-        /// Overwrites existing entries on TimerID conflict.
-        /// </summary>
-        static private void ReadTimerStateRows(SQLiteCommand cmd, Dictionary<long, TimerState> result)
-        {
-            using (SQLiteDataReader rdr = cmd.ExecuteReader())
-            {
-                while (rdr.Read())
-                {
-                    long timerID = rdr.GetInt64(rdr.GetOrdinal("TimerID"));
-                    int activeOrdinal = -1;
-                    try { activeOrdinal = rdr.GetOrdinal("ActiveYn"); } catch { }
-                    var ts = new TimerState
-                    {
-                        TimerID = timerID,
-                        Remaining = rdr.IsDBNull(rdr.GetOrdinal("Remaining")) ? "" : rdr.GetString(rdr.GetOrdinal("Remaining")),
-                        ButtonState = rdr.IsDBNull(rdr.GetOrdinal("ButtonState")) ? Timers.btnStart : rdr.GetString(rdr.GetOrdinal("ButtonState")),
-                        Count = rdr.IsDBNull(rdr.GetOrdinal("Count")) ? 0 : rdr.GetInt32(rdr.GetOrdinal("Count")),
-                        ActiveYn = activeOrdinal >= 0 && !rdr.IsDBNull(activeOrdinal) ? rdr.GetInt64(activeOrdinal) : 1
-                    };
-
-                    int savedAtUtcOrdinal = -1;
-                    try { savedAtUtcOrdinal = rdr.GetOrdinal("SavedAtUtc"); } catch { }
-                    if (savedAtUtcOrdinal >= 0 && !rdr.IsDBNull(savedAtUtcOrdinal))
-                    {
-                        DateTime parsed;
-                        if (DateTime.TryParse(rdr.GetString(savedAtUtcOrdinal), null,
-                            System.Globalization.DateTimeStyles.RoundtripKind, out parsed))
-                        {
-                            ts.SavedAtUtc = parsed.ToUniversalTime();
-                        }
-                    }
-
-                    result[timerID] = ts;
-                }
-            }
-        }
-
-        /// <summary>
-        /// Clears saved timer state for a character (or all if characterID is null).
-        /// </summary>
-        static public void ClearTimerStates(SQLiteConnection con, string characterID)
-        {
-            if (!isTableExist(con, "timer_runtime_state")) return;
-
-            SQLiteCommand cmd = new SQLiteCommand(con);
-
-            if (string.IsNullOrEmpty(characterID))
-            {
-                cmd.CommandText = "DELETE FROM timer_runtime_state";
-            }
-            else
-            {
-                cmd.CommandText = "DELETE FROM timer_runtime_state WHERE CharacterID = @charID";
-                cmd.Parameters.AddWithValue("@charID", characterID);
-            }
-
-            cmd.ExecuteNonQuery();
-        }
-
-        /// <summary>
-        /// Returns summary statistics about the current Tome database.
-        /// </summary>
-        static public TomeStatistics GetTomeStatistics(SQLiteConnection con)
-        {
-            var stats = new TomeStatistics();
-
-            stats.TimerCount = SafeCount(con, "SELECT COUNT(*) FROM timers");
-            stats.ActiveTimerCount = SafeCount(con, "SELECT COUNT(*) FROM timers WHERE ActiveYn = 1");
-            stats.CharacterCount = SafeCount(con, "SELECT COUNT(*) FROM characters");
-            stats.CategoryCount = SafeCount(con, "SELECT COUNT(*) FROM categories");
-            stats.ViewCount = SafeCount(con, "SELECT COUNT(*) FROM miniviews");
-            stats.ClassCount = SafeCount(con, "SELECT COUNT(*) FROM classes");
-
-            // Count timers by style
+            string appVersion;
             try
             {
-                using (var cmd = new SQLiteCommand("SELECT Style, COUNT(*) FROM timers GROUP BY Style", con))
-                using (var reader = cmd.ExecuteReader())
+                var v = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+                appVersion = v != null ? v.ToString() : "";
+            }
+            catch { appVersion = ""; }
+
+            // Always stamp schema version + last-written version
+            SetMetaValue(con, "SchemaVersion", CurrentSchemaVersion);
+            SetMetaValue(con, "LastWrittenByVersion", appVersion);
+            SetMetaValue(con, "LastWrittenAtUtc", DateTime.UtcNow.ToString("o"));
+
+            // CreatedByVersion is a one-shot stamp
+            if (string.IsNullOrEmpty(GetMetaValue(con, "CreatedByVersion")))
+                SetMetaValue(con, "CreatedByVersion", appVersion);
+        }
+
+        /// <summary>
+        /// Reads a db_meta value by key.  Returns null if the table or row is missing.
+        /// </summary>
+        static public string GetMetaValue(SQLiteConnection con, string key)
+        {
+            if (!isTableExist(con, "db_meta")) return null;
+            try
+            {
+                using (var cmd = new SQLiteCommand("SELECT Value FROM db_meta WHERE Key = @k", con))
                 {
-                    while (reader.Read())
-                    {
-                        string style = reader.IsDBNull(0) ? "Normal" : reader.GetString(0);
-                        int count = reader.GetInt32(1);
-                        if (stats.TimersByStyle.ContainsKey(style))
-                            stats.TimersByStyle[style] += count;
-                        else
-                            stats.TimersByStyle[style] = count;
-                    }
+                    cmd.Parameters.AddWithValue("@k", key);
+                    object o = cmd.ExecuteScalar();
+                    return o == null || o == DBNull.Value ? null : Convert.ToString(o);
+                }
+            }
+            catch { return null; }
+        }
+
+        /// <summary>
+        /// Upserts a db_meta key/value pair.
+        /// </summary>
+        static public void SetMetaValue(SQLiteConnection con, string key, string value)
+        {
+            try
+            {
+                using (var cmd = new SQLiteCommand(
+                    "INSERT OR REPLACE INTO db_meta (Key, Value) VALUES (@k, @v)", con))
+                {
+                    cmd.Parameters.AddWithValue("@k", key);
+                    cmd.Parameters.AddWithValue("@v", value ?? "");
+                    cmd.ExecuteNonQuery();
                 }
             }
             catch { }
-
-            // Count timers by scope
-            try
-            {
-                using (var cmd = new SQLiteCommand("SELECT Scope, COUNT(*) FROM timers GROUP BY Scope", con))
-                using (var reader = cmd.ExecuteReader())
-                {
-                    while (reader.Read())
-                    {
-                        string scope = reader.IsDBNull(0) ? "Character" : reader.GetString(0);
-                        int count = reader.GetInt32(1);
-                        if (stats.TimersByScope.ContainsKey(scope))
-                            stats.TimersByScope[scope] += count;
-                        else
-                            stats.TimersByScope[scope] = count;
-                    }
-                }
-            }
-            catch { }
-
-            return stats;
         }
-
-        /// <summary>
-        /// Runs a scalar COUNT query, returning 0 if the table doesn't exist
-        /// or any other error occurs.
-        /// </summary>
-        static private int SafeCount(SQLiteConnection con, string sql)
-        {
-            try
-            {
-                using (var cmd = new SQLiteCommand(sql, con))
-                    return Convert.ToInt32(cmd.ExecuteScalar());
-            }
-            catch
-            {
-                return 0;
-            }
-        }
-    }
-
-    /// <summary>
-    /// Summary statistics about a Tome database.
-    /// </summary>
-    class TomeStatistics
-    {
-        public int TimerCount { get; set; }
-        public int ActiveTimerCount { get; set; }
-        public int CharacterCount { get; set; }
-        public int CategoryCount { get; set; }
-        public int ViewCount { get; set; }
-        public int ClassCount { get; set; }
-        public Dictionary<string, int> TimersByStyle { get; set; } = new Dictionary<string, int>();
-        public Dictionary<string, int> TimersByScope { get; set; } = new Dictionary<string, int>();
     }
 }

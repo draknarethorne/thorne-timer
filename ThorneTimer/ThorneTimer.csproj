@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\packages\EntityFramework.6.3.0\build\EntityFramework.props" Condition="Exists('..\packages\EntityFramework.6.3.0\build\EntityFramework.props')" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
@@ -124,13 +124,19 @@
     <Compile Include="Categories.cs" />
     <Compile Include="CategoriesController.cs" />
     <Compile Include="CategoriesRepository.cs" />
+    <Compile Include="CharactersController.cs" />
+    <Compile Include="CharactersRepository.cs" />
+    <Compile Include="ClassesRepository.cs" />
     <Compile Include="FormTomeInfo.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="FormTomeInfo.Designer.cs">
       <DependentUpon>FormTomeInfo.cs</DependentUpon>
     </Compile>
+    <Compile Include="GridLayoutManager.cs" />
     <Compile Include="LogMonitor.cs" />
+    <Compile Include="MiniViewSettingsManager.cs" />
+    <Compile Include="RecentDatabasesManager.cs" />
     <Compile Include="SoundResolver.cs" />
     <Compile Include="Styles.cs" />
     <Compile Include="StylesController.cs" />
@@ -172,14 +178,22 @@
     <Compile Include="TimerPlus.cs">
       <SubType>Component</SubType>
     </Compile>
+    <Compile Include="TimersRepository.cs" />
+    <Compile Include="TimerStateRepository.cs" />
+    <Compile Include="TomeStatisticsRepository.cs" />
     <Compile Include="Views.cs" />
     <Compile Include="ViewsController.cs" />
     <Compile Include="ViewsRepository.cs" />
+    <Compile Include="VoiceManager.cs" />
+    <Compile Include="WindowPositionManager.cs" />
     <EmbeddedResource Include="FormMain.resx">
       <DependentUpon>FormMain.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="FormAbout.resx">
       <DependentUpon>FormAbout.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="FormTomeInfo.resx">
+      <DependentUpon>FormTomeInfo.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="MiniView.resx">
       <DependentUpon>MiniView.cs</DependentUpon>
