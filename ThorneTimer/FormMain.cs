@@ -756,6 +756,8 @@ namespace ThorneTimer
                 LoadColumnWidths("Categories", grdCategories);
                 if (stylesController?.Grid != null)
                     LoadColumnWidths("Styles", stylesController.Grid);
+                if (grdViews != null)
+                    LoadColumnWidths("Views", grdViews);
 
                 // Seed per-view FillWeight caches from the current (post-load) state
                 // so the very first compact/advanced toggle has weights to restore.
@@ -996,6 +998,7 @@ namespace ThorneTimer
                 LoadColumnWidths("Characters", grdCharacters);
                 LoadColumnWidths("Categories", grdCategories);
                 LoadColumnWidths("Styles", grdStyles);
+                LoadColumnWidths("Views", grdViews);
 
                 // Seed per-view FillWeight caches so the first compact/advanced
                 // toggle after a database switch has weights to restore.
@@ -1219,6 +1222,10 @@ namespace ThorneTimer
             Database.SaveColumnWidths(con, "Timers", grdTimers);
             Database.SaveColumnWidths(con, "Characters", grdCharacters);
             Database.SaveColumnWidths(con, "Categories", grdCategories);
+            if (stylesController?.Grid != null)
+                Database.SaveColumnWidths(con, "Styles", stylesController.Grid);
+            if (grdViews != null)
+                Database.SaveColumnWidths(con, "Views", grdViews);
 
             // Persist multi-column sort state
             var timerList = grdTimers.DataSource as SortableBindingList<Timers.GridData>;
@@ -2821,7 +2828,9 @@ namespace ThorneTimer
             statusParsing.Text = "Watching: " + Path.GetFileName(logMonitor.FilePath) + " (auto)";
             lblBrowsingIndicator.Visible = false; // Auto-switch means we're viewing the active character
 
-            // Refresh mini views
+            // Refresh mini views — update character name header first
+            if (miniViews.MiniViewsActive())
+                miniViews.UpdateActiveCharacter(con, activeCharacterID);
             UpdateMiniView();
         }
 
@@ -2894,7 +2903,9 @@ namespace ThorneTimer
             statusParsing.Text = "Watching: (no active character)";
             lblBrowsingIndicator.Visible = false; // No active character means no browsing mode
 
-            // Refresh mini views
+            // Refresh mini views — update character name header first
+            if (miniViews.MiniViewsActive())
+                miniViews.UpdateActiveCharacter(con, activeCharacterID);
             UpdateMiniView();
         }
 

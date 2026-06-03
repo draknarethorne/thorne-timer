@@ -54,6 +54,17 @@ namespace ThorneTimer
                     if (grid.Columns.Contains(kvp.Key))
                     {
                         DataGridViewColumn col = grid.Columns[kvp.Key];
+
+                        // For Fill-mode columns, layout is governed by FillWeight
+                        // (restored above), NOT pixel Width.  Assigning col.Width
+                        // here makes WinForms back-compute FillWeight against the
+                        // grid's CURRENT client width — which, for tabs that have
+                        // never been shown, is wrong and corrupts the restored
+                        // proportions (the Characters/Categories misalignment).
+                        // Only apply pixel Width to non-Fill columns.
+                        if (col.InheritedAutoSizeMode == DataGridViewAutoSizeColumnMode.Fill)
+                            continue;
+
                         if (col.Visible && kvp.Value >= col.MinimumWidth)
                         {
                             col.Width = kvp.Value;

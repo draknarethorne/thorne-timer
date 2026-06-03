@@ -216,6 +216,14 @@ _GUI enhancements, architecture cleanup, and a much richer Tome Information dial
 - ✅ **Grid performance** — O(n²) → O(n) dictionary lookup in `SyncRuntimeToGrid` (~98% faster with 130+ timers)
 - ✅ **One-shot startup migration** — v0.5.0 → v0.6.0 palette migration runs once; deletions stick, no snapback
 
+**Beta 2 fixes**
+- ✅ **Performance** — faster character switching and startup; the timers grid now filters via a single data-source swap instead of per-row visibility toggling (~1.8 s → fast on 100+ row grids)
+- ✅ **Visual polish** — refreshed default style colors for the black mini-view background; softened inactive-row tint (Gainsboro) so it no longer competes with red style colors
+- ✅ **Grid column layout** — fixed Characters/Categories tabs loading with misaligned columns; Styles and Views grids now persist column widths across restarts
+- ✅ **Grid correctness** — row colors and curated column order are now preserved after each filter rebuild
+- ✅ **Diagnostics** — added `PERF` timing instrumentation around startup and character-switch hot paths
+- ✅ **Cleanup** — removed the throwaway layered-window rendering spike from the build
+
 **v0.5.0** (June 2025)
 
 - ✅ Per-character timer state persistence (save/restore across character switches)
