@@ -1,12 +1,8 @@
 ---
 name: ThorneTimer-Testing
 description: 'Quality assurance specialist for the Thorne Timer C# application. Validates code correctness, checks for common WinForms issues, verifies database operations, and performs security and standards compliance checks.'
-user-invokable: true
-disable-model-invocation: false
-target: vscode
-model: GPT-5.2-Codex (copilot)
-tools: [vscode/getProjectSetupInfo, vscode/askQuestions, vscode/extensions, execute/getTerminalOutput, execute/awaitTerminal, execute/runInTerminal, read/problems, read/readFile, read/terminalSelection, read/terminalLastCommand, agent/runSubagent, edit/createFile, edit/editFiles, search/changes, search/codebase, search/fileSearch, search/listDirectory, search/searchResults, search/textSearch, search/usages, todo]
-argument-hint: 'Code area, file, or validation scope to test'
+model: GPT-5.3-Codex
+tools: [code_search, readfile, find_references, runcommandinterminal]
 ---
 
 # Thorne Timer Testing & QA Specialist

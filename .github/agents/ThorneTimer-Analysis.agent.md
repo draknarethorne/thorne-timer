@@ -1,12 +1,8 @@
 ---
 name: ThorneTimer-Analysis
 description: 'Architecture and code analysis specialist for the Thorne Timer C# desktop application. Performs deep code review, identifies patterns, technical debt, and architectural improvements. Synthesizes findings into actionable recommendations.'
-user-invokable: true
-disable-model-invocation: false
-target: vscode
-model: Gemini 2.5 Pro (copilot)
-tools: [vscode/getProjectSetupInfo, vscode/askQuestions, vscode/extensions, execute/getTerminalOutput, execute/runInTerminal, read/problems, read/readFile, read/terminalSelection, read/terminalLastCommand, agent/runSubagent, edit/createDirectory, edit/createFile, edit/editFiles, search/changes, search/codebase, search/fileSearch, search/listDirectory, search/searchResults, search/textSearch, search/usages, web/fetch, github/get_file_contents, github/issue_read, github/pull_request_read, github/search_code, github/search_issues, todo]
-argument-hint: 'Code area, class, or architecture concern to analyze'
+model: Gemini 3.1 Pro
+tools: [code_search, readfile, find_references, getwebpages]
 ---
 
 # Thorne Timer Analysis Specialist

@@ -1,12 +1,8 @@
 ---
 name: ThorneTimer-Implementation
 description: 'C# implementation specialist for the Thorne Timer desktop application. Handles feature development, refactoring, database operations, WinForms UI work, and multi-file changes across the codebase.'
-user-invokable: true
-disable-model-invocation: false
-target: vscode
-model: Claude Sonnet 4.5 (copilot)
-tools: [vscode/getProjectSetupInfo, vscode/askQuestions, vscode/extensions, execute/getTerminalOutput, execute/awaitTerminal, execute/killTerminal, execute/createAndRunTask, execute/runInTerminal, read/problems, read/readFile, read/terminalSelection, read/terminalLastCommand, agent/runSubagent, edit/createDirectory, edit/createFile, edit/editFiles, search/changes, search/codebase, search/fileSearch, search/listDirectory, search/searchResults, search/textSearch, search/usages, web/fetch, github/create_branch, github/create_pull_request, github/get_file_contents, github/issue_read, github/push_files, github/search_code, todo]
-argument-hint: 'Feature, refactoring task, or component to implement'
+model: Claude Sonnet 4.6
+tools: [code_search, readfile, editfiles, find_references, runcommandinterminal]
 ---
 
 # Thorne Timer Implementation Specialist
