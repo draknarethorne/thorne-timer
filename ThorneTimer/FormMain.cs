@@ -955,10 +955,18 @@ namespace ThorneTimer
             compactViewToolStripMenuItem.Checked = compactView;
 
             // Unhook event handlers before tearing down grids to prevent
-            // validation firing against columns that no longer exist.
+            // validation firing against columns that no longer exist or
+            // (worse) against a connection that was just closed during a
+            // database switch.  grdTimers still uses a FormMain-level
+            // handler; the Characters/Categories/Views/Styles grids own
+            // their RowValidating inside their controllers, so dispose
+            // those controllers here to unwire them before the DataSource
+            // swaps below trigger validation.
             grdTimers.RowValidating -= ValidateRowTimers;
-            grdCategories.RowValidating -= ValidateRowCategories;
-            grdViews.RowValidating -= ValidateRowViews;
+            charactersController?.Dispose();
+            categoriesController?.Dispose();
+            viewsController?.Dispose();
+            stylesController?.Dispose();
 
             // Reload grids
             tscActiveCharacter.SelectedIndexChanged -= tscActiveCharacter_SelectedIndexChanged;

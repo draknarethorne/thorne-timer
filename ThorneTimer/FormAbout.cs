@@ -20,10 +20,16 @@ namespace ThorneTimer
             Assembly asm = Assembly.GetExecutingAssembly();
             Version appVersion = asm.GetName().Version;
 
-            // Version — show major.minor.patch (drop revision unless non-zero)
-            string versionText = appVersion.Revision > 0
-                ? appVersion.ToString()
-                : $"{appVersion.Major}.{appVersion.Minor}.{appVersion.Build}";
+            // Prefer the informational version (e.g. "0.6.0-beta2"), which can
+            // carry a pre-release suffix that AssemblyVersion cannot.  Fall back
+            // to the numeric assembly version (drop revision unless non-zero).
+            string versionText = GetInformationalVersion(asm);
+            if (string.IsNullOrEmpty(versionText))
+            {
+                versionText = appVersion.Revision > 0
+                    ? appVersion.ToString()
+                    : $"{appVersion.Major}.{appVersion.Minor}.{appVersion.Build}";
+            }
             labelVersion.Text = "Version " + versionText;
 
             // Copyright from assembly attribute
@@ -71,6 +77,19 @@ namespace ThorneTimer
             {
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Returns the AssemblyInformationalVersion (e.g. "0.6.0-beta2"),
+        /// which can carry a pre-release suffix.  Returns null if the attribute
+        /// is missing or empty so callers can fall back to the numeric version.
+        /// </summary>
+        private static string GetInformationalVersion(Assembly asm)
+        {
+            var attr = (AssemblyInformationalVersionAttribute)Attribute.GetCustomAttribute(
+                asm, typeof(AssemblyInformationalVersionAttribute));
+            string value = attr?.InformationalVersion;
+            return string.IsNullOrWhiteSpace(value) ? null : value;
         }
 
         /// <summary>

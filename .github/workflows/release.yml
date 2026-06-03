@@ -39,10 +39,13 @@ jobs:
         $file = "ThorneTimer/Properties/AssemblyInfo.cs"
         $content = Get-Content $file -Raw
         $newVersion = "${{ steps.version.outputs.ASSEMBLY_VERSION }}"
+        $displayVersion = "${{ steps.version.outputs.VERSION }}"
         $content = $content -replace 'AssemblyVersion\("[^"]*"\)', "AssemblyVersion(`"$newVersion`")"
         $content = $content -replace 'AssemblyFileVersion\("[^"]*"\)', "AssemblyFileVersion(`"$newVersion`")"
+        # Display version keeps the full tag (e.g. "0.6.0-beta2") for the About dialog.
+        $content = $content -replace 'AssemblyInformationalVersion\("[^"]*"\)', "AssemblyInformationalVersion(`"$displayVersion`")"
         Set-Content $file $content
-        echo "Updated AssemblyInfo.cs to version $newVersion"
+        echo "Updated AssemblyInfo.cs to version $newVersion (display: $displayVersion)"
 
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2

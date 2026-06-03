@@ -34,3 +34,8 @@ using System.Runtime.InteropServices;
 // [assembly: AssemblyVersion("1.0.*")]
 [assembly: AssemblyVersion("0.6.0.0")]
 [assembly: AssemblyFileVersion("0.6.0.0")]
+// Display version — may carry a pre-release suffix (e.g. "0.6.0-beta2").
+// AssemblyVersion/FileVersion must stay purely numeric, so the human-facing
+// version (shown in the About dialog) lives here.  The release workflow
+// overwrites this with the full tag (minus the leading 'v') at build time.
+[assembly: AssemblyInformationalVersion("0.6.0-dev")]
