@@ -207,6 +207,7 @@
       <Link>.editorconfig</Link>
     </None>
     <None Include="Data\ThorneTimer-v0.5.0.tdb" />
+    <None Include="Data\ThorneTimer-v0.6.0.tdb" />
     <None Include="Data\Archive\EQTimer.db" />
     <None Include="Data\Archive\ThorneTimer_P99.tdb" />
     <None Include="Data\Archive\ThorneTimer_TAKP.tdb" />
