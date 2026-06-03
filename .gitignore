@@ -57,6 +57,10 @@ ThorneTimer/Data/Backups/*
 # are intentionally tracked in git for upgrade-path testing and provenance.
 # They are NOT included in the release zip — only Data\ThorneTimer.tdb is marked
 # as <Content> in ThorneTimer.csproj and copied to bin\Release\Data\.
+# Local pre-release / test tomes (e.g. ThorneTimer-v0.6.0-beta2.tdb) are NOT tracked.
+ThorneTimer/Data/*-beta*.tdb
+ThorneTimer/Data/*-test*.tdb
+ThorneTimer/Data/*-retest*.tdb
 *.bak
 *.backup
 *.tmp
