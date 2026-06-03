@@ -143,6 +143,7 @@ namespace ThorneTimer
             con = Database.Connection(dbPath);
             stylesRepository = new StylesRepository(con);
             miniViews.Styles = stylesRepository;
+            timerRuntime.StyleTimeFormatResolver = ResolveStyleTimeFormat;
             gridLayoutManager = new GridLayoutManager(con);
             voiceManager = new VoiceManager(con, cboActiveVoice);
             miniViewSettingsManager = new MiniViewSettingsManager(
@@ -3078,6 +3079,18 @@ namespace ThorneTimer
                 stylesRepository = new StylesRepository(con);
 
             return stylesRepository.GetRowBaseColor(style);
+        }
+
+        /// <summary>
+        /// Resolves a style name to its configured <see cref="TimeFormat"/> for the
+        /// runtime's countdown text. Wired into <c>TimerRuntime.StyleTimeFormatResolver</c>.
+        /// </summary>
+        private TimeFormat ResolveStyleTimeFormat(string style)
+        {
+            if (stylesRepository == null)
+                stylesRepository = new StylesRepository(con);
+
+            return stylesRepository.GetStyle(style).TimeFormat;
         }
 
         /// <summary>

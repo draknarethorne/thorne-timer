@@ -95,6 +95,12 @@ namespace ThorneTimer
         public string Remaining { get; set; }
         public string Style { get; set; }
         public string ButtonState { get; set; }
+
+        // Raw remaining time in milliseconds, independent of the display format.
+        // Used for warning-threshold detection so compact/lossy formats (e.g.
+        // AdaptiveCompact "1d 4h") don't misfire the warning. Negative means
+        // "unknown — fall back to parsing the Remaining string".
+        public double RemainingMs { get; set; } = -1;
     }
 
     /// <summary>
@@ -127,6 +133,23 @@ namespace ThorneTimer
 
         // Lock for thread safety between poll thread and UI thread
         private readonly object syncLock = new object();
+
+        /// <summary>
+        /// Resolves a style name to its <see cref="TimeFormat"/> so countdown text
+        /// the runtime produces (grid Remaining column, frozen character state)
+        /// matches the style's configured format. Set by the host (FormMain) from
+        /// the active <c>StylesRepository</c>. Defaults to Classic when unset.
+        /// </summary>
+        public Func<string, TimeFormat> StyleTimeFormatResolver { get; set; }
+
+        private TimeFormat ResolveTimeFormat(string style)
+        {
+            var resolver = StyleTimeFormatResolver;
+            if (resolver == null) return TimeFormat.Classic;
+
+            try { return resolver(style); }
+            catch { return TimeFormat.Classic; }
+        }
 
         // Events
         public event EventHandler<TimerStateChangedEventArgs> TimerStateChanged;
@@ -427,7 +450,7 @@ namespace ThorneTimer
 
             runningTimers.Add(new RunningTimer { TimerID = ts.TimerID, Timer = tp });
 
-            ts.Remaining = tp.GetTimeRemaining();
+            ts.Remaining = tp.GetTimeRemaining(ResolveTimeFormat(ts.Style));
             tp.Start();
 
             // Fire sound for Ping timers on start
@@ -485,7 +508,7 @@ namespace ThorneTimer
                 var ts = timerStates.FirstOrDefault(t => t.TimerID == e.TimerID);
                 if (ts == null) return;
 
-                ts.Remaining = e.GetTimeRemaining();
+                ts.Remaining = e.GetTimeRemaining(ResolveTimeFormat(ts.Style));
                 FireStateChanged(ts, false);
             }
         }
@@ -703,12 +726,20 @@ namespace ThorneTimer
                 {
                     if (ts.IsRunning || ts.ButtonState == Timers.btnPing)
                     {
+                        // Use the live TimerPlus for the authoritative raw remaining
+                        // milliseconds so warning detection is format-independent.
+                        var rt = runningTimers.FirstOrDefault(r => r.TimerID == ts.TimerID);
+                        double remainingMs = (rt != null)
+                            ? (rt.Timer.DurationTime - rt.Timer.ElapsedTime)
+                            : -1;
+
                         data.Add(new MiniTimerData
                         {
                             Name = ts.Name,
                             Remaining = ts.Remaining,
                             Style = ts.Style ?? "Normal",
-                            ButtonState = ts.ButtonState
+                            ButtonState = ts.ButtonState,
+                            RemainingMs = remainingMs
                         });
                     }
                 }
@@ -915,7 +946,7 @@ namespace ThorneTimer
                         var rt = runningTimers.FirstOrDefault(r => r.TimerID == ts.TimerID);
                         if (rt != null)
                         {
-                            remaining = rt.Timer.GetTimeRemaining();
+                            remaining = rt.Timer.GetTimeRemaining(ResolveTimeFormat(ts.Style));
                         }
                         StopTimerInternal(ts, false);
                         // Restore the frozen remaining and mark with the style button
@@ -1025,10 +1056,9 @@ namespace ThorneTimer
                             }
 
                             TimeSpan adjusted = TimeSpan.FromMilliseconds(adjustedMS);
-                            if (adjusted.Days > 0)
-                                effectiveRemaining = string.Format("{0}d {1:00}:{2:00}:{3:00}", adjusted.Days, adjusted.Hours, adjusted.Minutes, adjusted.Seconds);
-                            else
-                                effectiveRemaining = string.Format("{0:00}:{1:00}:{2:00}", adjusted.Hours, adjusted.Minutes, adjusted.Seconds);
+                            // Classic colon format keeps effectiveRemaining parseable by
+                            // TimerPlus.GetMilliseconds below; not user-facing display text.
+                            effectiveRemaining = TimerTimeFormatter.Format(adjusted, TimeFormat.Classic);
                         }
                         else if (ts.Scope == "Character+" && !saved.SavedAtUtc.HasValue)
                         {
@@ -1115,10 +1145,9 @@ namespace ThorneTimer
                         }
 
                         TimeSpan adjusted = TimeSpan.FromMilliseconds(adjustedMS);
-                        if (adjusted.Days > 0)
-                            effectiveRemaining = string.Format("{0}d {1:00}:{2:00}:{3:00}", adjusted.Days, adjusted.Hours, adjusted.Minutes, adjusted.Seconds);
-                        else
-                            effectiveRemaining = string.Format("{0:00}:{1:00}:{2:00}", adjusted.Hours, adjusted.Minutes, adjusted.Seconds);
+                        // Classic colon format keeps effectiveRemaining parseable by
+                        // TimerPlus.GetMilliseconds below; not user-facing display text.
+                        effectiveRemaining = TimerTimeFormatter.Format(adjusted, TimeFormat.Classic);
                     }
 
                     if (TimerPlus.GetMilliseconds(effectiveRemaining) <= 0) continue;

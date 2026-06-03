@@ -180,6 +180,7 @@
     </Compile>
     <Compile Include="TimersRepository.cs" />
     <Compile Include="TimerStateRepository.cs" />
+    <Compile Include="TimerTimeFormatter.cs" />
     <Compile Include="TomeStatisticsRepository.cs" />
     <Compile Include="Views.cs" />
     <Compile Include="ViewsController.cs" />

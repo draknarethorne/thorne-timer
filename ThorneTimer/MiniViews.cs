@@ -397,7 +397,8 @@ namespace ThorneTimer
                     {
                         Name = td.Name,
                         Remaining = td.Remaining,
-                        TheColor = colorType
+                        TheColor = colorType,
+                        RemainingMs = td.RemainingMs
                     };
 
                     // Route to view(s) whose StyleFilter matches this timer's Style

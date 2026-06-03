@@ -48,6 +48,11 @@ namespace ThorneTimer
             public string Name { get; set; }
             public string Remaining { get; set; }
             public ColorType TheColor { get; set; }
+
+            // Raw remaining time in milliseconds, independent of the displayed
+            // format. Warning detection uses this so lossy/compact formats don't
+            // misfire. Negative means "unknown — fall back to parsing Remaining".
+            public double RemainingMs { get; set; } = -1;
         }
 
         TableLayoutPanel tlpMain;
@@ -87,6 +92,24 @@ namespace ThorneTimer
             ShowWarning = showWarning;
 
             this.BackColor = viewBackColor;
+        }
+
+        /// <summary>
+        /// Determines whether a timer is within the warning threshold. Uses the
+        /// raw remaining milliseconds (format-independent) when available, falling
+        /// back to parsing the displayed Remaining string for legacy/unknown data.
+        /// This avoids false warnings with compact formats like "1d 4h" or "45s",
+        /// which TimerPlus.GetMilliseconds cannot parse.
+        /// </summary>
+        private bool IsWarning(MiniData md)
+        {
+            if (!ShowWarning) return false;
+
+            double remainingMs = (md.RemainingMs >= 0)
+                ? md.RemainingMs
+                : TimerPlus.GetMilliseconds(md.Remaining);
+
+            return remainingMs <= TimerPlus.GetMilliseconds(WarnTime);
         }
 
         private void Control_MouseDown(object sender, System.Windows.Forms.MouseEventArgs e)
@@ -198,8 +221,8 @@ namespace ThorneTimer
 
                     // v0.6.0: Apply warning colors if enabled and timer is expiring
                     // ShowWarning column now controls warning display (no Ping exemption)
-                    if (ShowWarning 
-                        && TimerPlus.GetMilliseconds(md.Remaining) <= TimerPlus.GetMilliseconds(WarnTime))
+                    // Warning detection uses raw remaining ms (format-independent).
+                    if (IsWarning(md))
                     {
                         lblRemaining.BackColor = WarnBackColor;
                         lblRemaining.ForeColor = WarnForeColor;
@@ -296,8 +319,8 @@ namespace ThorneTimer
 
                     // v0.6.0: Apply warning colors if enabled and timer is expiring
                     // ShowWarning column now controls warning display (no Ping exemption)
-                    if (ShowWarning 
-                        && TimerPlus.GetMilliseconds(md.Remaining) <= TimerPlus.GetMilliseconds(WarnTime))
+                    // Warning detection uses raw remaining ms (format-independent).
+                    if (IsWarning(md))
                     {
                         lblRemaining.BackColor = WarnBackColor;
                         lblRemaining.ForeColor = WarnForeColor;

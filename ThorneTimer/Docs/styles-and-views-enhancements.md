@@ -120,6 +120,24 @@ public static class TimerTimeFormatter
   users see exactly what they'll get the moment they change the dropdown. In the new
   `StyleEditorDialog`, the live `StylePreviewPanel` shows the same sample.
 
+### 2.5 Implementation status (landed)
+
+- ✅ `TimerTimeFormatter` + `TimeFormat` enum added (`Classic`/`Long`/`AdaptiveCompact`/`FullCompact`),
+  with `Classic` reproducing the original `GetTimeRemaining()` output byte-for-byte.
+- ✅ `TimerPlus.GetTimeRemaining()` delegates to the formatter; added `GetTimeRemaining(TimeFormat)`
+  overload for style-aware callers.
+- ✅ `styles.TimeFormat` column added (idempotent `ALTER TABLE` migration, fresh-DB `CREATE`,
+  hydration + persistence in `StylesRepository`); `StyleData.TimeFormat` defaults to `Classic`.
+- ✅ `TimerRuntime` resolves the timer's style → `TimeFormat` via `StyleTimeFormatResolver`
+  (wired from `FormMain` to `StylesRepository`) so the **main grid Remaining column** honors it.
+- ✅ Styles tab "Time Format" dropdown column added with live `Example` preview.
+- ✅ **Warning detection is format-independent.** Mini-view warning colors are driven by the
+  timer's **raw remaining milliseconds** (carried through `MiniTimerData.RemainingMs` →
+  `MiniData.RemainingMs`), not by re-parsing the formatted display string. This fixes false
+  warnings under lossy/compact formats (e.g. `AdaptiveCompact` `"1d 4h"`, `FullCompact` `"45s"`)
+  that `TimerPlus.GetMilliseconds` cannot parse. `MiniView.IsWarning(md)` falls back to string
+  parsing only when raw ms is unavailable (negative).
+
 ---
 
 ## 3. New / changed data fields

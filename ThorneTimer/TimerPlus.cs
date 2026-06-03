@@ -64,12 +64,14 @@ namespace ThorneTimer
 
         public string GetTimeRemaining()
         {
+            return GetTimeRemaining(TimeFormat.Classic);
+        }
+
+        public string GetTimeRemaining(TimeFormat format)
+        {
             TimeSpan t = TimeSpan.FromMilliseconds(this.DurationTime - this.ElapsedTime);
 
-            if (t.Days > 0)
-                return string.Format("{0}d {1:00}:{2:00}:{3:00}", t.Days, t.Hours, t.Minutes, t.Seconds);
-
-            return string.Format("{0:00}:{1:00}:{2:00}", t.Hours, t.Minutes, t.Seconds);
+            return TimerTimeFormatter.Format(t, format);
         }
 
         static public double GetMilliseconds(string timeValue)

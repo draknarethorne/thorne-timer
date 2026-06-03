@@ -118,6 +118,21 @@ namespace ThorneTimer
             grid.Columns["Example"].ReadOnly = true;
             grid.Columns["Example"].MinimumWidth = 160;
 
+            var timeFormatCol = new DataGridViewComboBoxColumn
+            {
+                Name = "TimeFormat",
+                HeaderText = "Time Format",
+                DataPropertyName = "TimeFormat",
+                FlatStyle = FlatStyle.Flat,
+                DisplayStyle = DataGridViewComboBoxDisplayStyle.Nothing,
+                ValueType = typeof(TimeFormat),
+                Width = 120,
+                MinimumWidth = 100,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.None
+            };
+            timeFormatCol.Items.AddRange(TimeFormat.Classic, TimeFormat.Long, TimeFormat.AdaptiveCompact, TimeFormat.FullCompact);
+            grid.Columns.Add(timeFormatCol);
+
             grid.Columns.Add("SortOrder", "SortOrder");
             grid.Columns["SortOrder"].DataPropertyName = "SortOrder";
             grid.Columns["SortOrder"].Visible = false;
@@ -126,6 +141,7 @@ namespace ThorneTimer
             grid.CellFormatting += Grid_CellFormatting;
             grid.CellClick += Grid_CellClick;
             grid.RowValidating += Grid_RowValidating;
+            grid.CurrentCellDirtyStateChanged += Grid_CurrentCellDirtyStateChanged;
             grid.CellValueChanged += Grid_CellValueChanged;
         }
 
@@ -142,6 +158,7 @@ namespace ThorneTimer
             grid.CellFormatting -= Grid_CellFormatting;
             grid.CellClick -= Grid_CellClick;
             grid.RowValidating -= Grid_RowValidating;
+            grid.CurrentCellDirtyStateChanged -= Grid_CurrentCellDirtyStateChanged;
             grid.CellValueChanged -= Grid_CellValueChanged;
         }
 
@@ -153,7 +170,10 @@ namespace ThorneTimer
             int foreColor = Convert.ToInt32(grid.Rows[e.RowIndex].Cells["ForeColor"].Value ?? Color.Black.ToArgb());
             int backColor = Convert.ToInt32(grid.Rows[e.RowIndex].Cells["BackColor"].Value ?? Color.Yellow.ToArgb());
 
-            e.Value = "Sample Timer 01:23";
+            TimeFormat fmt = ParseTimeFormat(grid.Rows[e.RowIndex].Cells["TimeFormat"].Value);
+            string sample = TimerTimeFormatter.Format(new TimeSpan(1, 2, 3, 45), fmt);
+
+            e.Value = "Sample Timer " + sample;
             e.CellStyle.ForeColor = Color.FromArgb(foreColor);
             e.CellStyle.BackColor = Color.FromArgb(backColor);
             e.FormattingApplied = true;
@@ -222,7 +242,18 @@ namespace ThorneTimer
             if (e.RowIndex < 0 || e.RowIndex >= grid.Rows.Count) return;
             if (grid.Columns[e.ColumnIndex].Name == "ForeColor" || grid.Columns[e.ColumnIndex].Name == "BackColor") return;
             SaveRow(grid.Rows[e.RowIndex]);
+
+            // Keep the live "Example" preview in sync when the format changes.
+            if (grid.Columns[e.ColumnIndex].Name == "TimeFormat")
+                grid.InvalidateRow(e.RowIndex);
+
             stylesChanged?.Invoke();
+        }
+
+        private void Grid_CurrentCellDirtyStateChanged(object sender, EventArgs e)
+        {
+            if (grid.IsCurrentCellDirty && grid.CurrentCell?.OwningColumn?.Name == "TimeFormat")
+                grid.CommitEdit(DataGridViewDataErrorContexts.Commit);
         }
 
         private void SaveRow(DataGridViewRow row)
@@ -235,10 +266,20 @@ namespace ThorneTimer
                 Name = Convert.ToString(row.Cells["Name"].Value),
                 ForeColor = Convert.ToInt32(row.Cells["ForeColor"].Value ?? Color.Black.ToArgb()),
                 BackColor = Convert.ToInt32(row.Cells["BackColor"].Value ?? Color.Yellow.ToArgb()),
-                SortOrder = Convert.ToInt32(row.Cells["SortOrder"].Value ?? 0)
+                SortOrder = Convert.ToInt32(row.Cells["SortOrder"].Value ?? 0),
+                TimeFormat = ParseTimeFormat(row.Cells["TimeFormat"].Value)
             };
 
             repository.SaveStyle(style);
+        }
+
+        private static TimeFormat ParseTimeFormat(object value)
+        {
+            if (value is TimeFormat tf) return tf;
+            if (value == null) return TimeFormat.Classic;
+
+            try { return (TimeFormat)Convert.ToInt32(value); }
+            catch { return TimeFormat.Classic; }
         }
     }
 }

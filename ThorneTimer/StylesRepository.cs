@@ -21,7 +21,7 @@ namespace ThorneTimer
             {
                 using (var cmd = new SQLiteCommand(con))
                 {
-                    cmd.CommandText = "CREATE TABLE styles(ID INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL UNIQUE, ForeColor INTEGER NOT NULL, BackColor INTEGER NOT NULL, SortOrder INTEGER DEFAULT 0)";
+                    cmd.CommandText = "CREATE TABLE styles(ID INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL UNIQUE, ForeColor INTEGER NOT NULL, BackColor INTEGER NOT NULL, SortOrder INTEGER DEFAULT 0, TimeFormat INTEGER NOT NULL DEFAULT 0)";
                     cmd.ExecuteNonQuery();
                 }
 
@@ -31,6 +31,18 @@ namespace ThorneTimer
                 // never touch existing rows again — deletions and edits stick.
                 SeedDefaultStyles(con);
                 MigrateUserColorsFromLegacyViews(con);
+            }
+
+            // Idempotent column add for databases that already have a styles table
+            // from an earlier v0.6.0 build. TimeFormat defaults to 0 (Classic) so
+            // existing styles render exactly as before.
+            if (!Database.isFieldExist(con, "styles", "TimeFormat"))
+            {
+                using (var cmd = new SQLiteCommand(con))
+                {
+                    cmd.CommandText = "ALTER TABLE styles ADD COLUMN TimeFormat INTEGER NOT NULL DEFAULT 0";
+                    cmd.ExecuteNonQuery();
+                }
             }
         }
 
@@ -55,7 +67,7 @@ namespace ThorneTimer
 
             using (var cmd = new SQLiteCommand(con))
             {
-                cmd.CommandText = "SELECT ID, Name, ForeColor, BackColor, SortOrder FROM styles ORDER BY SortOrder, Name";
+                cmd.CommandText = "SELECT ID, Name, ForeColor, BackColor, SortOrder, TimeFormat FROM styles ORDER BY SortOrder, Name";
                 using (SQLiteDataReader rdr = cmd.ExecuteReader())
                 {
                     while (rdr.Read())
@@ -66,7 +78,8 @@ namespace ThorneTimer
                             Name = rdr.IsDBNull(rdr.GetOrdinal("Name")) ? "" : rdr.GetString(rdr.GetOrdinal("Name")),
                             ForeColor = rdr.IsDBNull(rdr.GetOrdinal("ForeColor")) ? Color.Yellow.ToArgb() : rdr.GetInt32(rdr.GetOrdinal("ForeColor")),
                             BackColor = rdr.IsDBNull(rdr.GetOrdinal("BackColor")) ? Color.Black.ToArgb() : rdr.GetInt32(rdr.GetOrdinal("BackColor")),
-                            SortOrder = rdr.IsDBNull(rdr.GetOrdinal("SortOrder")) ? 0 : rdr.GetInt32(rdr.GetOrdinal("SortOrder"))
+                            SortOrder = rdr.IsDBNull(rdr.GetOrdinal("SortOrder")) ? 0 : rdr.GetInt32(rdr.GetOrdinal("SortOrder")),
+                            TimeFormat = rdr.IsDBNull(rdr.GetOrdinal("TimeFormat")) ? TimeFormat.Classic : (TimeFormat)rdr.GetInt32(rdr.GetOrdinal("TimeFormat"))
                         });
                     }
                 }
@@ -165,11 +178,11 @@ namespace ThorneTimer
             {
                 if (style.ID <= 0)
                 {
-                    cmd.CommandText = "INSERT INTO styles (Name, ForeColor, BackColor, SortOrder) VALUES (@name, @fore, @back, @sort)";
+                    cmd.CommandText = "INSERT INTO styles (Name, ForeColor, BackColor, SortOrder, TimeFormat) VALUES (@name, @fore, @back, @sort, @timeFormat)";
                 }
                 else
                 {
-                    cmd.CommandText = "UPDATE styles SET Name = @name, ForeColor = @fore, BackColor = @back, SortOrder = @sort WHERE ID = @id";
+                    cmd.CommandText = "UPDATE styles SET Name = @name, ForeColor = @fore, BackColor = @back, SortOrder = @sort, TimeFormat = @timeFormat WHERE ID = @id";
                     cmd.Parameters.AddWithValue("@id", style.ID);
                 }
 
@@ -177,6 +190,7 @@ namespace ThorneTimer
                 cmd.Parameters.AddWithValue("@fore", style.ForeColor);
                 cmd.Parameters.AddWithValue("@back", style.BackColor);
                 cmd.Parameters.AddWithValue("@sort", style.SortOrder);
+                cmd.Parameters.AddWithValue("@timeFormat", (int)style.TimeFormat);
                 cmd.ExecuteNonQuery();
             }
 
