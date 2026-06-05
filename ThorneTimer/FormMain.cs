@@ -174,7 +174,6 @@ namespace ThorneTimer
         int voiceRate = -2;
 
         const string blankTime = "";
-        const string noTime = "00:00:00";
         const string pingHour = "00:";
 
         const string startWatchingText = "Start Watching";
@@ -233,6 +232,8 @@ namespace ThorneTimer
         CategoriesController categoriesController;
         CharactersRepository charactersRepository;
         CharactersController charactersController;
+        TimersRepository timersRepository;
+        TimersController timersController;
         SQLiteConnection con;
 
         // Cross-cutting form helpers (v0.6.0 polish)
@@ -958,12 +959,10 @@ namespace ThorneTimer
             // Unhook event handlers before tearing down grids to prevent
             // validation firing against columns that no longer exist or
             // (worse) against a connection that was just closed during a
-            // database switch.  grdTimers still uses a FormMain-level
-            // handler; the Characters/Categories/Views/Styles grids own
-            // their RowValidating inside their controllers, so dispose
-            // those controllers here to unwire them before the DataSource
-            // swaps below trigger validation.
-            grdTimers.RowValidating -= ValidateRowTimers;
+            // database switch.  Each grid's RowValidating is owned by its
+            // controller, so dispose those controllers here to unwire them
+            // before the DataSource swaps below trigger validation.
+            timersController?.Dispose();
             charactersController?.Dispose();
             categoriesController?.Dispose();
             viewsController?.Dispose();
@@ -1550,6 +1549,25 @@ namespace ThorneTimer
 
         private void SetupTimerGrid()
         {
+            // Timers-tab logic follows the established Controller pattern.
+            // The controller owns timer construction (Add/Duplicate/Chain),
+            // duration validation / auto-format, and grid maintenance (row
+            // create / save / delete + per-row save validation).  Cross-cutting
+            // view/filter side effects stay in FormMain and are injected as
+            // hooks below.
+            if (timersRepository == null)
+                timersRepository = new TimersRepository(con);
+
+            timersController?.Dispose();
+            timersController = new TimersController(timersRepository, timerRuntime)
+            {
+                EnsureFullView = EnsureTimersFullView,
+                TrackTimer = AddTimerToMasterList,
+                UntrackTimer = RemoveTimerFromMasterList,
+                ApplyRowColor = ApplyTimerRowColor,
+                RepaintGrid = RepaintTimerGrid
+            };
+
             grdTimers.Columns.Add("ID", "ID");
             grdTimers.Columns[0].DataPropertyName = grdTimers.Columns[0].Name;
             grdTimers.Columns[0].Visible = false;
@@ -1753,7 +1771,7 @@ namespace ThorneTimer
 
             RegisterTimerDisplayResolvers(_visibleTimers);
 
-            grdTimers.RowValidating += ValidateRowTimers;
+            timersController.Initialize(grdTimers);
             grdTimers.EditingControlShowing += GrdTimers_EditingControlShowing;
             grdTimers.CellToolTipTextNeeded += GrdTimers_CellToolTipTextNeeded;
 
@@ -2094,84 +2112,63 @@ namespace ThorneTimer
             tscActiveCharacter.SelectedIndexChanged += tscActiveCharacter_SelectedIndexChanged;
         }
 
+        /// <summary>
+        /// Switches the timer grid out of compact view (used as the
+        /// <see cref="TimersController.EnsureFullView"/> hook) so a newly added
+        /// row exposes every editable field.
+        /// </summary>
+        private void EnsureTimersFullView()
+        {
+            if (tsbCompactView.Checked)
+            {
+                tsbCompactView.Checked = false;
+                compactViewToolStripMenuItem.Checked = false;
+                Database.SetSetting(con, "CompactView", "0");
+                ApplyCompactView(false);
+            }
+        }
+
+        /// <summary>
+        /// Adds a freshly created timer to the <c>_allTimers</c> master list and
+        /// bumps the filter version (the
+        /// <see cref="TimersController.TrackTimer"/> hook) so the row survives a
+        /// later filter rebuild.
+        /// </summary>
+        private void AddTimerToMasterList(Timers.GridData gd)
+        {
+            if (_allTimers != null)
+            {
+                _allTimers.Add(gd);
+                _allTimersVersion++;
+            }
+        }
+
+        /// <summary>
+        /// Removes a deleted timer from the <c>_allTimers</c> master list and
+        /// bumps the filter version (the
+        /// <see cref="TimersController.UntrackTimer"/> hook) so a later filter
+        /// rebuild doesn't resurrect the row.
+        /// </summary>
+        private void RemoveTimerFromMasterList(long timerID)
+        {
+            if (_allTimers != null)
+            {
+                var masterItem = _allTimers.FirstOrDefault(g => g.ID == timerID);
+                if (masterItem != null)
+                    _allTimers.Remove(masterItem);
+                _allTimersVersion++;
+            }
+        }
+
+        /// <summary>
+        /// Persists all timer rows.  Thin delegator to
+        /// <see cref="TimersController.SaveAll"/>, retained because several
+        /// FormMain call sites (database save-as, form close, sound picker,
+        /// category activation) save timers as part of larger workflows.
+        /// </summary>
         void SaveDataTimers()
         {
-            for (int r = 0; r < grdTimers.Rows.Count; r++)
-            {
-                DataGridViewRow row = grdTimers.Rows[r];
-                grdTimers.EndEdit();
-                TimersRepository.SaveTimer(con, grdTimers, row);
-            }
-
-            timerRuntime.SyncTimerFieldsFromGrid(grdTimers);
-            RepaintTimerGrid();
-        }
-
-        void ValidateRowTimers(object sender, DataGridViewCellCancelEventArgs data)
-        {
-            DataGridViewRow row = grdTimers.Rows[data.RowIndex];
-
-            if ((ValidDataTimers(row)) && (row.Index != 0))
-            {
-                SaveDataTimers();
-            }
-
-        }
-
-        bool ValidDataTimers(DataGridViewRow row)
-        {
-            DataGridViewCell durationCell = row.Cells[grdTimers.Columns["Duration"].Index];
-
-            if (!ValidDuration(durationCell))
-            {
-                return false;
-            }
-
-            return true;
-        }
-
-        bool ValidDuration(DataGridViewCell durationCell)
-        {
-            string durationText = (string)durationCell.Value + "";
-
-            durationCell.ErrorText = "Invalid Duration. Use 'HH:MM:SS' or 'DD HH:MM:SS' (or 'DDd HH:MM:SS')";
-
-            // Check for DD HH:MM:SS or DDd HH:MM:SS (space separates days from time)
-            int spaceIdx = durationText.IndexOf(' ');
-            if (spaceIdx > 0)
-            {
-                string dayPart = durationText.Substring(0, spaceIdx).TrimEnd('d');
-                if (dayPart.Length == 0 || !int.TryParse(dayPart, out _))
-                    return false;
-
-                string timePart = durationText.Substring(spaceIdx + 1);
-                string[] parts = timePart.Split(':');
-                if (parts.Length != 3)
-                    return false;
-
-                foreach (string p in parts)
-                {
-                    if (p.Length != 2 || !int.TryParse(p, out _))
-                        return false;
-                }
-
-                durationCell.ErrorText = "";
-                return true;
-            }
-
-            // HH:MM:SS
-            string[] timeParts = durationText.Split(':');
-            if (timeParts.Length != 3)
-                return false;
-
-            foreach (string p in timeParts)
-            {
-                if (p.Length != 2 || !int.TryParse(p, out _))
-                    return false;
-            }
-
-            durationCell.ErrorText = "";
-            return true;
+            timersController?.SaveAll();
         }
 
         void FindWAVFile(int rowIndex)
@@ -3278,109 +3275,51 @@ namespace ThorneTimer
 
         private void btnDeleteTimer_Click(object sender, EventArgs e)
         {
-            if (grdTimers.CurrentCell != null)
-            {
-                if (MessageBox.Show("Are you sure you want to delete this timer?", "Delete Timer", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1) == System.Windows.Forms.DialogResult.Yes)
-                {
-                    int rowIndex = grdTimers.CurrentCell.RowIndex;
-                    long timerID = Convert.ToInt64(grdTimers.Rows[rowIndex].Cells[grdTimers.Columns["ID"].Index].Value);
-
-                    // Stop this specific timer if running, via TimerRuntime
-                    timerRuntime.StopTimer(timerID);
-
-                    TimersRepository.DeleteTimer(con, Convert.ToString(timerID));
-
-                    // Remove from existing data source — preserves sort/filter
-                    timerRuntime.RemoveTimerState(timerID);
-                    var data = (SortableBindingList<Timers.GridData>)grdTimers.DataSource;
-                    var item = data.FirstOrDefault(g => g.ID == timerID);
-                    if (item != null)
-                        data.Remove(item);
-
-                    // Mirror the deletion in the master list so a later
-                    // filter rebuild doesn't resurrect the row.
-                    if (_allTimers != null)
-                    {
-                        var masterItem = _allTimers.FirstOrDefault(g => g.ID == timerID);
-                        if (masterItem != null)
-                            _allTimers.Remove(masterItem);
-                        _allTimersVersion++;
-                    }
-
-                    RepaintTimerGrid();
-                }
-            }
+            timersController.DeleteCurrent();
         }
 
         private void btnAddTimer_Click(object sender, EventArgs e)
         {
-            DataGridViewRow row = grdTimers.CurrentRow;
+            timersController.AddTimer();
+        }
 
-            if (row == null || ValidDataTimers(row))
+        private void btnDuplicateTimer_Click(object sender, EventArgs e)
+        {
+            timersController.DuplicateCurrent();
+        }
+
+        /// <summary>
+        /// Creates the next link in a dependent timer chain from the selected
+        /// timer. The controller copies the source's keyword/duration/style/etc.
+        /// but appends the next Roman numeral to the Name (and Speech), points
+        /// its DependsOnTimer at the selected timer, and applies the default
+        /// chain delay. Because the new row becomes the selection, repeated
+        /// clicks extend the series: Spawn 20 -> Spawn 20 II -> Spawn 20 III.
+        /// </summary>
+        private void btnChainTimer_Click(object sender, EventArgs e)
+        {
+            timersController.ChainCurrent();
+        }
+
+        private void grdTimers_CellMouseDown(object sender, DataGridViewCellMouseEventArgs e)
+        {
+            // On right-click, select the row/cell under the cursor first so
+            // the context-menu actions (Duplicate/Delete) operate on the
+            // timer the user actually clicked, not a stale selection.
+            if (e.Button == MouseButtons.Right && e.RowIndex >= 0 && e.ColumnIndex >= 0)
             {
-                // Switch to full view if compact so the user can edit all fields
-                if (tsbCompactView.Checked)
-                {
-                    tsbCompactView.Checked = false;
-                    compactViewToolStripMenuItem.Checked = false;
-                    Database.SetSetting(con, "CompactView", "0");
-                    ApplyCompactView(false);
-                }
-
-                // Add to the existing data source — preserves sort/filter
-                var data = (SortableBindingList<Timers.GridData>)grdTimers.DataSource;
-
-                Timers.GridData gd = new Timers.GridData
-                {
-                    ID = -1,
-                    ActiveYn = 1,
-                    Style = "Normal",
-                    Scope = "World",
-                    DependsOnTimer = "",
-                    DependsOnDelay = 0,
-                    ClassID = 0,
-                    Duration = noTime
-                };
-                data.Add(gd);
-
-                // Also add to the master list so the new timer survives
-                // any subsequent filter rebuild.  Defaults (ActiveYn=1,
-                // ClassID=0) are filter-safe under both ShowActiveOnly and
-                // class-restricted views, so the row stays visible.
-                if (_allTimers != null)
-                {
-                    _allTimers.Add(gd);
-                    _allTimersVersion++;
-                }
-
-                // Find the new row (may not be last if a sort is active)
-                int newRowIndex = -1;
-                for (int r = 0; r < grdTimers.Rows.Count; r++)
-                {
-                    if (Convert.ToInt64(grdTimers.Rows[r].Cells[grdTimers.Columns["ID"].Index].Value) == -1)
-                    {
-                        newRowIndex = r;
-                        break;
-                    }
-                }
-                if (newRowIndex < 0) newRowIndex = grdTimers.Rows.Count - 1;
-
-                // Save immediately to get a real DB ID
-                DataGridViewRow newRow = grdTimers.Rows[newRowIndex];
-                grdTimers.EndEdit();
-                TimersRepository.SaveTimer(con, grdTimers, newRow);
-
-                // Register in the runtime with the real ID
-                timerRuntime.AddTimerState(gd);
-
-                // Apply row color and navigate for editing
-                var ts = timerRuntime.GetState(gd.ID);
-                if (ts != null)
-                    ApplyTimerRowColor(newRow, ts);
-
-                grdTimers.CurrentCell = newRow.Cells[grdTimers.Columns["Name"].Index];
-                grdTimers.BeginEdit(true);
+                grdTimers.CurrentCell = grdTimers.Rows[e.RowIndex].Cells[e.ColumnIndex];
             }
+        }
+
+        private void cmsTimers_Opening(object sender, CancelEventArgs e)
+        {
+            // Add is always available; Duplicate, Chain and Delete require a
+            // timer row to act on.
+            bool hasRow = grdTimers.CurrentRow != null;
+            cmsTimersDuplicate.Enabled = hasRow;
+            cmsTimersChain.Enabled = hasRow;
+            cmsTimersDelete.Enabled = hasRow;
         }
 
         private void btnDeleteCharacter_Click(object sender, EventArgs e)

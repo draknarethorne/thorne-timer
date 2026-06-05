@@ -22,6 +22,14 @@ namespace ThorneTimer
             this.con = con;
         }
 
+        /// <summary>
+        /// The connection this repository was constructed with.  Exposed so
+        /// <see cref="TimersController"/> can drive the static CRUD helpers
+        /// (<see cref="GetTimers"/>, <see cref="SaveTimer"/>,
+        /// <see cref="DeleteTimer"/>) against the same database.
+        /// </summary>
+        public SQLiteConnection Con => con;
+
         // ---------------------------------------------------------------
         // Static API â€” matches the original Database.* signatures used by
         // FormMain so existing call sites compile unchanged.

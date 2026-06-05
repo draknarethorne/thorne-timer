@@ -178,6 +178,7 @@
     <Compile Include="TimerPlus.cs">
       <SubType>Component</SubType>
     </Compile>
+    <Compile Include="TimersController.cs" />
     <Compile Include="TimersRepository.cs" />
     <Compile Include="TimerStateRepository.cs" />
     <Compile Include="TimerTimeFormatter.cs" />

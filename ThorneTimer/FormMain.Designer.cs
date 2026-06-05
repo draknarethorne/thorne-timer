@@ -29,6 +29,12 @@
         private void InitializeComponent()
         {
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(FormMain));
+            this.components = new System.ComponentModel.Container();
+            this.cmsTimers = new System.Windows.Forms.ContextMenuStrip(this.components);
+            this.cmsTimersAdd = new System.Windows.Forms.ToolStripMenuItem();
+            this.cmsTimersDuplicate = new System.Windows.Forms.ToolStripMenuItem();
+            this.cmsTimersChain = new System.Windows.Forms.ToolStripMenuItem();
+            this.cmsTimersDelete = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStrip = new System.Windows.Forms.ToolStrip();
             this.tscActiveCharacter = new System.Windows.Forms.ToolStripComboBox();
             this.tsSepCharacter = new System.Windows.Forms.ToolStripSeparator();
@@ -74,6 +80,8 @@
             this.buttonStopAll = new System.Windows.Forms.Button();
             this.btnAddTimer = new System.Windows.Forms.Button();
             this.btnDeleteTimer = new System.Windows.Forms.Button();
+            this.btnDuplicateTimer = new System.Windows.Forms.Button();
+            this.btnChainTimer = new System.Windows.Forms.Button();
             this.grdTimers = new System.Windows.Forms.DataGridView();
             this.tabCharacters = new System.Windows.Forms.TabPage();
             this.btnAddCharacter = new System.Windows.Forms.Button();
@@ -512,6 +520,8 @@
             this.tabTimers.Controls.Add(this.buttonStopAll);
             this.tabTimers.Controls.Add(this.btnAddTimer);
             this.tabTimers.Controls.Add(this.btnDeleteTimer);
+            this.tabTimers.Controls.Add(this.btnDuplicateTimer);
+            this.tabTimers.Controls.Add(this.btnChainTimer);
             this.tabTimers.Controls.Add(this.grdTimers);
             this.tabTimers.Location = new System.Drawing.Point(4, 22);
             this.tabTimers.Name = "tabTimers";
@@ -551,7 +561,7 @@
             this.btnAddTimer.Location = new System.Drawing.Point(6, 554);
             this.btnAddTimer.Name = "btnAddTimer";
             this.btnAddTimer.Size = new System.Drawing.Size(75, 23);
-            this.btnAddTimer.TabIndex = 4;
+            this.btnAddTimer.TabIndex = 3;
             this.btnAddTimer.Text = "Add";
             this.btnAddTimer.UseVisualStyleBackColor = true;
             this.btnAddTimer.Click += new System.EventHandler(this.btnAddTimer_Click);
@@ -560,13 +570,76 @@
             // 
             this.btnDeleteTimer.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
             this.btnDeleteTimer.BackColor = System.Drawing.SystemColors.Control;
-            this.btnDeleteTimer.Location = new System.Drawing.Point(87, 554);
+            this.btnDeleteTimer.Location = new System.Drawing.Point(249, 554);
             this.btnDeleteTimer.Name = "btnDeleteTimer";
             this.btnDeleteTimer.Size = new System.Drawing.Size(75, 23);
-            this.btnDeleteTimer.TabIndex = 3;
+            this.btnDeleteTimer.TabIndex = 6;
             this.btnDeleteTimer.Text = "Delete";
             this.btnDeleteTimer.UseVisualStyleBackColor = true;
             this.btnDeleteTimer.Click += new System.EventHandler(this.btnDeleteTimer_Click);
+            // 
+            // btnDuplicateTimer
+            // 
+            this.btnDuplicateTimer.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.btnDuplicateTimer.BackColor = System.Drawing.SystemColors.Control;
+            this.btnDuplicateTimer.Location = new System.Drawing.Point(87, 554);
+            this.btnDuplicateTimer.Name = "btnDuplicateTimer";
+            this.btnDuplicateTimer.Size = new System.Drawing.Size(75, 23);
+            this.btnDuplicateTimer.TabIndex = 4;
+            this.btnDuplicateTimer.Text = "Duplicate";
+            this.btnDuplicateTimer.UseVisualStyleBackColor = true;
+            this.btnDuplicateTimer.Click += new System.EventHandler(this.btnDuplicateTimer_Click);
+            // 
+            // btnChainTimer
+            // 
+            this.btnChainTimer.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.btnChainTimer.BackColor = System.Drawing.SystemColors.Control;
+            this.btnChainTimer.Location = new System.Drawing.Point(168, 554);
+            this.btnChainTimer.Name = "btnChainTimer";
+            this.btnChainTimer.Size = new System.Drawing.Size(75, 23);
+            this.btnChainTimer.TabIndex = 5;
+            this.btnChainTimer.Text = "Chain";
+            this.btnChainTimer.UseVisualStyleBackColor = true;
+            this.btnChainTimer.Click += new System.EventHandler(this.btnChainTimer_Click);
+            // 
+            // cmsTimers
+            // 
+            this.cmsTimers.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.cmsTimersAdd,
+            this.cmsTimersDuplicate,
+            this.cmsTimersChain,
+            this.cmsTimersDelete});
+            this.cmsTimers.Name = "cmsTimers";
+            this.cmsTimers.Size = new System.Drawing.Size(181, 92);
+            this.cmsTimers.Opening += new System.ComponentModel.CancelEventHandler(this.cmsTimers_Opening);
+            // 
+            // cmsTimersAdd
+            // 
+            this.cmsTimersAdd.Name = "cmsTimersAdd";
+            this.cmsTimersAdd.Size = new System.Drawing.Size(180, 22);
+            this.cmsTimersAdd.Text = "Add";
+            this.cmsTimersAdd.Click += new System.EventHandler(this.btnAddTimer_Click);
+            // 
+            // cmsTimersDuplicate
+            // 
+            this.cmsTimersDuplicate.Name = "cmsTimersDuplicate";
+            this.cmsTimersDuplicate.Size = new System.Drawing.Size(180, 22);
+            this.cmsTimersDuplicate.Text = "Duplicate";
+            this.cmsTimersDuplicate.Click += new System.EventHandler(this.btnDuplicateTimer_Click);
+            // 
+            // cmsTimersChain
+            // 
+            this.cmsTimersChain.Name = "cmsTimersChain";
+            this.cmsTimersChain.Size = new System.Drawing.Size(180, 22);
+            this.cmsTimersChain.Text = "Chain";
+            this.cmsTimersChain.Click += new System.EventHandler(this.btnChainTimer_Click);
+            // 
+            // cmsTimersDelete
+            // 
+            this.cmsTimersDelete.Name = "cmsTimersDelete";
+            this.cmsTimersDelete.Size = new System.Drawing.Size(180, 22);
+            this.cmsTimersDelete.Text = "Delete";
+            this.cmsTimersDelete.Click += new System.EventHandler(this.btnDeleteTimer_Click);
             // 
             // grdTimers
             // 
@@ -578,11 +651,13 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.grdTimers.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.Fill;
             this.grdTimers.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            this.grdTimers.ContextMenuStrip = this.cmsTimers;
             this.grdTimers.Location = new System.Drawing.Point(6, 6);
             this.grdTimers.Name = "grdTimers";
             this.grdTimers.Size = new System.Drawing.Size(1356, 542);
             this.grdTimers.TabIndex = 1;
             this.grdTimers.CellClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.grdTimers_CellClick);
+            this.grdTimers.CellMouseDown += new System.Windows.Forms.DataGridViewCellMouseEventHandler(this.grdTimers_CellMouseDown);
             this.grdTimers.ColumnHeaderMouseClick += new System.Windows.Forms.DataGridViewCellMouseEventHandler(this.grdTimers_ColumnHeaderMouseClick);
             // 
             // tabCharacters
@@ -1242,6 +1317,13 @@
         private System.Windows.Forms.TabPage tabTimers;
         private System.Windows.Forms.Button btnAddTimer;
         private System.Windows.Forms.Button btnDeleteTimer;
+        private System.Windows.Forms.Button btnDuplicateTimer;
+        private System.Windows.Forms.Button btnChainTimer;
+        private System.Windows.Forms.ContextMenuStrip cmsTimers;
+        private System.Windows.Forms.ToolStripMenuItem cmsTimersAdd;
+        private System.Windows.Forms.ToolStripMenuItem cmsTimersDuplicate;
+        private System.Windows.Forms.ToolStripMenuItem cmsTimersChain;
+        private System.Windows.Forms.ToolStripMenuItem cmsTimersDelete;
         private System.Windows.Forms.DataGridView grdTimers;
         private System.Windows.Forms.TabPage tabCharacters;
         private System.Windows.Forms.DataGridView grdCharacters;
