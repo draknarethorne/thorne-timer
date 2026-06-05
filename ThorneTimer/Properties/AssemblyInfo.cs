@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -38,4 +38,4 @@ using System.Runtime.InteropServices;
 // AssemblyVersion/FileVersion must stay purely numeric, so the human-facing
 // version (shown in the About dialog) lives here.  The release workflow
 // overwrites this with the full tag (minus the leading 'v') at build time.
-[assembly: AssemblyInformationalVersion("0.6.0-dev")]
+[assembly: AssemblyInformationalVersion("0.6.0-beta4")]

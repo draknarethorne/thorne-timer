@@ -216,6 +216,14 @@ _GUI enhancements, architecture cleanup, and a much richer Tome Information dial
 - ✅ **Grid performance** — O(n²) → O(n) dictionary lookup in `SyncRuntimeToGrid` (~98% faster with 130+ timers)
 - ✅ **One-shot startup migration** — v0.5.0 → v0.6.0 palette migration runs once; deletions stick, no snapback
 
+**Beta 4 additions**
+- ✅ **Per-style time formats** — each style renders its remaining time as Classic, Long, Adaptive Compact, or Full Compact, applied in both the mini views and the main grid; pick it from the new Styles-tab **Time Format** column with a live example preview (existing tomes default to Classic)
+- ✅ **Dependency-delay fix** — dependent timer chains using a compact format (e.g. Spawn) no longer fire all at once; the delay is read from authoritative elapsed time instead of the display string
+- ✅ **Format-independent warnings** — mini-view warning colors use raw remaining milliseconds, so compact formats like `1d 4h` or `45s` no longer trigger false warnings
+- ✅ **Lossless timer-state persistence** — saved remaining times are normalized to `HH:MM:SS` at the storage boundary so state round-trips exactly regardless of display format
+- ✅ **`TimersController` extraction** — timer add/duplicate/chain, duration validation, and grid CRUD moved out of `FormMain` into a dedicated controller
+- ✅ **Grid layout survives new columns** — adding the Time Format column no longer pushes saved grid layouts past their edge
+
 **Beta 3 fixes**
 - ✅ **Open Database crash** — fixed `Database is not open` when switching tomes via File → Open Database (validation no longer saves against the closed connection during teardown)
 - ✅ **About dialog version** — now shows the full release label (e.g. `0.6.0-beta3`) instead of just the numeric version; dev builds show `0.6.0-dev`
