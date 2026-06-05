@@ -625,7 +625,130 @@ matches the EQ overlay it's tracking.
 
 ---
 
-## Appendix A — Harvested layered-window plumbing (from the deleted spike)
+## 13. Runtime time-model refactor (deferred — numeric time, strings at the edges)
+
+> **Status:** Planned follow-up — *do not bundle into the styles/views feature work.*
+> Implement on its own branch with the restore/offline scenarios in §13.5 explicitly re-tested.
+
+### 13.1 Problem statement
+
+Today the canonical "remaining time" repeatedly round-trips through a **display string**:
+
+```
+double ms  →  "01:23:45" (string)  →  parsed back to double ms  →  new TimerPlus
+```
+
+`TimerState.Remaining` is overloaded: it is simultaneously the **display string** *and* the
+**serialized runtime state**. This conflation is a holdover from the original grid-centric /
+GINA-replacement design, where `Remaining` was a `DataGridView` cell value and the string *was*
+the model. The `TimerRuntime` redesign decoupled the engine from the grid, but the
+string-as-source-of-truth survived the move.
+
+Symptoms this causes (all currently patched, not cured):
+
+- **Warning detection was format-dependent.** It parsed the display string, so it broke the
+  moment the format became lossy (`AdaptiveCompact` `"1d 4h"`). Fixed by smuggling a parallel
+  raw-ms field (`MiniTimerData.RemainingMs` / `MiniData.RemainingMs`) alongside the string. (§2.5)
+- **Display formatter used as a serializer.** The Character+ / World restore paths call
+  `TimerTimeFormatter.Format(adjusted, TimeFormat.Classic)` purely to produce a *machine-parseable*
+  wire string for the next step, which only knows how to read strings.
+- **`TimerPlus.GetMilliseconds(string)` is a fragile pseudo-parser.** It understands only
+  colon formats and silently returns `0` on any failure — a tell that it was a grid-cell reader,
+  never a real parser. A `0` return is indistinguishable from a genuinely-expired timer.
+
+Beyond correctness, every conversion is wasted allocation + parse work on the timer tick path,
+which scales with timer count × tick frequency.
+
+### 13.2 Target model
+
+**Time is a number everywhere internally; strings exist only at the two edges — display and
+persistence input.**
+
+- `TimerState` carries the source of truth as a numeric value — `long RemainingMs`
+  (or `TimeSpan`). `string Remaining` becomes a **derived, display-only** property
+  (`TimerTimeFormatter.Format(...)`), never an input.
+- Persist **raw milliseconds** to `timer_runtime_state` (numeric column) instead of a formatted
+  string. Storing `4980000` is strictly better than `"01:23:45"` TEXT — exact, format-independent,
+  no parser required.
+- `TimerPlus.GetMilliseconds(string)` is **retired** from the runtime/restore paths. The only
+  legitimate string→time parse that remains is the **user's duration input** (e.g. they type
+  `"5:00"`), which is a genuine edge and should live in a single, well-tested input parser that
+  *reports failure explicitly* rather than returning `0`.
+- The `RemainingMs` fields added for the warning fix stop being a bolt-on and become the
+  **normal** way data flows to mini views; the display string rides alongside purely for
+  rendering.
+
+### 13.3 Why deferred
+
+1. The current `RemainingMs` fallback approach is correct and safe; this is a cleanliness /
+   performance improvement, not a bug that bites.
+2. The refactor touches **persistence** (`timer_runtime_state` schema), the
+   **Character / Character+ / World restore math**, and **offline-elapsed** calculation — the
+   trickiest correctness paths in the app. High blast radius.
+3. It must not be mixed into the styles/views feature work or it makes both harder to review.
+
+### 13.4 Affected surface (scope checklist)
+
+- `TimerPlus` — `DurationTime`/`ElapsedTime` already numeric (keep); retire runtime use of
+  `GetMilliseconds`; keep/relocate a single duration-input parser.
+- `TimerState` — add numeric `RemainingMs` (source of truth); make `Remaining` derived.
+- `TimerRuntime` — `GetMiniViewData`, `OnTimerElapsed`, `StartTimerInternal`,
+  `RestartTimerFromRemaining`, `SaveCharacterState`, `RestoreCharacterState`,
+  `RestoreWorldTimersOnStartup` (remove the `Format(..., Classic)`-as-wire-string calls).
+- `Database` / persistence — migrate `timer_runtime_state.Remaining` (TEXT) to a numeric column
+  (e.g. `RemainingMs INTEGER`); idempotent, one-shot, with back-fill that parses any existing
+  TEXT values once during upgrade.
+- `MiniViews` / `MiniView` — `RemainingMs` becomes the primary field; `Remaining` is display-only.
+- Grid Remaining column — already routed through the style's `TimeFormat`; unaffected beyond
+  reading the derived string.
+
+### 13.5 Test scenarios to re-validate
+
+- Character switch with running Character and Character+ timers (frozen vs. continuing).
+- App restart restoring World timers with correct offline-elapsed subtraction.
+- Character+ timer that **expires while offline** (must resolve to stopped, count decremented).
+- Sub-minute, multi-hour, and multi-day spans across all four `TimeFormat`s.
+- Warning threshold fires correctly under every format (the §2.5 regression).
+- Upgrade of an existing `.tdb` whose `timer_runtime_state.Remaining` holds legacy TEXT values.
+
+### 13.6 Acceptance
+
+- No runtime/restore code path calls `TimerPlus.GetMilliseconds`; the only string→time parse is
+  the single duration-input parser, which surfaces parse failure explicitly (no silent `0`).
+- `timer_runtime_state` stores numeric remaining time; round-trip is lossless and
+  format-independent.
+- Mini-view warning logic reads numeric ms directly with no string fallback needed.
+- All §13.5 scenarios pass; existing tomes upgrade in place with no lost timer state.
+
+### 13.7 Interim hardening already landed (v0.6.0)
+
+The full numeric refactor above is still deferred, but a string-format defect forced a partial
+down-payment that removes the *correctness* risk now while leaving the larger numeric-internals
+cleanup for later:
+
+- **Symptom:** dependency `DependsOnDelay` was ignored for any timer whose style used a
+  non-Classic `TimeFormat` (e.g. Spawn = FullCompact `"9m 30s"`); the whole chain fired at once.
+- **Root cause:** `CheckDependentTimer` and the restore paths parsed the *display* `Remaining`
+  string with a colon-only parser that returned `0` on failure — indistinguishable from a real
+  zero, so elapsed looked like the full duration.
+- **Fixes shipped:**
+  - `TimerPlus.TryParseRemaining` — tolerant parser covering **every** `TimerTimeFormatter`
+    output (colon forms *and* unit-suffixed `d/h/m/s` forms); `GetMilliseconds` delegates to it.
+  - `CheckDependentTimer` now reads the live `TimerPlus.ElapsedTime` (authoritative raw ms)
+    instead of re-parsing the display string.
+  - `ValidDuration` delegates to `TryParseRemaining`, so restore no longer rejects non-colon
+    persisted `Remaining`.
+  - Persistence normalizes `Remaining` to canonical **Classic** at the `TimerStateRepository`
+    write boundary (`NormalizeRemainingForStorage`) since AdaptiveCompact is lossy; the live grid
+    / mini view still render the per-style format from the running timer.
+- **Still deferred (the real §13 target):** making `RemainingMs`/`TimeSpan` the in-memory source
+  of truth, persisting numeric ms, and retiring runtime string parsing entirely. The interim fix
+  keeps strings as the wire format but makes that round-trip *lossless and total* rather than
+  format-fragile.
+
+---
+
+
 
 > The `Spike\LayeredMiniViewSpike.cs` proof-of-concept **validated** the layered-window +
 > custom-paint approach (per-pixel alpha, drag via `WM_NCLBUTTONDOWN`, right-click menu,
