@@ -49,6 +49,27 @@ namespace ThorneTimer
                     }
                 }
 
+                // Layout-schema guard: a saved layout only describes the columns that
+                // existed when it was written.  When a new column is later added to a
+                // grid (e.g. the Styles "Time Format" column), the persisted layout has
+                // no entry for it, so the new column's coded default width is added on
+                // top of every restored width — pushing the total past the grid's client
+                // area until the user manually resizes.
+                //
+                // Rather than discard the user's saved widths (unfriendly), we keep their
+                // overall footprint and make room for the new column(s) by proportionally
+                // shrinking the existing saved columns down to their MinimumWidth floors.
+                // This is width-independent on purpose: the grid's client width is
+                // unreliable for tabs that have never been shown (see the FillWeight note
+                // below), but the user's previously-saved footprint is a layout they had
+                // already accepted as fitting.  SaveColumnWidths rewrites the full current
+                // column set on close, so the adjusted layout becomes the new baseline.
+                if (IsSavedLayoutStale(grid, widths))
+                {
+                    ApplyWidthsWithFitForNewColumns(grid, widths);
+                    return;
+                }
+
                 foreach (var kvp in widths)
                 {
                     if (grid.Columns.Contains(kvp.Key))
@@ -76,6 +97,144 @@ namespace ThorneTimer
             {
                 // Database may not have the table yet; ignore.
             }
+        }
+
+        /// <summary>
+        /// Applies a saved layout that is missing one or more newly-added columns,
+        /// fitting the new column(s) into the user's existing footprint instead of
+        /// discarding their saved widths.
+        ///
+        /// Strategy (width-independent): treat the sum of the saved widths of the
+        /// currently-visible, non-Fill columns as the budget the user already accepted.
+        /// New columns (no saved width) want their coded default width; we reclaim that
+        /// many pixels from the existing saved columns, distributed in proportion to how
+        /// much slack each one has above its <see cref="DataGridViewColumn.MinimumWidth"/>.
+        /// Columns already at their floor give nothing.  If the existing columns cannot
+        /// yield enough (everything is at its floor), the footprint grows by the shortfall
+        /// — a best-effort minimum rather than a hard overflow.  Hidden and Fill columns
+        /// are left to the normal saved-width / FillWeight handling.
+        /// </summary>
+        private static void ApplyWidthsWithFitForNewColumns(DataGridView grid, Dictionary<string, int> savedWidths)
+        {
+            var existing = new List<DataGridViewColumn>();
+            var newCols = new List<DataGridViewColumn>();
+
+            foreach (DataGridViewColumn col in grid.Columns)
+            {
+                if (!col.Visible)
+                    continue;
+                if (col.Resizable == DataGridViewTriState.False)
+                    continue;
+                if (col.InheritedAutoSizeMode == DataGridViewAutoSizeColumnMode.Fill)
+                    continue;
+
+                if (savedWidths.ContainsKey(col.Name))
+                    existing.Add(col);
+                else
+                    newCols.Add(col);
+            }
+
+            // Pixels the new columns want, at their coded default (clamped to floor).
+            int need = 0;
+            foreach (DataGridViewColumn col in newCols)
+                need += System.Math.Max(col.Width, col.MinimumWidth);
+
+            // Total slack available above each existing column's minimum width.
+            int totalSlack = 0;
+            foreach (DataGridViewColumn col in existing)
+            {
+                int saved = System.Math.Max(savedWidths[col.Name], col.MinimumWidth);
+                totalSlack += saved - col.MinimumWidth;
+            }
+
+            int reclaim = System.Math.Min(need, totalSlack);
+
+            // Apply existing columns at their saved width minus a proportional share of
+            // the reclaim, floored at MinimumWidth.
+            int distributed = 0;
+            for (int i = 0; i < existing.Count; i++)
+            {
+                DataGridViewColumn col = existing[i];
+                int saved = System.Math.Max(savedWidths[col.Name], col.MinimumWidth);
+                int slack = saved - col.MinimumWidth;
+
+                int give;
+                if (i == existing.Count - 1)
+                {
+                    // Last column absorbs any rounding remainder so the total reclaim is exact.
+                    give = reclaim - distributed;
+                }
+                else if (totalSlack > 0)
+                {
+                    give = (int)System.Math.Round((double)reclaim * slack / totalSlack);
+                }
+                else
+                {
+                    give = 0;
+                }
+
+                if (give < 0) give = 0;
+                if (give > slack) give = slack;
+                distributed += give;
+
+                col.Width = saved - give;
+            }
+
+            // New columns keep their coded default (clamped to their floor).
+            foreach (DataGridViewColumn col in newCols)
+            {
+                if (col.Width < col.MinimumWidth)
+                    col.Width = col.MinimumWidth;
+            }
+
+            // Hidden non-Fill columns don't contribute to the visible footprint, but
+            // their saved widths are still meaningful (e.g. the Timers grid persists
+            // hidden-column widths for compact/advanced view toggling).  Restore them
+            // verbatim so the stale path doesn't silently drop that state.
+            foreach (DataGridViewColumn col in grid.Columns)
+            {
+                if (col.Visible)
+                    continue;
+                if (col.Resizable == DataGridViewTriState.False)
+                    continue;
+                if (col.InheritedAutoSizeMode == DataGridViewAutoSizeColumnMode.Fill)
+                    continue;
+                if (!savedWidths.ContainsKey(col.Name))
+                    continue;
+
+                int saved = savedWidths[col.Name];
+                if (saved >= col.MinimumWidth)
+                    col.Width = saved;
+            }
+        }
+
+        /// <summary>
+        /// Returns true when a non-empty saved layout is missing one or more of the
+        /// grid's current resizable columns — i.e. the layout was written before that
+        /// column existed and is therefore stale.  An empty layout (first run, or a
+        /// grid that has never been persisted) is NOT considered stale; callers fall
+        /// through to the normal saved-width restore (which is a no-op for unknown
+        /// columns) in that case.  When stale, the caller fits the new column(s) into
+        /// the user's existing footprint via <see cref="ApplyWidthsWithFitForNewColumns"/>
+        /// rather than discarding their saved widths.
+        /// Mirrors the column-eligibility filter in <see cref="Database.SaveColumnWidths"/>
+        /// (resizable columns only) so the staleness check matches what gets saved.
+        /// </summary>
+        private static bool IsSavedLayoutStale(DataGridView grid, Dictionary<string, int> savedWidths)
+        {
+            if (savedWidths == null || savedWidths.Count == 0)
+                return false;
+
+            foreach (DataGridViewColumn col in grid.Columns)
+            {
+                if (col.Resizable == DataGridViewTriState.False)
+                    continue;
+
+                if (!savedWidths.ContainsKey(col.Name))
+                    return true;
+            }
+
+            return false;
         }
 
         /// <summary>
