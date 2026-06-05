@@ -821,9 +821,17 @@ namespace ThorneTimer
                 {
                     if (ValidDuration(ts.Duration))
                     {
-                        double remainingMS = TimerPlus.GetMilliseconds(ts.Remaining ?? "00:00:00");
-                        double durationMS = TimerPlus.GetMilliseconds(ts.Duration);
-                        double elapsedMS = durationMS - remainingMS;
+                        // Use the live TimerPlus elapsed time (authoritative raw ms)
+                        // rather than parsing the display string. The displayed
+                        // Remaining is formatted per the timer's style (e.g. Spawn
+                        // uses FullCompact "9m 30s"), which the old colon-only parser
+                        // turned into 0 ms — making elapsed look like the full duration
+                        // and firing every dependent immediately regardless of delay.
+                        var rt = runningTimers.FirstOrDefault(r => r.TimerID == ts.TimerID);
+                        double elapsedMS = (rt != null)
+                            ? rt.Timer.ElapsedTime
+                            : TimerPlus.GetMilliseconds(ts.Duration)
+                                - TimerPlus.GetMilliseconds(ts.Remaining ?? "00:00:00");
 
                         if (elapsedMS > delayMS)
                         {
@@ -846,36 +854,13 @@ namespace ThorneTimer
 
         private bool ValidDuration(string durationText)
         {
-            if (string.IsNullOrEmpty(durationText)) return false;
-
-            // Check for DD HH:MM:SS or DDd HH:MM:SS (space separates days from time)
-            int spaceIdx = durationText.IndexOf(' ');
-            if (spaceIdx > 0)
-            {
-                string dayPart = durationText.Substring(0, spaceIdx).TrimEnd('d');
-                if (dayPart.Length == 0 || !int.TryParse(dayPart, out _))
-                    return false;
-
-                string[] parts = durationText.Substring(spaceIdx + 1).Split(':');
-                if (parts.Length != 3) return false;
-
-                foreach (string p in parts)
-                {
-                    if (p.Length != 2 || !int.TryParse(p, out _)) return false;
-                }
-                return true;
-            }
-
-            // HH:MM:SS
-            string[] timeParts = durationText.Split(':');
-            if (timeParts.Length != 3) return false;
-
-            foreach (string p in timeParts)
-            {
-                if (p.Length != 2 || !int.TryParse(p, out _)) return false;
-            }
-
-            return true;
+            // A value is valid if the robust parser can turn it into a time.
+            // This accepts every format TimerTimeFormatter emits (colon forms for
+            // Classic/Long, unit-suffixed forms for Adaptive/FullCompact) so that
+            // restoring a persisted Remaining written in a non-Classic style format
+            // (e.g. Spawn's "9m 30s") is no longer rejected and silently dropped.
+            // Callers separately guard against zero via GetMilliseconds(...) <= 0.
+            return TimerPlus.TryParseRemaining(durationText, out _);
         }
 
         // --- Event firing helpers ---
@@ -946,7 +931,13 @@ namespace ThorneTimer
                         var rt = runningTimers.FirstOrDefault(r => r.TimerID == ts.TimerID);
                         if (rt != null)
                         {
-                            remaining = rt.Timer.GetTimeRemaining(ResolveTimeFormat(ts.Style));
+                            // Persist in Classic (lossless colon) format, NOT the style's
+                            // display format. Compact formats are lossy/awkward to round-trip
+                            // (AdaptiveCompact "1d 4h" drops minutes & seconds), which would
+                            // corrupt the restored remaining time. The live grid/mini view
+                            // still renders the style format from the running TimerPlus; this
+                            // value is the serialized snapshot consumed by RestoreCharacterState.
+                            remaining = rt.Timer.GetTimeRemaining(TimeFormat.Classic);
                         }
                         StopTimerInternal(ts, false);
                         // Restore the frozen remaining and mark with the style button

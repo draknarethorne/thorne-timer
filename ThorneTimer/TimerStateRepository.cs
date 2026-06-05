@@ -23,6 +23,26 @@ namespace ThorneTimer
             this.con = con;
         }
 
+        /// <summary>
+        /// Normalizes a remaining-time value to the canonical Classic colon format
+        /// (<c>HH:MM:SS</c> / <c>{d}d HH:MM:SS</c>) for storage. The live grid and
+        /// mini views render the per-style display format from the running
+        /// <see cref="TimerPlus"/>, but the persisted snapshot must be lossless and
+        /// uniformly parseable on reload â€” compact display formats are lossy
+        /// (AdaptiveCompact "1d 4h" drops minutes &amp; seconds) and must not be the
+        /// stored form. Unparseable or empty input is passed through unchanged so we
+        /// never fabricate a time where there wasn't one.
+        /// </summary>
+        static private string NormalizeRemainingForStorage(string remaining)
+        {
+            if (string.IsNullOrEmpty(remaining)) return remaining ?? "";
+
+            if (TimerPlus.TryParseRemaining(remaining, out double ms) && ms > 0)
+                return TimerTimeFormatter.Format(TimeSpan.FromMilliseconds(ms), TimeFormat.Classic);
+
+            return remaining;
+        }
+
         // ---------------------------------------------------------------
         // Static API â€” matches the original Database.* signatures.
         // ---------------------------------------------------------------
@@ -74,7 +94,7 @@ namespace ThorneTimer
                     cmd.Parameters.Clear();
                     cmd.Parameters.AddWithValue("@timerID", ts.TimerID);
                     cmd.Parameters.AddWithValue("@charID", string.IsNullOrEmpty(effectiveCharID) ? (object)DBNull.Value : (object)effectiveCharID);
-                    cmd.Parameters.AddWithValue("@remaining", ts.Remaining ?? "");
+                    cmd.Parameters.AddWithValue("@remaining", NormalizeRemainingForStorage(ts.Remaining));
                     cmd.Parameters.AddWithValue("@btnState", ts.ButtonState ?? Timers.btnStart);
                     cmd.Parameters.AddWithValue("@count", ts.Count);
 
@@ -129,7 +149,7 @@ namespace ThorneTimer
             cmd.Parameters.Clear();
             cmd.Parameters.AddWithValue("@timerID", ts.TimerID);
             cmd.Parameters.AddWithValue("@charID", string.IsNullOrEmpty(effectiveCharID) ? (object)DBNull.Value : (object)effectiveCharID);
-            cmd.Parameters.AddWithValue("@remaining", ts.Remaining ?? "");
+            cmd.Parameters.AddWithValue("@remaining", NormalizeRemainingForStorage(ts.Remaining));
             cmd.Parameters.AddWithValue("@btnState", ts.ButtonState ?? Timers.btnStart);
             cmd.Parameters.AddWithValue("@count", ts.Count);
 

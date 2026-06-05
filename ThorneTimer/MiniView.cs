@@ -95,11 +95,12 @@ namespace ThorneTimer
         }
 
         /// <summary>
-        /// Determines whether a timer is within the warning threshold. Uses the
-        /// raw remaining milliseconds (format-independent) when available, falling
-        /// back to parsing the displayed Remaining string for legacy/unknown data.
-        /// This avoids false warnings with compact formats like "1d 4h" or "45s",
-        /// which TimerPlus.GetMilliseconds cannot parse.
+        /// Determines whether a timer is within the warning threshold. Prefers the
+        /// raw remaining milliseconds (exact, format-independent) when available,
+        /// falling back to parsing the displayed Remaining string for legacy/unknown
+        /// data. The raw path is still preferred because AdaptiveCompact ("1d 4h") is
+        /// lossy, but TimerPlus.GetMilliseconds now understands every display format
+        /// so the fallback no longer mis-reads compact strings as zero.
         /// </summary>
         private bool IsWarning(MiniData md)
         {
