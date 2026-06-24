@@ -220,6 +220,7 @@
     <None Include="Docs\active-views\technical-debt.md" />
     <None Include="Docs\architecture-redesign.md" />
     <None Include="Docs\auto-character-switching.md" />
+    <None Include="Docs\BUG-FIX-SUMMARY-v0.6.0-style-combo-sync.md" />
     <None Include="Docs\camp-out-auto-pause.md" />
     <None Include="Docs\character-scope-timer-pausing.md" />
     <None Include="Docs\mini-view-per-view-colors-plan.md" />

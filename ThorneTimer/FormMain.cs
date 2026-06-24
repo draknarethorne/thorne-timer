@@ -1678,7 +1678,15 @@ namespace ThorneTimer
                 DataPropertyName = "Style",
                 FlatStyle = FlatStyle.Flat
             };
-            cboRole.Items.AddRange("Normal", "Buff", "Pet", "Ping", "Spawn", "Lockout", "Character");
+            // Populate Style combo with styles from database (dynamically loaded, not hardcoded)
+            if (stylesRepository != null)
+            {
+                foreach (string styleName in stylesRepository.GetStyleNames())
+                    cboRole.Items.Add(styleName);
+            }
+            // Fallback to default if database is empty
+            if (cboRole.Items.Count == 0)
+                cboRole.Items.AddRange("Normal", "Buff", "Pet", "Ping", "Spawn", "Lockout", "Character");
             grdTimers.Columns.Add(cboRole);
             grdTimers.Columns["Style"].Width = 80;
             grdTimers.Columns["Style"].MinimumWidth = 60;
@@ -1872,6 +1880,10 @@ namespace ThorneTimer
             viewsController?.Dispose();
             viewsController = new ViewsController(viewsRepository, stylesRepository, OnViewsChanged);
             viewsController.Initialize(grdViews);
+
+            // Wire up data error handler to suppress combo-box validation errors
+            // during transient sync issues (e.g., when style combo items are being refreshed)
+            grdViews.DataError += GrdViews_DataError;
         }
 
         private void OnViewsChanged()
@@ -1894,9 +1906,43 @@ namespace ThorneTimer
         {
             stylesRepository?.RefreshCache();
             viewsController?.RefreshStyleOptions();
+            RefreshTimerGridStyleCombo();
             miniViews.RefreshMiniViews(con, activeCharacterID);
             RepaintTimerGrid();
             UpdateMiniView();
+        }
+
+        /// <summary>
+        /// Refreshes the Style combo box column in the main Timer grid
+        /// to include all current styles from the database.
+        /// Called whenever styles are added, deleted, or renamed.
+        /// </summary>
+        private void RefreshTimerGridStyleCombo()
+        {
+            var col = grdTimers.Columns["Style"] as DataGridViewComboBoxColumn;
+            if (col == null) return;
+
+            col.Items.Clear();
+            if (stylesRepository != null)
+            {
+                foreach (string name in stylesRepository.GetStyleNames())
+                    col.Items.Add(name);
+            }
+            if (col.Items.Count == 0)
+                col.Items.Add("Normal");
+        }
+
+        /// <summary>
+        /// Handles DataGridView errors on the Views grid (e.g., combo box value mismatches).
+        /// Suppresses the error dialog and optionally logs the error for diagnostics.
+        /// Combo-box errors typically occur during transient sync issues when the combo items
+        /// list is being refreshed after style additions/deletions.
+        /// </summary>
+        private void GrdViews_DataError(object sender, DataGridViewDataErrorEventArgs e)
+        {
+            ThorneLog.Warn($"Views grid data error at ({e.RowIndex}, {e.ColumnIndex}): {e.Exception?.Message ?? "Unknown"}");
+            // Suppress the error dialog by setting ThrowException to false
+            e.ThrowException = false;
         }
 
         void grdViews_CellToolTipTextNeeded(object sender, DataGridViewCellToolTipTextNeededEventArgs e)
