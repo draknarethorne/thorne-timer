@@ -282,11 +282,11 @@ namespace ThorneTimer
                 // Process Categories
                 foreach (var cat in categoryStates)
                 {
-                    if (cat.StartKeyword.Length > 0 && chunk.Contains(cat.StartKeyword))
+                    if (cat.StartKeyword.Length > 0 && KeywordMatches(cat.StartKeyword, chunk, caseSensitive: false))
                     {
                         ActivateCategoryTimers(cat.CategoryID, true);
                     }
-                    else if (cat.EndKeyword.Length > 0 && chunk.Contains(cat.EndKeyword))
+                    else if (cat.EndKeyword.Length > 0 && KeywordMatches(cat.EndKeyword, chunk, caseSensitive: false))
                     {
                         if (cat.AutoStop == 1)
                         {
@@ -300,19 +300,9 @@ namespace ThorneTimer
                 {
                     if (!ts.IsActive) continue;
 
-                    bool containsStart;
-                    bool containsEnd;
-
-                    if (ts.CaseYn != 0)
-                    {
-                        containsStart = chunk.IndexOf(ts.StartKeyword, StringComparison.Ordinal) >= 0;
-                        containsEnd = chunk.IndexOf(ts.EndKeyword, StringComparison.Ordinal) >= 0;
-                    }
-                    else
-                    {
-                        containsStart = chunk.IndexOf(ts.StartKeyword, StringComparison.OrdinalIgnoreCase) >= 0;
-                        containsEnd = chunk.IndexOf(ts.EndKeyword, StringComparison.OrdinalIgnoreCase) >= 0;
-                    }
+                    bool caseSensitive = ts.CaseYn != 0;
+                    bool containsStart = KeywordMatches(ts.StartKeyword, chunk, caseSensitive);
+                    bool containsEnd = KeywordMatches(ts.EndKeyword, chunk, caseSensitive);
 
                     if (containsStart && ts.StartKeyword.Length > 0)
                     {
@@ -1209,5 +1199,45 @@ namespace ThorneTimer
                 default: return Timers.btnStop;
             }
         }
+
+        /// <summary>
+        /// Checks if a keyword or pipe-separated keywords match a log chunk.
+        /// Supports multiple keywords separated by '|' using OR logic:
+        /// if ANY keyword matches, returns true.
+        /// 
+        /// Example:
+        ///   KeywordMatches("spell cast|ability ready|buff applied", chunk, false)
+        ///   Returns true if chunk contains any of those phrases.
+        /// 
+        /// Single keywords work unchanged (backward compatible).
+        /// Empty or whitespace-only keywords are skipped.
+        /// </summary>
+        private bool KeywordMatches(string keywordString, string chunk, bool caseSensitive)
+        {
+            if (string.IsNullOrEmpty(keywordString) || string.IsNullOrEmpty(chunk))
+                return false;
+
+            // Split by pipe separator; trim whitespace from each keyword
+            var keywords = keywordString.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (var keyword in keywords)
+            {
+                string trimmedKeyword = keyword.Trim();
+                if (trimmedKeyword.Length == 0)
+                    continue;
+
+                // Check if chunk contains this keyword (with case sensitivity based on flag)
+                int index = caseSensitive
+                    ? chunk.IndexOf(trimmedKeyword, StringComparison.Ordinal)
+                    : chunk.IndexOf(trimmedKeyword, StringComparison.OrdinalIgnoreCase);
+
+                if (index >= 0)
+                    return true;  // Found a match — OR logic returns immediately
+            }
+
+            // No keywords matched
+            return false;
+        }
     }
 }
+
