@@ -9,6 +9,7 @@
 
 **Latest Release:** v0.6.0 (shipped)
 **Active Branch:** `v0.7.0-dev`
+**v0.7.0 Focus:** Phase G — Smarter Timer Authoring (wildcards, keyword test button, capture-group templates) plus small reliability/data-safety fixes. The Timer Maintenance Dialog is **deferred to post-1.0** (promote on adoption).
 
 ---
 
@@ -92,55 +93,28 @@ Thorne Timer is built primarily for **solo and small-group players** (not raid-c
 
 ## 🔄 Next
 
-### Phase C — Timer Maintenance Dialog (v0.7.0) 🎯 **PRIORITY**
+### Phase G — Smarter Timer Authoring (v0.7.0) 🎯 **PRIORITY**
 
-Separate gameplay view from timer maintenance, eliminating complexity in the main form.
+The single biggest player pain: **adding and fine-tuning timers takes too long.** This is the
+highest-value gameplay work — it makes every timer you'll ever create faster and more accurate.
+This phase makes authoring feel fast and forgiving.
 
-> **Status note (post-v0.6.0):** the Phase C **prerequisite refactor is already complete.**
-> `TimersController` + `TimersRepository` and `CharactersController` + `CharactersRepository`
-> shipped in v0.6.0. What remains for v0.7.0 is the *UI split itself* — making the main grid
-> read-only and hosting the existing `TimersController` inside a dedicated dialog.
-
-**Core Vision:**
-- **Main Form (Gameplay)** — Read-only grid locked to actively logging character, auto-switch enabled, mini-views active
-- **Timer Maintenance Dialog** — Full CRUD on any character's timers without affecting active gameplay
-
-**Remaining work for v0.7.0:**
-- **Read-only timer view** — Main form grid becomes non-editable, always shows active character
-- **Timer maintenance dialog** (`Edit > Timers...`) — hosts the existing `TimersController` against a separate grid for add/edit/delete across all characters
-- **Dual-grid architecture** — Main form grid (active gameplay) + dialog grid (frozen maintenance)
-- **Always-show-active mode** — Main form automatically follows actively logging character
-- **No manual character browsing in main form** — Eliminates current dropdown complexity
-- **Frozen timer display in dialog** — Maintenance grid loads timers with `isActive=false` (no countdown)
-- **Background preservation** — Active character's timers continue running while editing others in dialog
-
-**Why Priority:** The building blocks are now in place — the v0.6.0 controller/repository extraction is done, and the `isActive` flag plus `GetActiveCharacterID()` on `LogMonitor` let the main form lock to the actively logging character without snapshot/restore gymnastics. Phase C is now purely a **UI re-host**: point the finished `TimersController` at a dialog grid and freeze the main grid. Completing Phase C also unblocks the authoring polish in Phase G below (the right-click menu, DependsOn picker, and search/filter box naturally live on the maintenance grid).
-
-#### Phase C add-on — `.tdb` provenance & auto-archive 🛡️ **PARTIALLY SHIPPED**
-
-Lightweight data-safety feature so we never lose a "last known good" `.tdb` across upgrades.
-
-- ✅ **`db_meta` table** (`Key TEXT PRIMARY KEY, Value TEXT`) — **shipped in v0.6.0.** `Database.EnsureMetaSchema` creates it and stamps `CreatedByVersion` (one-shot), `LastWrittenByVersion`, `SchemaVersion`, and `LastWrittenAtUtc` on every `Database.Open()`.
-- ✅ **Tiered tome backup** — `Database.BackupDatabase` writes a timestamped copy into a `Backups/` subfolder and prunes via the `ThorneArchive` retention policy. **Shipped in v0.6.0.**
-- ⛳ **Auto-archive on detected upgrade (remaining)** — wire the existing `db_meta` stamp into an upgrade check: when `LastWrittenByVersion` is older than the running assembly version, snapshot the live `.tdb` *before* migrations run (connection closed) into `Data/Archive/ThorneTimer-v{stamped}-{yyyyMMdd}.tdb`, falling back to a `_2`, `_3` counter on a dated-name collision.
-- ⛳ **Pre-stamp DBs (no version row)** — treat as version unknown; migrate and stamp going forward, but do **not** auto-archive (source version is unknown).
-- **Never auto-delete** archives. Pairs with the historical `Archive/` files already committed for upgrade-path testing.
-- **Failure is non-fatal** — copy errors log via `ThorneLog.Warn` but never block app launch.
-
-**Why bundled with Phase C:** the maintenance dialog makes destructive timer edits easy, so an automatic pre-upgrade snapshot is a natural companion. The plumbing (`db_meta` + `BackupDatabase`) already exists; only the upgrade-detection trigger remains — a small, well-scoped finish.
-
-### Phase G — Smarter Timer Authoring (v0.8.0) ✨ **NEW**
-
-The single biggest user pain identified: **adding new timers takes too long**. This phase makes authoring feel fast and forgiving.
+> **Re-sequenced for player value (v0.7.0-dev planning).** The roadmap is now ordered by *what
+> brings the most value to a player at the keyboard*, not by internal architecture. The **Timer
+> Maintenance Dialog** (formerly the v0.7.0 priority) is **deferred to post-1.0** — the current
+> single-grid + auto-switch workflow is finely tuned and works well, so the dual-grid refactor is
+> a *nice-to-have* we'll revisit only if adoption grows enough to justify it. See
+> [Post-1.0 / Promote-on-Adoption](#-post-10--promote-on-adoption).
 
 > **Already shipped (foundation laid in v0.6.0):** pipe-delimited multi-keyword (OR) matching and the one-click **Duplicate** button both landed early in `TimersController`. The remaining Phase G work builds on top of them.
 
-**Keyword power features:**
-- **Wildcards in keywords** — `*` glob support (compiled to `Regex` and cached per timer); `^` / `$` as an opt-in full-regex escape hatch for power users
-- **Capture groups → speech / display templates** — new `SpeechTemplate` and `DisplayNameTemplate` columns. With keyword `"* tells you, '*'"` and template `"{0} says {1}"`, pings can actually speak meaningful content instead of generic alerts
-- **Cooldown / throttling per timer** — new `MinTriggerIntervalSeconds` column to suppress ping spam in noisy zones (busy auction channel, etc.)
+**Keyword power features (the core fine-tuning):**
+- **Wildcards in keywords** — `*` glob support (compiled to `Regex` and cached per timer); `^` / `$` as an opt-in full-regex escape hatch for power users. This is the headline ask: stop fighting exact-match keywords for spells/messages that have small variations.
+- **Capture groups → speech / display templates** — new `SpeechTemplate` and `DisplayNameTemplate` columns. With keyword `"* tells you, '*'"` and template `"{0} says {1}"`, pings can actually speak meaningful content instead of generic alerts.
+- **Cooldown / throttling per timer** — new `MinTriggerIntervalSeconds` column to suppress ping spam in noisy zones (busy auction channel, etc.).
+- **Keyword conflict detection** — warn when two timers would match the same line, so a new timer doesn't silently shadow an existing one (issue #33).
 
-**Authoring UX:**
+**Authoring UX (close the feedback loop):**
 - **Test / preview keyword button** — small dialog in the timer editor where you paste a log line (or pick from the active log file's tail) and see ✅ Match / ❌ No match plus capture group preview. Eliminates the "alt-tab into the game to trigger it" loop.
 - **DependsOn picker** — replace the free-text column with a `DataGridViewComboBoxColumn` bound to the in-memory timer list, sorted by Name, refreshed when the collection changes (same pattern as v0.6.0's dynamic Style dropdown).
 - **Right-click context menu on the Timers grid** — Start / Stop / Reset / Duplicate / Test / Toggle Active / Jump to last trigger.
@@ -152,13 +126,29 @@ The single biggest user pain identified: **adding new timers takes too long**. T
 - **Per-timer fire-rate stats** — alongside trigger history, surface triggers/hour, last-fired timestamp, average interval between fires. Surfaces "this timer never actually completes its cooldown" or "this buff drops 4s early consistently" without any new parsing — it's just aggregation on data you already have. Foundation for Phase K.
 - **Capture-group `aggregate` modifier** — when a capture group is marked `aggregate=true` (e.g. `{damage:aggregate}`), the runtime automatically rolls min / max / avg / count into per-timer stats. No new parsing code; statistics fall out of writing timers. This is the architectural unlock for Phase K.
 
-### Phase H — Spell Library & Templates (v0.9.0) 📚 **NEW**
+**Reliability & data-safety riding along (the 1.0 quality bar):**
+Small, high-trust fixes shipped opportunistically alongside the authoring work — none require the deferred maintenance dialog:
+- **Auto-switch pause respects "peek" mode** — paused auto-switch no longer snaps back when the still-logged-in character's log grows (issue #6).
+- **`(auto)` status indicator is always accurate** — re-enabling auto-switch reliably restores the indicator (issue #7).
+- **Compact/full toggle preserves window position** — toggling view modes no longer throws the window off-screen (issue #26).
+- **Periodic auto-save of timer state** — crash / power-loss protection by flushing runtime state on a timer, building on the existing `TimerStateRepository` (issue #23).
+- **Auto-archive `.tdb` on detected upgrade** — finish the data-safety add-on (relocated from the old Phase C): snapshot the tome before migrations when the stamped `LastWrittenByVersion` is older than the running build. The `db_meta` stamp and `BackupDatabase` plumbing already shipped in v0.6.0; only the upgrade-detection trigger remains.
+
+### Phase H — Spell Library & Templates (v0.8.0) 📚 **NEW**
 
 Direct attack on the "new spell → new timer" pain. Eliminate the most repetitive part of authoring entirely.
 
+> **Player-value framing & scope:** this phase is an *accelerator*, not a 1.0 requirement.
+> Phase G already makes hand-authoring fast; the spell library makes the common "I just learned
+> a new spell" case nearly automatic. **Treat the bundled spell data as optional** — Thorne Timer
+> stays fully usable without it. A **PDQ/Project Quarm `.sql` dump with spell data is already on
+> hand** as a candidate seed source, so the effort is mostly *import + UI*, not data collection
+> from scratch. Ship the smallest useful slice first (searchable "Add timer from spell" dialog
+> backed by a seeded `spells` table — issue #27) and grow packs from there.
+
 **Spell library:**
-- **Bundled EQ spell database** — JSON / SQLite snapshot of spell data (name, duration, target type, recast, level by class). Shipped with the app; refreshable. Sources: existing EQ databases (Lucy, Allakhazam exports) where licensing permits, or community-contributed JSON.
-- **"Add timer from spell" dialog** — pick spell from a searchable, class-filtered list → keywords, duration, recast, suggested style auto-populated. The whole timer is one click + a few tweaks instead of starting from a blank row.
+- **Bundled EQ spell database** — JSON / SQLite snapshot of spell data (name, duration, target type, recast, level by class). Shipped with the app; refreshable. **Candidate seed source already in hand:** a PDQ/Project Quarm `.sql` dump (see issue #27 — "seed spells table from .sql dump"). Other sources (Lucy, Allakhazam exports) where licensing permits, or community-contributed JSON.
+- **"Add timer from spell" dialog** — pick spell from a searchable, class-filtered list → keywords, duration, recast, suggested style auto-populated. The whole timer is one click + a few tweaks instead of starting from a blank row. **This is the high-value core of the phase.**
 - **Spell-cast auto-detection (optional)** — when a `You begin casting <Spell>` or `<You|Someone> feel(s) the <Buff>` line is seen for a spell with no timer yet, surface a non-intrusive prompt or notification: "Add timer for <Spell>?" Click yes → pre-filled dialog. Click no → suppressed per-character.
 
 **Templates:**
@@ -166,7 +156,7 @@ Direct attack on the "new spell → new timer" pain. Eliminate the most repetiti
 - **Class starter packs** — ship curated packs per EQ class (utility spells, common buffs, pet management). New player imports their class pack and has a sensible default setup in seconds.
 - **Zone spawn packs** — pre-built spawn timer sets for popular hunting zones, leveraging DependsOn chains. Solves the "new zone setup" pain.
 
-### Phase I — Mini View Skinning & Theming (v0.10.0) 🎨 **NEW**
+### Phase I — Mini View Skinning & Theming (v0.9.0) 🎨 **NEW**
 
 Make overlays feel like part of the EQ UI rather than alien windows on top of it.
 
@@ -185,7 +175,7 @@ Make overlays feel like part of the EQ UI rather than alien windows on top of it
 - **Per-view background opacity** — already partial; expose to UI
 - **Optional title bar / drag handle** styling that matches the chosen skin
 
-### Phase J — Feed Views & Log Synthesis (v0.11.0) 📜 **NEW**
+### Phase J — Feed Views & Log Synthesis (v0.10.0) 📜 **NEW**
 
 Introduces a second view type alongside countdown timers: a **scrolling, transformed event feed**. Generalizes the speech-template work from Phase G into a full capture → transform → display → (optionally) speak pipeline. The killer example: vendor sale prices appear as `Rusty Short Sword — 1p 2g` next to the merchant window, optionally spoken as "one platinum two gold".
 
@@ -215,7 +205,7 @@ Introduces a second view type alongside countdown timers: a **scrolling, transfo
 - ❌ No two-way chat / sending text to the game
 - ✅ Yes: curated, transformed streams (vendor prices, faction hits, named-mob sightings, group invites, tells)
 
-### Phase B — Directional Speech & Ping Refactor (v0.12.0)
+### Phase B — Directional Speech & Ping Refactor (v0.11.0)
 
 Centralize the Ping timer execution model and eliminate hardcoded branch points. **Pushed later** because it's internal cleanup with no user-visible benefit — Phases G, H, I deliver more user value first.
 
@@ -226,9 +216,46 @@ Centralize the Ping timer execution model and eliminate hardcoded branch points.
 
 ---
 
+## 🧭 Post-1.0 / Promote-on-Adoption
+
+Larger structural features that are **deliberately deferred until after 1.0** and only promoted
+into a numbered release if user adoption grows enough to justify the effort and the disruption.
+The current app is finely tuned for a solo/small-group player; these change *how the app is
+shaped*, so they wait until there's a base of users asking for them.
+
+### Timer Maintenance Dialog (formerly Phase C) ⏸️ **DEFERRED**
+
+Separate the gameplay view from timer maintenance by splitting the single grid into a read-only
+runtime dashboard plus a dedicated editing dialog.
+
+> **Why deferred:** the existing single-grid + auto-switch workflow already works well and is
+> finely tuned in daily play. The dual-grid split is a *UX refinement for power users with many
+> timers/characters*, not a correctness, stability, or data-safety gap — so it does not gate 1.0.
+> The prerequisite refactor is already done (see below), which keeps the door open to pick this up
+> cheaply whenever adoption warrants it.
+
+**Already in place (shipped in v0.6.0):**
+- ✅ `TimersController` + `TimersRepository` and `CharactersController` + `CharactersRepository` extracted from `FormMain`
+- ✅ `LogMonitor` exposes `isActive` + `GetActiveCharacterID()` so the main form can lock to the actively logging character without snapshot/restore gymnastics
+
+**Remaining work when promoted (issues #16–#21):**
+- **Read-only timer view** — main form grid becomes non-editable, always shows the active character
+- **Timer maintenance dialog** (`Edit > Timers...`) — host the existing `TimersController` against a separate grid for add/edit/delete across all characters (#16)
+- **Dual-grid architecture** — main form grid (active gameplay) + dialog grid (frozen maintenance)
+- **Always-show-active mode** — main form automatically follows the actively logging character (#21)
+- **Frozen timer display in dialog** — maintenance grid loads timers with `isActive=false` (no countdown)
+- **Background preservation** — active character's timers keep running while editing others in the dialog
+- **Companion management dialogs** — Characters (#17), Categories (#18), Classes (#19), Views (#20) follow the same dialog pattern once the Timers dialog proves it out
+
+**Promotion trigger:** revisit when there's meaningful external adoption (multiple active users
+managing large timer sets) or when a concrete user request makes the single-grid workflow a pain
+point rather than a preference.
+
+---
+
 ## 📋 Planned
 
-### Phase E — Zones, Groups & Conditions (v0.13.0)
+### Phase E — Zones, Groups & Conditions (v0.12.0)
 
 Context-aware timer activation — useful for solo/small-group exploration play.
 
@@ -342,20 +369,20 @@ Ongoing improvements that can ship with any release:
 | Phase A — Core Engine | v0.1.0 – v0.4.0 | Foundation | ✅ Shipped |
 | Phase D — Per-Character & Styles | v0.5.0 | Multi-character | ✅ Shipped |
 | Phase D++ — GUI & Performance | v0.6.0 | Styles / Views CRUD, perf | ✅ Shipped |
-| **Phase C — Maintenance Dialog** | **v0.7.0** | **Separate play from edit (read-only grid + `Edit > Timers...` dialog)** | **🎯 Next** |
-| **Phase G — Smarter Authoring** | **v0.8.0** | **Multi-keyword, wildcards, capture groups, test button** | **🎯 Planned** |
-| **Phase H — Spell Library & Templates** | **v0.9.0** | **Spell DB, "add from spell", import/export packs** | **🎯 Planned** |
-| **Phase I — Skinning & Theming** | **v0.10.0** | **EQ-UI-matching overlays, per-style fonts** | **🎯 Planned** |
-| **Phase J — Feed Views & Log Synthesis** | **v0.11.0** | **Scrolling feed view type, transformed event streams, speech sanitizer** | **📜 Planned** |
-| Phase B — Ping Refactor | v0.12.0 | Internal cleanup | 📋 Planned |
-| Phase E — Zones, Groups, Conditions | v0.13.0 | Context-aware activation | 📋 Planned |
-| Phase F — Power-User & QoL | v1.0.0 | Hotkeys, mute, backups, a11y | 📋 Future |
+| **Phase G — Smarter Authoring** | **v0.7.0** | **Wildcards, capture groups, keyword test button, conflict detection (+ reliability fixes)** | **🎯 Next** |
+| **Phase H — Spell Library & Templates** | **v0.8.0** | **Seed `spells` from PDQ `.sql`, "add from spell", import/export packs** | **🎯 Planned** |
+| **Phase I — Skinning & Theming** | **v0.9.0** | **EQ-UI-matching overlays, per-style fonts** | **🎯 Planned** |
+| **Phase J — Feed Views & Log Synthesis** | **v0.10.0** | **Scrolling feed view type, transformed event streams, speech sanitizer** | **📜 Planned** |
+| Phase B — Ping Refactor | v0.11.0 | Internal cleanup | 📋 Planned |
+| Phase E — Zones, Groups, Conditions | v0.12.0 | Context-aware activation | 📋 Planned |
+| Phase F — Power-User & QoL | v1.0.0 | Hotkeys, mute, backups, a11y, in-app help | 📋 Future |
 | **Phase K — Personal Play Statistics** | **v1.1.0** | **Survival, fizzle rate, deaths, XP/hr; stats view type; death recap** | **📊 Post-1.0** |
+| Timer Maintenance Dialog (was Phase C) | Post-1.0 | Read-only grid + `Edit > Timers...` dialog | ⏸️ Deferred (promote on adoption) |
 
 > Version numbers are targets and may shift as development progresses.
-> **Theme grouping:** v0.7.0–v0.10.0 form a coherent "authoring & presentation" arc — separate editing from play, then make editing fast, then auto-populate from spell data, then make the overlays look native. **v0.11.0 (Phase J)** introduces the second display modality (scrolling feeds) and the log-synthesis pipeline; v0.12.0–v1.0.0 shift to internal cleanup, context awareness, and power-user polish. **v1.1.0 (Phase K)** is the first post-1.0 release, adding personal-play statistics on top of the capture-group infrastructure built in Phase G.
+> **Theme grouping:** v0.7.0–v0.9.0 form a coherent "fast, forgiving authoring" arc — make timer authoring fast (wildcards, test button), then optionally seed it from spell data, then make the overlays look native. **v0.10.0 (Phase J)** introduces the second display modality (scrolling feeds) and the log-synthesis pipeline; v0.11.0–v1.0.0 shift to internal cleanup, context awareness, and power-user polish that caps the **1.0** release. **v1.1.0 (Phase K)** is the first post-1.0 release, adding personal-play statistics on top of the capture-group infrastructure built in Phase G. The **Timer Maintenance Dialog** is intentionally **off the numbered track** — it is promoted only if adoption justifies the dual-grid restructure.
 
 ---
 
-**Last Updated:** v0.7.0 planning pass (`v0.7.0-dev` branch) — reconciled with shipped v0.6.0 code
+**Last Updated:** v0.7.0 planning pass (`v0.7.0-dev` branch) — re-sequenced for player value; maintenance dialog deferred post-1.0
 **Maintained By:** Draknaré Thorne
