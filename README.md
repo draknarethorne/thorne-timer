@@ -112,12 +112,46 @@ Your data lives in a **Tome** (`.tdb` file) â€” a portable SQLite database 
 
 ## Screenshots
 
-> ðŸ“¸ *Screenshots are being captured for the v0.6.0 release. The placeholders below show what each will illustrate.*
+### Main window
 
-| | |
-|---|---|
-| ![Main timer grid with timers configured](Docs/images/main-grid.png)<br/>**Main window** â€” the timer grid, tabs, and toolbar | ![Mini view overlays floating over the EQ client](Docs/images/mini-views-ingame.png)<br/>**Overlays in action** â€” mini views floating over EverQuest |
-| ![Configuring a timer: style, keywords, and duration](Docs/images/timer-config.png)<br/>**Configuring a timer** â€” keywords, duration, style, and alerts | ![Styles and Views tabs with color pickers](Docs/images/styles-views-tabs.png)<br/>**Styles & Views** â€” colors, filters, and per-view behavior |
+The timer grid, tabs, and toolbar &mdash; this is where you build and watch your timers.
+
+<p align="center">
+  <img src="Docs/images/main-grid.png" alt="Main timer grid with timers configured, tabs, and toolbar" width="900">
+</p>
+
+### Styles &amp; Views
+
+Two dedicated tabs let you add, rename, recolor, and delete **styles**, then map them to **views** (overlay windows) &mdash; each view with its own colors, style filter, warning behavior, and empty-state display.
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="Docs/images/styles-tab.png" alt="Styles tab with color pickers and time formats" width="100%"><br/>
+      <sub><b>Styles tab</b> &mdash; colors, time formats, and the style list</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="Docs/images/views-tab.png" alt="Views tab with per-view colors, style filter, and options" width="100%"><br/>
+      <sub><b>Views tab</b> &mdash; per-view colors, style filter, and behavior</sub>
+    </td>
+  </tr>
+</table>
+
+### Configuring a timer
+
+Set the **Start/End keywords** (pipe-separate for multi-keyword matching), **duration**, **style**, and **speech / WAV** alerts.
+
+<p align="center">
+  <img src="Docs/images/timer-config.png" alt="Configuring a timer: keywords, duration, style, and alerts" width="900">
+</p>
+
+### Overlays in action
+
+Compact, always-on-top mini views floating over the EverQuest client &mdash; a couple of examples cropped from live play.
+
+<p align="center">
+  <img src="Docs/images/mini-views-ingame.png" alt="Mini view overlays floating over the EverQuest client" width="600">
+</p>
 
 *(See [`Docs/images/`](Docs/images/) for the full list and naming.)*
 
@@ -492,5 +526,6 @@ Free to use, modify, and share. Built for the EverQuest community, useful anywhe
   <sub>Built with ☕ for the Project Quarm community by Draknaré Thorne</sub><br/>
   <sub>âš”ï¸ See you in Norrath</sub>
 </p>
+
 
 
