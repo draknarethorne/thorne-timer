@@ -3,6 +3,15 @@
 # Build results
 [Bb]in/
 [Oo]bj/
+# Root-level maintenance-scripts folder (bin/fix_markdown.py, etc.). The [Bb]in/
+# rule above targets .NET build output (e.g. ThorneTimer/bin/); re-include the
+# repo-root /bin/ folder explicitly so these tracked tools are not swept up by it.
+# The leading slash anchors this to the root, leaving ThorneTimer/bin/ ignored.
+!/bin/
+!/bin/**
+# ...but never the Python bytecode cache produced by running those scripts.
+__pycache__/
+*.pyc
 # User-specific files
 *.user
 *.suo

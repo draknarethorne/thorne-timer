@@ -10,7 +10,7 @@
 > upgrade. If chat context is lost, this file is the source of truth for the agreed
 > behavior (matching tiers, compiled-matcher architecture, capture-group templates,
 > schema, and the performance/benchmark plan). Adjust this doc **before**
-> implementation begins, and update it as each phase in §10 lands.
+> implementation begins, and update it as each phase in Section 10 lands.
 
 ---
 
@@ -60,7 +60,7 @@ On a busy raid log with 130+ active timers, that allocation churn - not the
    half. Substring `Contains` mostly tolerates this (a phrase split across two
    chunks simply misses that tick), but **anchored regex (`^`/`$`) and capture
    groups are meaningless on a half-line**. Line-aware matching becomes a
-   prerequisite for the regex tier (see §6).
+   prerequisite for the regex tier (see Section 6).
 2. **No precompilation.** Keyword strings are re-parsed on every chunk. Anything
    we add (globs -> regex) must be compiled **once** and cached, never per-chunk.
    This drives a hard rule for the whole feature: **all keyword syntax is
@@ -129,7 +129,7 @@ KeywordTerm
 - The `Regex` objects are reused for the life of the matcher; capture extraction
   only runs on a term that actually matched **and** has `HasCaptureGroups` set
   (any tier-2 group, or a tier-1 glob whose `*` became an implicit capture - see
-  §5.5). Tier-0 literals never extract captures.
+  Section 5.5). Tier-0 literals never extract captures.
 
 ---
 
@@ -175,10 +175,10 @@ log line -> matcher -->| matched? --no--> (nothing; next line)         |
         (TimerStateChanged) (TimerSoundRequested)
 ```
 
-1. **Detect.** A keyword term matches the whole line (§6). For this scenario the
+1. **Detect.** A keyword term matches the whole line (Section 6). For this scenario the
    term is a tier-2 regex with capture groups, e.g.
    `I'll give you (\d+) platinum and (\d+) gold for a (?<item>.+?)\.`
-   (a `*` glob can stand in for the looser parts - see §5.5).
+   (a `*` glob can stand in for the looser parts - see Section 5.5).
 2. **Capture.** Because the matched term `HasCaptureGroups`, the engine pulls the
    group values into a small capture map (`{1}`, `{2}`, `{item}`, ...). This runs
    **only on a confirmed match**, never on the non-matching majority of lines.
@@ -201,7 +201,7 @@ log line -> matcher -->| matched? --no--> (nothing; next line)         |
   grid/mini-view label. NULL => today's behavior (show the timer `Name`).
 - Whether `Speech`/`DisplayName` is treated as literal or template is a
   **load/edit-time classification** (does it contain `{...}` placeholders?), never
-  decided per match - consistent with §3/§4.
+  decided per match - consistent with Section 3/Section 4.
 
 Both are backwards compatible: an existing `.tdb` with literal `Speech` and no
 `DisplayName` behaves exactly as it does now.
@@ -232,7 +232,7 @@ matched term has no capture groups, the literal value is used and nothing change
 - A glob `*` becomes an *implicit* capturing group so simple wildcard rules can
   still feed a template (e.g. `... for a *` exposes `{1}` = the item text) without
   the user writing regex. This translation is done **once at load/edit time**,
-  consistent with §3/§4 - the hot path never inspects template or glob syntax.
+  consistent with Section 3/Section 4 - the hot path never inspects template or glob syntax.
 - An unresolved placeholder (no such group, or empty capture) renders as empty
   string and is logged once at Debug - it never throws on the parse path.
 - **Resolution happens after a match is confirmed and outside the tight match
@@ -265,7 +265,7 @@ Because chunks split mid-line, the regex tier needs whole lines.
   wildcard, and regex terms all match against whole lines and `^`/`$` are always
   meaningful. This trades a small, bounded amount of buffering (one trailing
   partial line) for correctness and a single uniform code path. The buffering
-  overhead is included in the §7 benchmark so we can confirm it stays negligible.
+  overhead is included in the Section 7 benchmark so we can confirm it stays negligible.
 
 ---
 
@@ -307,7 +307,7 @@ lines around startup/character-switch. We extend that to the match path.
 
 - A repeatable **replay benchmark**: feed a captured log file through
   `ProcessLogText` against a representative tome (the 156-timer example tome is a
-  good stress case) and emit the §7.1 stats. This gives an apples-to-apples
+  good stress case) and emit the Section 7.1 stats. This gives an apples-to-apples
   before/after number per tier and prevents "it feels fine" regressions.
 - Capture a baseline number **first** (literal-only, today's code) so every later
   change is measured against it.
@@ -374,7 +374,7 @@ in `Database.cs`.
    the new `DisplayName` column; authoring via the Advanced Output dialog (see
    [`timer-output-authoring.md`](timer-output-authoring.md)).
 6. **Conflict detection** - editor-side advisory.
-7. **(Conditional) automaton** - only if §7.3 numbers demand it.
+7. **(Conditional) automaton** - only if Section 7.3 numbers demand it.
 
 Each phase is independently shippable and independently measured.
 
@@ -384,12 +384,12 @@ Each phase is independently shippable and independently measured.
 
 **Resolved:**
 
-- ✅ **Line assembly: always-on** for all tiers (see §6). Correctness over lazy
-  buffering; overhead verified by the §7 benchmark.
+- ✅ **Line assembly: always-on** for all tiers (see Section 6). Correctness over lazy
+  buffering; overhead verified by the Section 7 benchmark.
 - ✅ **Glob syntax: `*` and `?`** (`*` -> `.*?`, `?` -> `.`). Both are translated to a
   compiled `Regex` **once at load/edit time** - the hot path never inspects glob
-  syntax. The `*`-vs-`?` cost difference is measured per the phasing in §10.
-- ✅ **Phasing: incremental and individually measured** (see §10). Each tier ships
+  syntax. The `*`-vs-`?` cost difference is measured per the phasing in Section 10.
+- ✅ **Phasing: incremental and individually measured** (see Section 10). Each tier ships
   and is benchmarked on its own so any regression is attributable.
 
 **Still open (resolve during implementation):**

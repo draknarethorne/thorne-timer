@@ -23,7 +23,7 @@ The timers grid is already large - ~18 visible columns:
 `Active / Name / Category / Start Keyword / End Keyword / Sound / ... / Speech / Duration / Remaining / Case / Loop / Style / Class / Scope / Depends On / Depends Delay / Start/Stop / Count`
 
 Adding raw `SpeechTemplate` and `DisplayNameTemplate` columns (as the first draft of
-`keyword-power-features.md` §5 proposed) would push it to ~20 and dump more free-text
+`keyword-power-features.md` Section 5 proposed) would push it to ~20 and dump more free-text
 into a grid that is already hard to scan. The user's goals:
 
 1. **Reduce duplicate / raw-text columns** in the grid.
@@ -78,11 +78,11 @@ or a template is a *rendering-time* distinction, not a *storage* distinction:
 So `Speech` becomes "what to say (literal, or a template if it contains
 placeholders)". No second column, no migration for speech. The same logic applies to
 the **display label**: rather than a new `DisplayNameTemplate` column, the display
-template is an *advanced* field (see §5) that defaults to the timer `Name`.
+template is an *advanced* field (see Section 5) that defaults to the timer `Name`.
 
 **Why not auto-detect on every column?** Detection (does this string contain
 placeholders?) must be a **load/edit-time classification**, never per-match - exactly
-the rule already locked in `keyword-power-features.md` §3/§4. A template flag is
+the rule already locked in `keyword-power-features.md` Section 3/Section 4. A template flag is
 computed once when the timer loads or is edited.
 
 ---
@@ -106,7 +106,7 @@ pattern (`StylesController`/`StylesRepository`, etc.). But it adds real scope:
 That is a feature in its own right. The pragmatic path:
 
 - **Phase 1 (this release):** inline templates only, authored in the **Advanced
-  output dialog** (§5). The `Speech`/display fields accept literal-or-template text
+  output dialog** (Section 5). The `Speech`/display fields accept literal-or-template text
   directly. No `templates` table yet.
 - **Phase 2 (later):** introduce the `templates` table + tab, and add a "Use
   preset" picker in the Advanced dialog. Inline text becomes the "Custom..." option.
@@ -218,12 +218,12 @@ never re-seeding.
 
 ## 8. Corrections this forces in `keyword-power-features.md`
 
-- §5 currently names new columns `timers.SpeechTemplate` and
+- Section 5 currently names new columns `timers.SpeechTemplate` and
   `timers.DisplayNameTemplate`. Replace with: **reuse `timers.Speech`** for speech
   (literal-or-template) and **one nullable `timers.DisplayName`** for the label.
-- §5.4's table should reference `Speech` / `DisplayName`, not the `*Template`
+- Section 5.4's table should reference `Speech` / `DisplayName`, not the `*Template`
   columns.
-- The capture-resolution mechanics in §5.2/§5.5 are unchanged - only the *storage*
+- The capture-resolution mechanics in Section 5.2/Section 5.5 are unchanged - only the *storage*
   and *authoring surface* change.
 
 ---

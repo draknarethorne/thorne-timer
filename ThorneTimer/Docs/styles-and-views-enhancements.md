@@ -79,12 +79,12 @@ Four named formats. Samples shown for a **long** timer (1d 4h 5m 22s), a **mid**
 - The format is a **per-style** property (column on the `styles` table). Every timer rendered
   with that style — in **mini views** *and* in the **main grid Remaining column** — uses the
   style's chosen format, so what the user previews is exactly what they get everywhere.
-- `TimePlacement` (separate **per-view** field, see §3.2) controls *which side* of the row the
+- `TimePlacement` (separate **per-view** field, see Section 3.2) controls *which side* of the row the
   time slot sits on (Left/Right), independent of the *format string* itself.
 - **Alignment:** the time slot is **right-justified** by default. This is essential for the
   variable-width formats (Long, Adaptive/Full Compact) so a vertical stack of timers stays
   aligned on the right edge instead of drifting left as units collapse — the original reason
-  Classic's fixed `HH:MM:SS` width existed. The fixed time-slot column in the §8 row layout
+  Classic's fixed `HH:MM:SS` width existed. The fixed time-slot column in the Section 8 row layout
   reserves enough width for the widest expected value and right-aligns the rendered text.
 
 ### 2.3 `TimerTimeFormatter` helper
@@ -147,7 +147,7 @@ public static class TimerTimeFormatter
 | Field          | Type (C#) | DB column     | Default              | Meaning |
 |----------------|-----------|---------------|----------------------|---------|
 | *(existing)* ID, Name, ForeColor, BackColor, SortOrder | — | — | — | unchanged |
-| `TimeFormat`   | `int`     | `TimeFormat`  | `0` (Classic)        | One of §2 `TimeFormat` enum. |
+| `TimeFormat`   | `int`     | `TimeFormat`  | `0` (Classic)        | One of Section 2 `TimeFormat` enum. |
 | `FontSize`     | `int`     | `FontSize`    | `0` (inherit/global) | Per-style point size; `0` = use the view/global default. |
 | `FontBold`     | `int`     | `FontBold`    | `0`                  | Bool-as-int (0/1). |
 | `FontItalic`   | `int`     | `FontItalic`  | `0`                  | Bool-as-int (0/1). |
@@ -161,7 +161,7 @@ public static class TimerTimeFormatter
 | Field             | Type (C#) | DB column          | Default     | Meaning |
 |-------------------|-----------|--------------------|-------------|---------|
 | *(existing)* ID, Name, ActiveYn, StyleFilter, PositionX, PositionY, SortOrder, ShowWarning, EmptyBehavior | — | — | — | unchanged |
-| `RenderEngine`    | `int`     | `RenderEngine`     | `0` (Classic) | Which renderer paints this view: `0=Classic` (`MiniView`), `1=Thorne` (`ThorneView`). Subject to the global force-Classic override (§10). |
+| `RenderEngine`    | `int`     | `RenderEngine`     | `0` (Classic) | Which renderer paints this view: `0=Classic` (`MiniView`), `1=Thorne` (`ThorneView`). Subject to the global force-Classic override (Section 10). |
 | `BackgroundOpacity` | `int`   | `BackgroundOpacity`| `100`       | 0–100 %; drives per-pixel alpha of the panel background in the layered window. |
 | `TimePlacement`   | `int`     | `TimePlacement`    | `0` (Left)  | Which side of the row the time slot occupies. `0=Left` (canonical / current behavior: time to the **left** of the name), `1=Right` (time to the **right** of the name). Time text is **right-justified within its slot**, name is **left-justified within its slot**, either way. **Thorne-engine only** — the Classic render engine always draws its fixed time-on-left layout and ignores this field. |
 | `ShowHeader`      | `int`     | `ShowHeader`       | `0`         | Bool-as-int; draw a header bar above the rows. |
@@ -185,7 +185,7 @@ public static class TimerTimeFormatter
 - **Naming guardrail — keep the two axes distinct:**
   - **`RenderEngine`** = *which painter* draws the view: **Classic** (`MiniView`, the
     fixed-layout fallback) vs. **Thorne** (`ThorneView`, the new skin engine). This is the
-    **kill-switch** (§10), preserved exactly as defined.
+    **kill-switch** (Section 10), preserved exactly as defined.
   - **`TimePlacement`** = *cosmetic time side* within the Thorne layout: **Left** vs.
     **Right**. Stored/enumerated as `Left`/`Right`, **not** "Classic/Thorne", so a single view
     doesn't carry two different "Classic/Thorne" toggles meaning different things. The UI may
@@ -202,7 +202,7 @@ public static class TimerTimeFormatter
   can show: the **view name**, **custom placeholder text**, or **nothing** (collapse/hide).
 - Proposed values for `EmptyBehavior`: `"ViewName"` (default), `"Placeholder"`, `"Hidden"`.
 - When `EmptyBehavior = "Placeholder"`, the text comes from a dedicated
-  `PlaceholderText TEXT DEFAULT ''` column on `miniviews` (**decided**, §9.2). It is only
+  `PlaceholderText TEXT DEFAULT ''` column on `miniviews` (**decided**, Section 9.2). It is only
   consulted in the `"Placeholder"` branch; `"ViewName"` and `"Hidden"` ignore it.
 
 ### 3.4 `settings` table — global font family (plan step 8/23)
@@ -226,7 +226,7 @@ and **must follow the existing idempotent, one-shot pattern**:
 Migration steps (map to plan steps 5–8):
 
 1. `styles`: add `TimeFormat, FontSize, FontBold, FontItalic, ShowIconSlot`.
-2. `miniviews`: add `RenderEngine, TimePlacement, BackgroundOpacity, ShowHeader, HeaderText, RowSpacing, FixedWidth, LockPosition, ClickThrough` (+ `PlaceholderText` per §3.3 decision).
+2. `miniviews`: add `RenderEngine, TimePlacement, BackgroundOpacity, ShowHeader, HeaderText, RowSpacing, FixedWidth, LockPosition, ClickThrough` (+ `PlaceholderText` per Section 3.3 decision).
 3. Unify `EmptyBehavior` values / add `PlaceholderText`.
 4. `settings`: add `FontFamily`.
 
@@ -257,7 +257,7 @@ Migration steps (map to plan steps 5–8):
 ## 7. UI rework
 
 ### 7.1 Reusable preview (plan step 13)
-- `StylePreviewPanel` user control: renders a representative row (and the §2.4 sample time)
+- `StylePreviewPanel` user control: renders a representative row (and the Section 2.4 sample time)
   using a `StyleData` + optional `ViewData`, so both editor dialogs show a **live preview**.
 
 ### 7.2 Editor dialogs (plan steps 14–15)
@@ -279,7 +279,7 @@ Migration steps (map to plan steps 5–8):
 
 ### 7.5 Grid column-layout persistence (pre-work fix — completed)
 
-Done **before** the §7.3 grid rework as a prerequisite, since the rework touches the same
+Done **before** the Section 7.3 grid rework as a prerequisite, since the rework touches the same
 grids. Three defects in per-grid column persistence were fixed:
 
 1. **Fill-mode corruption (the Characters/Categories misalignment).** All main-form grids use
@@ -303,7 +303,7 @@ before initial layout) plus a pixel re-apply for any non-Fill columns.
 
 
 
-> **This is additive, not a destructive rewrite.** See **§10 Dual-renderer transition
+> **This is additive, not a destructive rewrite.** See **Section 10 Dual-renderer transition
 > strategy**. The old `TableLayoutPanel`-based renderer (`MiniView`) is the **Classic**
 > engine and stays the default until the new **Thorne** engine reaches parity. The new
 > layered-window renderer lives in a brand-new `ThorneView.cs`; both implement the shared
@@ -320,7 +320,7 @@ The new **Thorne** renderer (`ThorneView`) uses the spike's layered-window custo
      so all times line up on the slot's right edge even as Long/Compact widths change.
    - **ICON** slot: fixed width, reserved only when `ShowIconSlot=1` (future).
    - **NAME** slot: flexible width, text **left-justified**.
-   `TimePlacement` (a **per-view** field, §3.2) swaps the time slot to the right of the name
+   `TimePlacement` (a **per-view** field, Section 3.2) swaps the time slot to the right of the name
    (`1=Right`) for users who prefer it; `0=Left` is the default and matches current behavior.
    `ShowIconSlot` reserves the icon column.
 3. **Per-row invalidation** on each timer tick (redraw only changed rows) — all UI updates
@@ -328,10 +328,10 @@ The new **Thorne** renderer (`ThorneView`) uses the spike's layered-window custo
 4. **Right-click context menu** (`ContextMenuStrip`) for view actions.
 5. **`LockPosition`** disables drag; **`ClickThrough`** adds `WS_EX_TRANSPARENT`.
 6. Header bar drawn when `ShowHeader=1` (text = `HeaderText` or view Name).
-7. Empty-state rendering per §3.3 (`ViewName` / `Placeholder` / `Hidden`).
+7. Empty-state rendering per Section 3.3 (`ViewName` / `Placeholder` / `Hidden`).
 
 ### 8.1 `SetAppearance` call site (plan step 24)
-`IThorneMiniView.SetAppearance(MiniViewAppearance)` (see §10.1) receives the new per-view +
+`IThorneMiniView.SetAppearance(MiniViewAppearance)` (see Section 10.1) receives the new per-view +
 resolved per-style fields as a single options object; `MiniViews.SetMiniAppearance` builds it
 and pushes it through to whichever engine the view is using. The Classic `MiniView` unpacks it
 into its existing private fields (no visual change); the Thorne `ThorneView` reads the new
@@ -344,11 +344,11 @@ so they don't resurface as bugs:
 
 1. **You cannot partially update a layered surface.** `UpdateLayeredWindow` replaces the
    So "per-row
-   invalidation" (§8 item 3) is a **CPU optimization, not a GPU one**: keep a single persistent
+   invalidation" (Section 8 item 3) is a **CPU optimization, not a GPU one**: keep a single persistent
    off-screen `Bitmap`/`Graphics` owned by the `ThorneView`, repaint only the rows whose text
    changed into that bitmap, then push the whole bitmap with one `UpdateLayeredWindow` call per
    tick. Do **not** allocate a new bitmap per tick (GC churn + flicker). (This is the "per-row
-   invalidation" referenced in **§8 item 3**.)
+   invalidation" referenced in **Section 8 item 3**.)
 2. **The bitmap is owned by, and pushed from, the UI thread.** Timer ticks arrive on a
    background thread; marshal to the UI thread via `Invoke`/`BeginInvoke` (per the threading
    standard) before touching the bitmap or calling `UpdateLayeredWindow`. The Classic renderer
@@ -365,22 +365,22 @@ so they don't resurface as bugs:
 ## 9. Open decisions (resolve before/while implementing)
 
 1. ~~**"Long" hours padding**~~ — **RESOLVED:** Long always shows full zero-padded
-   `HH:MM:SS` (e.g. `01:23:01`, `00:00:32`); true no-op rename of current output. *(see §2.1)*
+   `HH:MM:SS` (e.g. `01:23:01`, `00:00:32`); true no-op rename of current output. *(see Section 2.1)*
 2. ~~**`PlaceholderText` storage**~~ — **RESOLVED:** add a dedicated
    `PlaceholderText TEXT DEFAULT ''` column on `miniviews` (clarity over reusing the empty-text
-   path); only consulted when `EmptyBehavior = "Placeholder"`. *(see §3.3)*
+   path); only consulted when `EmptyBehavior = "Placeholder"`. *(see Section 3.3)*
 3. ~~**`TimePlacement` "Inline" layout**~~ — **RESOLVED:** no inline mode. Canonical layout
    is `TIME | ICON | NAME` (time left of name, `TimePlacement=0`); time slot right-justified,
-   name slot left-justified; `1=Right` puts time after the name. *(see §3.1 / §8)*
+   name slot left-justified; `1=Right` puts time after the name. *(see Section 3.1 / Section 8)*
 4. ~~**`FontSize = 0` inheritance**~~ — **RESOLVED:** `0` means **inherit** (fall back to the
    view/global font size), not a literal 0-pt size. The resolver substitutes the global size
-   before building `MiniViewAppearance`, so renderers never see `0`. *(see §3.1)*
+   before building `MiniViewAppearance`, so renderers never see `0`. *(see Section 3.1)*
 5. ~~**Spike validation**~~ — **RESOLVED:** the layered-window approach was validated by the
    spike; its reusable Win32 plumbing is preserved in **Appendix A** and the throwaway
    `Spike\` file has been **deleted** (so no proof-of-concept code ships). `ThorneView` builds
-   on Appendix A. *(see §10.0 / §A)*
+   on Appendix A. *(see Section 10.0 / Section A)*
 6. **Default engine cutover** — confirm we keep **Classic** as the default `RenderEngine`
-   until `ThorneView` reaches parity, then flip the default in a later step. *(see §10)*
+   until `ThorneView` reaches parity, then flip the default in a later step. *(see Section 10)*
 
 ---
 
@@ -401,8 +401,8 @@ concrete type.
 |------|--------|------|-------|
 | `MiniView.cs` + `MiniView.Designer.cs` | **Keep — unchanged behavior** | The **Classic** renderer (`TableLayoutPanel`, fixed time-on-left layout). | Only edit: add `: IThorneMiniView` and adapt method signatures to match the interface. No layout/visual changes. This is the permanent fallback until/unless we delete it post-cutover. |
 | `IThorneMiniView.cs` | **New** | Shared contract both renderers implement. | The single seam that lets `MiniViews.cs` stay renderer-agnostic. |
-| `ThorneView.cs` + `ThorneView.Designer.cs` | **New** | The **Thorne** renderer (layered-window skin engine, §8). | Built from the validated `Spike\` code. Implements `IThorneMiniView`. All new per-view/per-style appearance features live here. |
-| `MiniViewFactory.cs` *(or a factory method on `MiniViews`)* | **New** | Picks Classic vs. Thorne per view at creation time. | Reads the resolved engine (§10.2). Single place that decides which concrete type to `new`. |
+| `ThorneView.cs` + `ThorneView.Designer.cs` | **New** | The **Thorne** renderer (layered-window skin engine, Section 8). | Built from the validated `Spike\` code. Implements `IThorneMiniView`. All new per-view/per-style appearance features live here. |
+| `MiniViewFactory.cs` *(or a factory method on `MiniViews`)* | **New** | Picks Classic vs. Thorne per view at creation time. | Reads the resolved engine (Section 10.2). Single place that decides which concrete type to `new`. |
 | `MiniViews.cs` | **Modify (minimal)** | Orchestration: create / update / destroy / position. | `ViewEntry.Form` retyped `MiniView` → `IThorneMiniView`; `CreateMiniView` routes through the factory. Lifecycle logic otherwise unchanged. |
 | `Spike\LayeredMiniViewSpike.cs` | **Deleted (harvested)** | Throwaway proof-of-concept. | Validated the layered-window approach; reusable plumbing preserved in **Appendix A**. Removed so no spike code ships in the build. |
 
@@ -498,7 +498,7 @@ public interface IThorneMiniView : IDisposable
 
 - **`MiniView`** (existing `TableLayoutPanel`) implements `IThorneMiniView` with ~zero
   behavior change → this is the **Classic** engine.
-- **`ThorneView`** (new layered-window skin engine, §8) implements the same contract → the
+- **`ThorneView`** (new layered-window skin engine, Section 8) implements the same contract → the
   **Thorne** engine.
 - `ViewEntry.Form` becomes `IThorneMiniView`; `CreateMiniView` becomes a **factory** that
   picks the concrete type.
@@ -545,13 +545,13 @@ This is the concrete answer to "how do we keep `MiniView` working while building
 1. Extract `IThorneMiniView`; make `MiniView` implement it (no behavior change). Build + verify.
 2. Change `ViewEntry.Form` to the interface; route `CreateMiniView` through a factory.
    Build + verify — still 100% **Classic**.
-3. Build `ThorneView` against the interface (the whole §8 work), Classic untouched & default.
+3. Build `ThorneView` against the interface (the whole Section 8 work), Classic untouched & default.
 4. Add the per-view `RenderEngine` column + global override so individual views can opt in.
 5. Once `ThorneView` reaches parity and is dogfooded, flip the default; later remove `MiniView`.
 
 ### 10.4 Schema impact
 
-- `miniviews`: add `RenderEngine INTEGER DEFAULT 0` (idempotent, one-shot — see §4).
+- `miniviews`: add `RenderEngine INTEGER DEFAULT 0` (idempotent, one-shot — see Section 4).
 - `settings`: optional `RenderEngine` global override (or reuse an existing settings flag).
 
 ---
@@ -588,7 +588,7 @@ matches the EQ overlay it's tracking.
 
 > **Action:** when finalizing default style colors (`StylesRepository.SeedDefaultStyles`),
 > cross-check against this palette so the timer overlay and the EQ UI agree. (Seeding stays
-> one-shot per §4 — only affects new `.tdb` files.)
+> one-shot per Section 4 — only affects new `.tdb` files.)
 
 ### 11.2 Other reference material in `C:\Thorne-UI`
 
@@ -600,7 +600,7 @@ matches the EQ overlay it's tracking.
   rules, transparency behavior (parent `Style_Transparent` dims children — informs how we
   reason about layered-window alpha).
 - `thorne_drak\*.tga` — gauge/spell/class icon textures (e.g. `spell_icons_thorne0*.tga`,
-  class `*01.tga`) that could feed the §3.1 `ShowIconSlot` icon column later.
+  class `*01.tga`) that could feed the Section 3.1 `ShowIconSlot` icon column later.
 - SIDL files use **integer ARGB-style RGB triples**; Thorne Timer already stores colors as
   ARGB `int` (`Color.ToArgb()`), so palette values port directly.
 
@@ -614,21 +614,21 @@ matches the EQ overlay it's tracking.
 
 - `msbuild Thorne-Timer.sln /p:Configuration=Release` succeeds; `get_errors` clean.
 - Existing `.tdb` upgrades in place (no lost styles/views; user edits & deletions preserved).
-- All four time formats render per the §2.1 table for long/mid/sub-minute spans.
+- All four time formats render per the Section 2.1 table for long/mid/sub-minute spans.
 - Styles tab "Time Format" column + sample preview re-render against the `1h 23m 45s` sample.
 - Mini views honor opacity, header, row spacing, fixed width, lock, and click-through.
 - **Classic** renderer remains default and unchanged; views can opt into **Thorne** per-view
-  via `RenderEngine`, with a global override forcing Classic. (§10)
-- Default style colors cross-checked against the `C:\Thorne-UI` palette. (§11)
+  via `RenderEngine`, with a global override forcing Classic. (Section 10)
+- Default style colors cross-checked against the `C:\Thorne-UI` palette. (Section 11)
 - No throwaway/spike code ships in the build (the `Spike\` proof-of-concept has been
-  harvested into Appendix A and removed; see §10.0). (§A)
+  harvested into Appendix A and removed; see Section 10.0). (Section A)
 
 ---
 
 ## 13. Runtime time-model refactor (deferred — numeric time, strings at the edges)
 
 > **Status:** Planned follow-up — *do not bundle into the styles/views feature work.*
-> Implement on its own branch with the restore/offline scenarios in §13.5 explicitly re-tested.
+> Implement on its own branch with the restore/offline scenarios in Section 13.5 explicitly re-tested.
 
 ### 13.1 Problem statement
 
@@ -648,7 +648,7 @@ Symptoms this causes (all currently patched, not cured):
 
 - **Warning detection was format-dependent.** It parsed the display string, so it broke the
   moment the format became lossy (`AdaptiveCompact` `"1d 4h"`). Fixed by smuggling a parallel
-  raw-ms field (`MiniTimerData.RemainingMs` / `MiniData.RemainingMs`) alongside the string. (§2.5)
+  raw-ms field (`MiniTimerData.RemainingMs` / `MiniData.RemainingMs`) alongside the string. (Section 2.5)
 - **Display formatter used as a serializer.** The Character+ / World restore paths call
   `TimerTimeFormatter.Format(adjusted, TimeFormat.Classic)` purely to produce a *machine-parseable*
   wire string for the next step, which only knows how to read strings.
@@ -708,7 +708,7 @@ persistence input.**
 - App restart restoring World timers with correct offline-elapsed subtraction.
 - Character+ timer that **expires while offline** (must resolve to stopped, count decremented).
 - Sub-minute, multi-hour, and multi-day spans across all four `TimeFormat`s.
-- Warning threshold fires correctly under every format (the §2.5 regression).
+- Warning threshold fires correctly under every format (the Section 2.5 regression).
 - Upgrade of an existing `.tdb` whose `timer_runtime_state.Remaining` holds legacy TEXT values.
 
 ### 13.6 Acceptance
@@ -718,7 +718,7 @@ persistence input.**
 - `timer_runtime_state` stores numeric remaining time; round-trip is lossless and
   format-independent.
 - Mini-view warning logic reads numeric ms directly with no string fallback needed.
-- All §13.5 scenarios pass; existing tomes upgrade in place with no lost timer state.
+- All Section 13.5 scenarios pass; existing tomes upgrade in place with no lost timer state.
 
 ### 13.7 Interim hardening already landed (v0.6.0)
 
@@ -741,7 +741,7 @@ cleanup for later:
   - Persistence normalizes `Remaining` to canonical **Classic** at the `TimerStateRepository`
     write boundary (`NormalizeRemainingForStorage`) since AdaptiveCompact is lossy; the live grid
     / mini view still render the per-style format from the running timer.
-- **Still deferred (the real §13 target):** making `RemainingMs`/`TimeSpan` the in-memory source
+- **Still deferred (the real Section 13 target):** making `RemainingMs`/`TimeSpan` the in-memory source
   of truth, persisting numeric ms, and retiring runtime string parsing entirely. The interim fix
   keeps strings as the wire format but makes that round-trip *lossless and total* rather than
   format-fragile.
@@ -753,7 +753,7 @@ cleanup for later:
 > The `Spike\LayeredMiniViewSpike.cs` proof-of-concept **validated** the layered-window +
 > custom-paint approach (per-pixel alpha, drag via `WM_NCLBUTTONDOWN`, right-click menu,
 > per-row repaint) and has been **deleted** so no throwaway code ships. The reusable Win32
-> plumbing it proved out is preserved verbatim here so `ThorneView` (§8) can adopt it directly.
+> plumbing it proved out is preserved verbatim here so `ThorneView` (Section 8) can adopt it directly.
 
 **Layered-window `CreateParams` + the ARGB-bitmap push.** The non-obvious detail is
 `bmp.GetHbitmap(Color.FromArgb(0))` (premultiplied alpha) paired with `AC_SRC_ALPHA`; getting
@@ -775,7 +775,7 @@ protected override CreateParams CreateParams
 }
 
 // Push a 32-bpp premultiplied-ARGB bitmap as the whole window surface.
-// Per §8.2 there is no partial update — this replaces the entire window bitmap.
+// Per Section 8.2 there is no partial update — this replaces the entire window bitmap.
 private void PushBitmap(Bitmap bmp)
 {
     const int ULW_ALPHA = 0x00000002;
@@ -836,12 +836,12 @@ private static extern bool UpdateLayeredWindow(IntPtr hwnd, IntPtr hdcDst,
 `SendMessage(Handle, 0xA1 /*WM_NCLBUTTONDOWN*/, 0x2 /*HT_CAPTION*/, 0)`. Gate it on
 `!LockPosition`.
 
-**Row painting recipe the spike proved** (feeds §8 layout): build one full-window
+**Row painting recipe the spike proved** (feeds Section 8 layout): build one full-window
 `Format32bppArgb` bitmap per repaint with `SmoothingMode.AntiAlias` +
 `TextRenderingHint.ClearTypeGridFit` + `CompositingMode.SourceOver`; fill the panel
 background with the per-view background alpha, then per row draw the row-tint rectangle and
 the `TIME` (right-justified `StringAlignment.Far`) / icon-slot / `NAME` (left-justified, with
 `StringTrimming.EllipsisCharacter`) — i.e. the `TIME | ICON | NAME` layout, time right-aligned
-in its fixed slot so stacked rows line up. Per §8.2, prefer a single persistent backing bitmap
+in its fixed slot so stacked rows line up. Per Section 8.2, prefer a single persistent backing bitmap
 in production rather than allocating one per tick.
 ```

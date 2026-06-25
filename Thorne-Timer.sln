@@ -1,4 +1,4 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
 VisualStudioVersion = 18.4.11620.152
@@ -46,6 +46,13 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "workflows", "workflows", "{
 	ProjectSection(SolutionItems) = preProject
 		.github\workflows\build.yml = .github\workflows\build.yml
 		.github\workflows\release.yml = .github\workflows\release.yml
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "bin", "bin", "{121F0123-B25F-4913-BCFC-177DDC031005}"
+	ProjectSection(SolutionItems) = preProject
+		bin\fix_markdown.py = bin\fix_markdown.py
+		bin\fix_markdown.bat = bin\fix_markdown.bat
+		bin\README.md = bin\README.md
 	EndProjectSection
 EndProject
 Global

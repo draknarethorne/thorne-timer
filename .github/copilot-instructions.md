@@ -120,26 +120,33 @@ New files do **not** appear automatically. After creating a doc you MUST:
 
 A doc that is not in the `.csproj` will not show in Solution Explorer's Docs folder.
 
-### 2. Write docs as ASCII-safe Markdown (avoid "funky characters")
+### 2. Write docs as ASCII-safe where it matters
 
-Repo Markdown is stored as **UTF-8 without a BOM**. Some viewers (Solution Explorer
-preview, editors defaulting to the system codepage) then misread multi-byte UTF-8 as
-Windows-1252, so decorative Unicode shows up as garbled glyphs (e.g. an em dash `—`
-appears as `â€"`). To stay safe and portable, prefer plain ASCII:
+Repo Markdown is stored as **UTF-8 without a BOM**. The one character that reliably
+breaks is the **section sign** `§`: in cross-references like `§5.4` it garbles in
+viewers that misread the encoding, so always spell out the word `Section ` instead
+(e.g. `§5` -> `Section 5`). Also avoid leftover **mojibake** (the garbled multi-
+character runs left when a UTF-8 file was once saved as Windows-1252) and a UTF-8
+**BOM**. Those three - section sign, mojibake, BOM - are the only must-fixes.
 
-| Avoid (Unicode) | Use (ASCII) |
+| Always fix | Use instead |
 |---|---|
-| em dash `—`, en dash `–` | ` - ` (spaced hyphen) |
-| ellipsis `…` | `...` |
-| arrows `→` `⇒` | `->` `=>` |
-| math `×` `≈` `≤` `Σ` | `x` `~=` `<=` `sum` |
-| box-drawing `│ ─ ┌ ┐ └ ┘ ├ ┼` | `| - + ` for ASCII diagrams |
-| middot `·` separators | `/` or `,` |
-| play/UI glyphs `▶ ▸ ▾` | `>` / `(play)` / `v` |
+| section sign `§` (before a number) | the word `Section ` (e.g. `Section 5`) |
+| mojibake (garbled Latin-1 <-> UTF-8 runs) | repair the encoding (tool below) |
+| UTF-8 BOM | UTF-8 without a BOM |
 
-Acceptable non-ASCII (intentional, also safe in Latin-1 or used consistently):
-status emoji in headers (`📐`, `✅`, `🗄️`), the section sign `§`, and accented names
-(e.g. `Draknaré`).
+**Decorative punctuation renders fine - keep it if you like.** Em/en dashes, arrows,
+ellipsis, math glyphs, middot, and smart quotes all display correctly in UTF-8-aware
+viewers (VS, VS Code, GitHub), so there is **no requirement** to flatten them to
+ASCII. If you specifically want ASCII-only output, the tool's `--aggressive` mode
+converts them.
+
+Keep as-is (intentional, render fine, never "fix" these):
+- **Emoji / pictographs** anywhere (headers, tables, prose).
+- **ASCII-art diagrams** - box-drawing / block elements and geometric glyphs used
+  inside diagram mockups (stored as clean UTF-8).
+- **Accented letters** in names, e.g. `Draknaré`, and any other-language letters.
+- **Decorative punctuation** (dashes, arrows, smart quotes, ellipsis, math) - see above.
 
 ### 3. Tooling note (how to write docs without corrupting bytes)
 
@@ -155,6 +162,28 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 After writing, verify: confirm `BOM=False`, scan for mojibake markers
 (`Ã`, `â€`, `Â`), and list any chars `> U+007F` to catch stray decorative Unicode
 before committing.
+
+### 4. Automated check/fix tool (`bin/fix_markdown.py`)
+
+Instead of hand-scanning, use the repo's stdlib-only Python tool. By **default** it
+fixes only what actually breaks: the section sign `§` -> `Section ` and classic
+Latin-1 <-> UTF-8 mojibake; it reports BOMs and **preserves line endings**
+(CRLF/LF untouched). It leaves alone all emoji / pictographs, accented names,
+ASCII-art diagram glyphs (box-drawing / block elements `U+2500`..`U+259F` plus
+curated geometric shapes), AND decorative punctuation (dashes, arrows, smart
+quotes, ellipsis, math) - those render fine. Anything else non-ASCII is surfaced
+as an informational "review" note. Pass `--aggressive` to also flatten decorative
+punctuation to ASCII for strictly ASCII-only output. It is registered as the `bin`
+Solution Items folder; see `bin/README.md`.
+
+```powershell
+python bin/fix_markdown.py                      # check repo Docs (report only, exit 1 if dirty)
+python bin/fix_markdown.py --fix                # fix section sign + mojibake (UTF-8, no BOM)
+python bin/fix_markdown.py --fix --aggressive   # also flatten dashes/arrows/quotes to ASCII
+python bin/fix_markdown.py --check ThorneTimer/Docs Docs
+```
+
+Run `--check` after editing docs (good pre-commit gate); use `--fix` to repair.
 
 ## Key Patterns
 
