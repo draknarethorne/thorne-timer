@@ -9,7 +9,7 @@
 
 **Latest Release:** v0.6.0 (shipped)
 **Active Branch:** `v0.7.0-dev`
-**v0.7.0 Focus:** Smarter Timer Authoring — wildcards, keyword test button, capture-group templates — plus small reliability/data-safety fixes. The Timer Maintenance Dialog is **deferred to post-1.0** (promote on adoption).
+**Road to 1.0:** two releases away. **v0.7.0** finishes timer-authoring fine-tuning plus reliability/data-safety fixes; **v1.0.0** adds final polish (mute, hotkeys, restore UI, help) and ships. Everything else — spell library, theming, feeds, zones, stats — is **post-1.0, built as desired or as users ask**.
 
 ---
 
@@ -79,9 +79,9 @@ Quality of life improvements, critical bug fixes, per-view color configuration, 
 
 ## 🎯 Audience & Guiding Principles
 
-Thorne Timer is built primarily for **solo and small-group players** (not raid-coordination tools). Optimization priorities derive from that audience:
+Thorne Timer is built primarily for **solo and small-group players** (not raid-coordination tools). Priorities derive from that audience:
 
-keywords and durations. Several releases below attack this wound from different angles.
+1. **Timer authoring pain is the #1 user pain** — adding timers when leveling new spells, setting up spawn timers in a new zone, figuring out keywords and durations.
 2. **Configuration data lives in the right place** — per-character / per-timer / per-style data lives in the `.tdb` tome; preferences, hotkeys, recent files, transient runtime state can live in INI.
 3. **Overlays should feel native to the EQ UI** — borders, padding, fonts, and color should be skinnable to match the player's chosen EQ UI (Vert, Drakah's, Project Quarm defaults, etc.) rather than forcing a single Thorne Timer look.
 4. **The core feature is timers — feeds and synthesis are additive output modes, not a chat-client substitute.** Captured events should be *transformed* (extract item + price), not echoed verbatim. If the user wants raw log, Notepad++ tail mode already exists.
@@ -89,7 +89,7 @@ keywords and durations. Several releases below attack this wound from different 
 
 ---
 
-## 🔄 Next
+## 🔄 Road to 1.0
 
 ### Smarter Timer Authoring — v0.7.0 🎯 **PRIORITY**
 
@@ -118,97 +118,100 @@ Adding and fine-tuning timers is the single biggest player pain. This release ma
 - **Periodic auto-save of timer state** — crash / power-loss protection by flushing runtime state on a timer (issue #23).
 - **Auto-archive `.tdb` on detected upgrade** — snapshot the tome before migrations when the stamped `LastWrittenByVersion` is older than the running build. The `db_meta` stamp and `BackupDatabase` plumbing already shipped in v0.6.0; only the upgrade-detection trigger remains.
 
-### Spell Library & Templates — v0.8.0 📚 **NEW**
+### Final Polish & 1.0 — v1.0.0 🚀 **SHIP IT**
 
-Direct attack on the "new spell → new timer" pain — eliminate the most repetitive part of authoring entirely.
+The small, high-trust quality-of-life items that make Thorne Timer feel finished, then tag 1.0.
 
-> Bundled spell data is **optional**; Thorne Timer stays fully usable without it. A PDQ/Project Quarm `.sql` dump is on hand as a seed source, so the work is mostly import + UI (issue #27).
+- **Quick mute button** in toolbar — doorbell / phone / boss-walked-in scenarios
+- **Global hotkeys** (low-level keyboard hook) — toggle mini-views, pause/resume all, force-switch character, "mute all for N seconds" panic button
+- **Tome restore UI** — `Restore` dialog and a pre-destructive auto-snapshot trigger on top of the existing `Database.BackupDatabase` (backup + `db_meta` stamps already shipped in v0.6.0)
+- **In-app help / onboarding** — `Help → Topics` pointing at bundled markdown / online guide; first-run experience
+- **Accessibility basics** — high-contrast option, larger-text mode, screen-reader labels
+- **README screenshots** — main grid, mini views, configuration
 
-**Spell library:**
-- **Bundled EQ spell database** — JSON / SQLite snapshot of spell data (name, duration, target type, recast, level by class), shipped with the app and refreshable. Seed source: a PDQ/Project Quarm `.sql` dump (issue #27), or community-contributed JSON where licensing permits.
-- **"Add timer from spell" dialog** — pick a spell from a searchable, class-filtered list → keywords, duration, recast, and suggested style auto-populated. One click plus a few tweaks instead of a blank row.
-- **Spell-cast auto-detection (optional)** — when a `You begin casting <Spell>` or `<You|Someone> feel(s) the <Buff>` line is seen for a spell with no timer, prompt "Add timer for <Spell>?" Yes → pre-filled dialog; No → suppressed per-character.
-
-**Templates:**
-- **Timer template / pack export & import** — share timer sets as portable JSON (or `.ttpack` files). Critical for community sharing: "Druid Vert's leveling pack", "Necro charm/snare combo", "Velious overland spawn timers".
-- **Class starter packs** — ship curated packs per EQ class (utility spells, common buffs, pet management). New player imports their class pack and has a sensible default setup in seconds.
-- **Zone spawn packs** — pre-built spawn timer sets for popular hunting zones, leveraging DependsOn chains. Solves the "new zone setup" pain.
-
-### Mini View Skinning & Theming — v0.9.0 🎨 **NEW**
-
-Make overlays feel like part of the EQ UI rather than alien windows on top of it.
-
-**Per-style typography:**
-- Add `FontFamily`, `FontSize`, `Bold`, `Italic` columns to the `styles` table
-- Settings to choose between bundled fonts (a curated set that match common EQ skins) or any installed system font
-
-**Theme / skin system:**
-- **Skin definition file format** (likely JSON, stored under `Skins/` next to `Sounds/`) — declares border style, border color, padding, corner radius, background pattern/image, title bar style, header font
-- **Bundled skins** matching popular EQ UI mods (Vert, Drakah's, Project Quarm default, Velious-era classic, Luclin-era) plus a "Thorne Timer" original
-- **Per-view skin selection** — each view in the Views tab picks its skin independently; great for multi-boxers running different UIs per character
-- **Skin editor / preview** — small dialog to preview a skin against sample timers before applying
-
-**Layout polish:**
-- **Per-view padding / spacing** — currently fixed; let busy views go tight, casual views go loose
-- **Per-view background opacity** — already partial; expose to UI
-- **Optional title bar / drag handle** styling that matches the chosen skin
-
-### Feed Views & Log Synthesis — v0.10.0 📜 **NEW**
-
-Introduces a second view type alongside countdown timers: a **scrolling, transformed event feed**. The killer example: vendor sale prices appear as `Rusty Short Sword — 1p 2g` next to the merchant window, optionally spoken as "one platinum two gold".
-
-**New view type:**
-- **`ViewType` column on `miniviews`** — `Timers` (current behavior) or `Feed` (new). Existing views default to `Timers`; backwards compatible.
-- **Feed renderer** — scrolling, timestamped lines; newest-top or newest-bottom (per view); configurable max line count; pause-on-hover; click-to-copy.
-- **Per-line color** inherits from the originating timer's style — the v0.6.0 style system carries straight through.
-- **Auto-fade / shrink on idle** — feed compresses when no new activity, expands when busy. Optional.
-- **Skin support** — feeds use the same skin system from the theming release; bundled skins ship a "feed" variant tuned for readability over transparency.
-
-**Log synthesis pipeline (generalizes the authoring release):**
-- **Multiple output targets per timer** — a single keyword match can trigger any combination of: countdown timer, feed line, speech, sound. Each target has its own template.
-- **Templated output with capture groups** — `FeedTemplate`, `SpeechTemplate`, `DisplayNameTemplate` columns. Named groups (`{item}`, `{price}`, `{npc}`) preferred over positional (`{0}`, `{1}`) for clarity.
-- **Speech sanitizer** — user-configurable substitutions (INI-stored) so `1p 2g 3s 4c` becomes "one platinum two gold three silver four copper" instead of "one P two G three S four C". Ships with a default EQ-aware substitution set.
-- **Per-target throttling** — `MinFeedIntervalSeconds`, `MinSpeechIntervalSeconds`, separate from the authoring release's per-timer throttle, so a busy timer can still flash visually but only speak the first match per window.
-- **"Speak only if feed was idle"** option — in noisy zones, the visual feed shows everything but speech stays quiet until there's a gap.
-
-**Persistence model:**
-- Feed contents are **runtime state only by default** — not saved to `.tdb`. Behaves like a chat window.
-- Optional "save last N lines on close" toggle (per-view); if enabled, written to `Logs/feeds/{viewname}.log`, not the tome.
-
-**Hard scope boundaries (so this doesn't become a chat client):**
-- ❌ No full raw-log mirroring — every feed line must come from an explicit timer / keyword match
-- ❌ No combat log roll-ups, DPS parsing, or fight summaries
-- ❌ No two-way chat / sending text to the game
-- ✅ Yes: curated, transformed streams (vendor prices, faction hits, named-mob sightings, group invites, tells)
-
-### Directional Speech & Ping Refactor — v0.11.0
-
-Centralize the Ping timer execution model and eliminate hardcoded branch points — internal cleanup with no user-visible change.
-
-- Refactor `StartTimer` / `StopTimer` / `ResetTimer` to handle Ping via the directional speech pattern
-- Eliminate `|| PingTimer()` escape hatches throughout the codebase
-- Centralize Ping lifecycle management
-- See [TD-011](../ThorneTimer/Docs/active-views/technical-debt.md) for the full 19-step plan
+> Stretch items if they're quick: better online/offline state detection, and adjusting Character-scope timers for time elapsed while logged out. Neither gates the tag.
 
 ---
 
-## 🧭 Post-1.0 / Promote-on-Adoption
+## 🧭 Post-1.0 — Build As Desired
 
-Larger structural features that are **deliberately deferred until after 1.0** and only promoted
-into a numbered release if user adoption grows enough to justify the effort and the disruption.
-The current app is finely tuned for a solo/small-group player; these change *how the app is
-shaped*, so they wait until there's a base of users asking for them.
+Everything below is **past the 1.0 line**. None of it gates the 1.0 tag. These are unordered — each
+ships as a minor release (1.1, 1.2, …) if and when it's fun to build or a user asks for it. They're
+grouped by theme, not sequenced; pick whatever brings the most value at the time.
 
-### Timer Maintenance Dialog (formerly Phase C) ⏸️ **DEFERRED**
+### Spell Library & Templates 📚
 
-Separate the gameplay view from timer maintenance by splitting the single grid into a read-only
-runtime dashboard plus a dedicated editing dialog.
+Direct attack on the "new spell → new timer" pain. Bundled spell data is **optional** — Thorne Timer stays fully usable without it. A PDQ/Project Quarm `.sql` dump is on hand as a seed source, so the work is mostly import + UI (issue #27).
 
-> **Why deferred:** the existing single-grid + auto-switch workflow already works well and is
-> finely tuned in daily play. The dual-grid split is a *UX refinement for power users with many
-> timers/characters*, not a correctness, stability, or data-safety gap — so it does not gate 1.0.
-> The prerequisite refactor is already done (see below), which keeps the door open to pick this up
-> cheaply whenever adoption warrants it.
+- **Bundled EQ spell database** — JSON / SQLite snapshot of spell data (name, duration, target type, recast, level by class), shipped and refreshable. Seed source: a PDQ/Project Quarm `.sql` dump (issue #27), or community-contributed JSON where licensing permits.
+- **"Add timer from spell" dialog** — pick a spell from a searchable, class-filtered list → keywords, duration, recast, and suggested style auto-populated. One click plus a few tweaks instead of a blank row.
+- **Spell-cast auto-detection (optional)** — on a `You begin casting <Spell>` line for a spell with no timer, prompt "Add timer for <Spell>?" Yes → pre-filled dialog; No → suppressed per-character.
+- **Timer template / pack export & import** — share timer sets as portable JSON (or `.ttpack` files): "Druid leveling pack", "Necro charm/snare combo", "Velious overland spawn timers".
+- **Class starter packs** — curated packs per EQ class so a new player imports their class pack and has a sensible setup in seconds.
+- **Zone spawn packs** — pre-built spawn timer sets for popular hunting zones, leveraging DependsOn chains.
+
+### Mini View Skinning & Theming 🎨
+
+Make overlays feel like part of the EQ UI rather than alien windows on top of it.
+
+- **Per-style typography** — `FontFamily`, `FontSize`, `Bold`, `Italic` columns on `styles`; choose bundled fonts (matched to common EQ skins) or any installed system font.
+- **Skin definition file format** (JSON under `Skins/`) — border style/color, padding, corner radius, background pattern/image, title-bar style, header font.
+- **Bundled skins** matching popular EQ UI mods (Vert, Drakah's, Project Quarm default, Velious/Luclin-era) plus a "Thorne Timer" original.
+- **Per-view skin selection** — each view picks its skin independently; great for multi-boxers running different UIs per character.
+- **Skin editor / preview** — preview a skin against sample timers before applying.
+- **Layout polish** — per-view padding/spacing, per-view background opacity exposed to the UI, optional skinned title bar / drag handle.
+
+### Feed Views & Log Synthesis 📜
+
+A second view type alongside countdown timers: a **scrolling, transformed event feed**. The killer example — vendor sale prices appear as `Rusty Short Sword — 1p 2g` next to the merchant window, optionally spoken as "one platinum two gold".
+
+- **`ViewType` column on `miniviews`** — `Timers` (current) or `Feed` (new); existing views default to `Timers`, backwards compatible.
+- **Feed renderer** — scrolling timestamped lines; newest-top or newest-bottom; configurable max lines; pause-on-hover; click-to-copy. Per-line color inherits from the originating timer's style.
+- **Multiple output targets per timer** — one keyword match can drive any combination of countdown timer, feed line, speech, sound; each target has its own template.
+- **Templated output with capture groups** — `FeedTemplate`, `SpeechTemplate`, `DisplayNameTemplate` columns; named groups (`{item}`, `{price}`) preferred over positional.
+- **Speech sanitizer** — INI-stored substitutions so `1p 2g 3s 4c` speaks "one platinum two gold three silver four copper"; ships with an EQ-aware default set.
+- **Per-target throttling** and a **"speak only if feed was idle"** option for noisy zones.
+- **Persistence** — feed is runtime-only by default (like a chat window); optional "save last N lines on close" writes to `Logs/feeds/{viewname}.log`, never the tome.
+
+**Scope boundaries (so this doesn't become a chat client):**
+- ❌ No raw-log mirroring — every feed line comes from an explicit keyword match
+- ❌ No combat roll-ups, DPS parsing, or two-way chat
+- ✅ Yes: curated, transformed streams (vendor prices, faction hits, named sightings, tells)
+
+### Zones, Groups & Conditions 🗺️
+
+Context-aware timer activation for solo/small-group exploration play.
+
+- **Zone-aware timers** — parse `You have entered <Zone>`; `Zone` column on timers (nullable, single or pipe-delimited); auto-activate / deactivate as the player zones.
+- **Timer groups** — `GroupName` column for bulk enable / disable / edit; combinable with zones (e.g. a "Solusek's Eye spawns" group auto-activates in that zone).
+- **Conditional / chained timers beyond DependsOn** — "start Y only if X is running", "reset all timers in group Z when keyword fires" (great for wipes: `You have been slain`).
+- **Per-timer warning threshold override** — global warning is the default; per-timer "warn at last 30s" or "warn at last 10%".
+- **Class profiles (optional)** — class-specific timer profiles, building on the spell library.
+
+### Personal Play Statistics 📊
+
+A self-improvement dashboard built mostly on data the timers already capture. The `aggregate` capture-group modifier means most stats fall out of writing timers — this is mostly *presentation*.
+
+- **Personal play metrics** — combat survival (hits taken/min, max hit, heals), casting health (fizzle/interrupt rate, pet deaths), progression (XP/hr proxy, loot, currency), session summary (time per character/zone, camps, switches), and a **death recap** (last N lines before death, written to `Logs/deaths/`).
+- **Per-timer fire-rate stats** — triggers/hour, last-fired, average interval; reveals "this timer never completes its cooldown" or "this buff drops 4s early".
+- **`ViewType=Stats`** — third view type with cards, simple charts, top-N tables, CSV export; periodic refresh (250–500 ms), never per-match.
+- **Architecture** — `aggregate` modifier rolls min/max/avg/count with no new parsing; in-memory dictionaries flushed to SQLite periodically; lazy computation; optional "performance mode" to disable collection; bounded ring buffers.
+
+**Scope boundaries (so this doesn't become GamParse):**
+- ❌ No raid DPS parsing, combat replay, cross-player aggregation, or upload to external services
+- ✅ Yes: personal play-improvement metrics that fall out of data Thorne Timer already captures
+
+### Directional Speech & Ping Refactor 🔧
+
+Internal cleanup with no user-visible change — centralize the Ping execution model and remove hardcoded branch points.
+
+- Refactor `StartTimer` / `StopTimer` / `ResetTimer` to handle Ping via the directional speech pattern
+- Eliminate `|| PingTimer()` escape hatches; centralize Ping lifecycle management
+- See [TD-011](../ThorneTimer/Docs/active-views/technical-debt.md) for the full 19-step plan
+
+### Timer Maintenance Dialog (formerly Phase C) ⏸️
+
+Split the single grid into a read-only runtime dashboard plus a dedicated editing dialog. A *UX refinement for power users with large timer/character sets* — promoted into a release only if adoption warrants the dual-grid restructure.
 
 **Already in place (shipped in v0.6.0):**
 - ✅ `TimersController` + `TimersRepository` and `CharactersController` + `CharactersRepository` extracted from `FormMain`
@@ -222,73 +225,6 @@ runtime dashboard plus a dedicated editing dialog.
 - **Frozen timer display in dialog** — maintenance grid loads timers with `isActive=false` (no countdown)
 - **Background preservation** — active character's timers keep running while editing others in the dialog
 - **Companion management dialogs** — Characters (#17), Categories (#18), Classes (#19), Views (#20) follow the same dialog pattern once the Timers dialog proves it out
-
-**Promotion trigger:** revisit when there's meaningful external adoption (multiple active users
-managing large timer sets) or when a concrete user request makes the single-grid workflow a pain
-point rather than a preference.
-
----
-
-## 📋 Planned
-
-### Zones, Groups & Conditions — v0.12.0
-
-Context-aware timer activation — useful for solo/small-group exploration play.
-
-- **Zone-aware timers** — parse `You have entered <Zone>` from log; `Zone` column on timers (nullable, single or pipe-delimited); auto-activate / deactivate as the player zones
-- **Timer groups** — `GroupName` column for bulk-enable / disable / edit; can be combined with zones (e.g. "Solusek's Eye spawns" group auto-activates in that zone)
-- **Conditional / chained timers beyond DependsOn**:
-  - "Start timer Y only if timer X is currently running"
-  - "Reset all timers in group Z when keyword fires" (great for wipes: `You have been slain` resets combat group)
-- **Per-timer warning threshold override** — global warning is the default; per-timer override for "warn at last 30s" or "warn at last 10%"
-- **Class profiles (optional)** — class-specific timer profiles per EQ class, building on the spell library
-
-### Power-User & Quality-of-Life — v1.0.0
-
-The "everything we deferred because it was a nice-to-have" release that pushes us to 1.0.
-
-- **Global hotkeys** (low-level keyboard hook) — toggle mini-views, pause/resume all, force-switch character, "mute all sounds for N seconds" panic button
-- **Quick mute button** in toolbar — doorbell / phone / boss-walked-in scenarios
-- **Character online/offline time tracking** — adjust Character+ scope timers for time elapsed while logged out (server cooldowns that progress offline)
-- **Better online state detection** — distinguish character inactive (manual switch) vs. logged out (camp/disconnect)
-- **Timer database backup / restore tooling** — built-in `.tdb` snapshot and restore, with auto-snapshots before destructive ops. *(Partially shipped: `Database.BackupDatabase` with tiered pruning and the `db_meta` version stamps landed in v0.6.0; a `Restore` UI and the pre-destructive auto-snapshot trigger remain.)*
-- **Performance profiling diagnostics** — built-in panel showing log-poll latency, grid sync time, mini-view paint time
-- **Accessibility** — high contrast mode, screen-reader labels, larger text mode (overlaps with the theming release)
-- **User documentation / help system** — in-app help dialog or `Help → Topics` menu pointing at bundled markdown / online guide
-
-### Personal Play Statistics — v1.1.0 📊 **NEW**
-
-The first post-1.0 release: a self-improvement dashboard built mostly on data the earlier releases already capture. The `aggregate` capture-group modifier means most stats fall out of writing timers — this release is mostly *presentation*.
-
-**Personal play metrics ("am I playing well?"):**
-- **Combat survival** — hits taken, hits/min, max single hit, heals received, net survivability
-- **Casting health** — fizzle rate per spell, interrupt rate, cast count, pet death count
-- **Progression** — XP messages per hour (proxy for XP/hr), loot drops by item, currency earned per session
-- **Session summary** — time logged in per character, time per zone, camp count, character switches
-- **Death recap** — last N log lines before death with damage source highlighted; written to `Logs/deaths/` for post-mortem review
-- **Per-timer fire-rate stats** — triggers/hour, last-fired timestamp, average interval between fires; reveals "this timer never completes its cooldown" or "this buff drops 4s early"
-
-**New view type:**
-- **`ViewType=Stats` (third view type alongside `Timers` and `Feed`)** — dashboard renderer with cards, simple bar / line charts, top-N tables. Same skin system as the other view types.
-- **Optional graph view** — basic charts over a session window; not real-time tick-by-tick (that's a perf trap), but periodic refresh (every few seconds)
-- **CSV export** — raw session data for users who want their own analysis
-
-**Architecture (avoids parsing slowdown):**
-- **Capture-group `aggregate` modifier** — marking a group `aggregate=true` (e.g. `{damage:aggregate}`) rolls min / max / avg / count into per-timer stats with no new parsing code
-- Stats accumulate in **in-memory dictionaries** keyed by timer ID / spell name / zone, not SQLite-per-match
-- **Periodic flush to SQLite** — every 60s and on session end / character switch / camp
-- **Lazy computation** — derived metrics (kills/hour, fizzle %) computed only when the stats view is open
-- **UI refresh on a timer (250–500 ms)**, never on every match event
-- **Optional "performance mode" toggle** — disables stats collection entirely for users who want minimum overhead
-- **Bounded history** — ring buffers and aggregation windows; never unbounded event logs
-
-**Hard scope boundaries (so this doesn't become GamParse):**
-- ❌ No raid DPS parsing or fight summaries
-- ❌ No combat log replay / timeline UI
-- ❌ No cross-player aggregation / network sync
-- ❌ No upload to external raid-logging services
-- ❌ No real-time per-tick damage graphs during fights
-- ✅ Yes to personal play-improvement metrics that fall out of data Thorne Timer is already capturing
 
 ---
 
@@ -346,19 +282,19 @@ Ongoing improvements that can ship with any release:
 | Per-Character & Styles | v0.5.0 | Multi-character | ✅ Shipped |
 | GUI & Performance | v0.6.0 | Styles / Views CRUD, perf | ✅ Shipped |
 | **Smarter Authoring** | **v0.7.0** | **Wildcards, capture groups, keyword test button, conflict detection (+ reliability fixes)** | **🎯 Next** |
-| **Spell Library & Templates** | **v0.8.0** | **Seed `spells` from PDQ `.sql`, "add from spell", import/export packs** | **🎯 Planned** |
-| **Skinning & Theming** | **v0.9.0** | **EQ-UI-matching overlays, per-style fonts** | **🎯 Planned** |
-| **Feed Views & Log Synthesis** | **v0.10.0** | **Scrolling feed view type, transformed event streams, speech sanitizer** | **📜 Planned** |
-| Ping Refactor | v0.11.0 | Internal cleanup | 📋 Planned |
-| Zones, Groups, Conditions | v0.12.0 | Context-aware activation | 📋 Planned |
-| Power-User & QoL | v1.0.0 | Hotkeys, mute, backups, a11y, in-app help | 📋 Future |
-| **Personal Play Statistics** | **v1.1.0** | **Survival, fizzle rate, deaths, XP/hr; stats view type; death recap** | **📊 Post-1.0** |
-| Timer Maintenance Dialog | Post-1.0 | Read-only grid + `Edit > Timers...` dialog | ⏸️ Deferred (promote on adoption) |
+| **Final Polish & 1.0** | **v1.0.0** | **Quick mute, global hotkeys, restore UI, in-app help, accessibility, screenshots** | **🚀 Ship it** |
+| Spell Library & Templates | post-1.0 | Bundled spells, "add from spell", import/export packs | 🧭 Build as desired |
+| Skinning & Theming | post-1.0 | EQ-UI-matching overlays, per-style fonts | 🧭 Build as desired |
+| Feed Views & Log Synthesis | post-1.0 | Scrolling feed view type, transformed streams, speech sanitizer | 🧭 Build as desired |
+| Zones, Groups & Conditions | post-1.0 | Context-aware activation | 🧭 Build as desired |
+| Personal Play Statistics | post-1.0 | Survival, fizzle rate, deaths, XP/hr; stats view type | 🧭 Build as desired |
+| Ping Refactor | post-1.0 | Internal cleanup | 🧭 Build as desired |
+| Timer Maintenance Dialog | post-1.0 | Read-only grid + `Edit > Timers...` dialog | ⏸️ Promote on adoption |
 
-> Version numbers are targets and may shift as development progresses.
-> The **Timer Maintenance Dialog** sits off the numbered track; promoted into a release only if adoption justifies the dual-grid restructure.
+> Version numbers through v1.0.0 are the committed path; post-1.0 items are an **unordered pool** shipped as minor releases (1.1, 1.2, …) when they bring the most value.
+> The **Timer Maintenance Dialog** is promoted into a release only if adoption justifies the dual-grid restructure.
 
 ---
 
-**Last Updated:** v0.7.0 planning pass (`v0.7.0-dev` branch) — re-sequenced for player value; maintenance dialog deferred post-1.0
+**Last Updated:** v0.7.0 planning pass (`v0.7.0-dev` branch) — collapsed to 1.0; v0.7.0 is the last pre-1.0 release, everything beyond is a post-1.0 build-as-desired pool
 **Maintained By:** Draknaré Thorne
