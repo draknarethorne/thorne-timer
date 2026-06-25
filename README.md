@@ -64,7 +64,7 @@ Thorne Timer ships with a default set of styles you can edit, rename, or extend:
 
 Each view remembers its position independently â€” arrange them once and they stay put. Use the **Styles** and **Views** tabs to add, rename, or delete styles and views, change their colors, and control how empty views display (character name, view name, blank, or hidden).
 
-### â±ï¸ Real-Time Log Parsing
+### ⏱️ Real-Time Log Parsing
 Point Thorne Timer at your EQ log file and it starts working immediately:
 
 - **Start keywords** trigger timers when specific text appears in your log
@@ -151,7 +151,7 @@ You only need to do this once per download. If your antivirus quarantines the EX
 - EverQuest with logging enabled (`/log on` in game)
 
 ### Quick Setup
-1. **Add a character** â€” give it a name and browse to your EQ log file (e.g., `eqlog_DraknarÃ©_project1999.txt`)
+1. **Add a character** — give it a name and browse to your EQ log file (e.g., `eqlog_Draknaré_project1999.txt`)
 2. **Select your character** from the dropdown and click **Start Parsing**
 3. **Create timers** â€” set start keywords that match text in your log, set a duration, and optionally add voice/sound alerts
 4. **Show Mini Views** â€” click the mini view button to see your overlay windows
@@ -489,6 +489,8 @@ Free to use, modify, and share. Built for the EverQuest community, useful anywhe
 ---
 
 <p align="center">
-  <sub>Built with â˜• for the Project Quarm community by DraknarÃ© Thorne</sub><br/>
+  <sub>Built with ☕ for the Project Quarm community by Draknaré Thorne</sub><br/>
   <sub>âš”ï¸ See you in Norrath</sub>
 </p>
+
+
