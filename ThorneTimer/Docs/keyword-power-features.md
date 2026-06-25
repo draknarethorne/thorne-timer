@@ -167,7 +167,7 @@ log line ─▶ matcher ──▶│ matched? ──no──▶ (nothing; next l
                              │  (resolution runs OUTSIDE the match loop)
               ┌──────────────┼───────────────────────────┐
               ▼              ▼                             ▼
-      DisplayNameTemplate  SpeechTemplate            (timer/feed action
+      DisplayName (label)  Speech (as template)      (timer/feed action
       "{item} — {1}p {2}g" "{1} platinum {2} gold"    as today: start,
               │              │                          reset, sound)
               ▼              ▼
@@ -182,22 +182,31 @@ log line ─▶ matcher ──▶│ matched? ──no──▶ (nothing; next l
 2. **Capture.** Because the matched term `HasCaptureGroups`, the engine pulls the
    group values into a small capture map (`{1}`, `{2}`, `{item}`, …). This runs
    **only on a confirmed match**, never on the non-matching majority of lines.
-3. **Render.** The capture map is substituted into whichever templates are set:
-   - `DisplayNameTemplate` → the label shown in the grid / mini view.
-   - `SpeechTemplate` → the phrase handed to `VoiceManager` for TTS.
+3. **Render.** The capture map is substituted into whichever output fields contain
+   placeholders:
+   - `DisplayName` → the label shown in the grid / mini view (defaults to `Name`).
+   - `Speech` → the phrase handed to `VoiceManager` for TTS (literal if no
+     placeholders).
    Each is independent and optional.
 
-### 5.3 New columns (idempotent migration, default NULL = today's behavior)
+### 5.3 Storage (reuse existing columns; minimal additions)
 
-- `timers.SpeechTemplate` (TEXT) — overrides what is **spoken**. NULL ⇒ today's
-  behavior (speak the literal `SpeechText`, or nothing if unset).
-- `timers.DisplayNameTemplate` (TEXT) — overrides the **label** shown in the grid
-  and mini view. NULL ⇒ today's behavior (show the timer `Name`).
+> Authoring surface and grid simplification are specified in
+> [`timer-output-authoring.md`](timer-output-authoring.md). Summary here:
 
-Both are pure additions; an existing `.tdb` with no templates behaves exactly as
-it does now.
+- **Speech: reuse the existing `timers.Speech` column** — it holds *either* a
+  literal phrase (today) *or* a template (e.g. `{1} platinum {2} gold`). No new
+  speech column, no migration. NULL/empty ⇒ nothing spoken, as today.
+- **Display label: one new nullable `timers.DisplayName` (TEXT)** — overrides the
+  grid/mini-view label. NULL ⇒ today's behavior (show the timer `Name`).
+- Whether `Speech`/`DisplayName` is treated as literal or template is a
+  **load/edit-time classification** (does it contain `{...}` placeholders?), never
+  decided per match — consistent with §3/§4.
 
-### 5.4 How the templates relate to the existing `SpeechText` / label columns
+Both are backwards compatible: an existing `.tdb` with literal `Speech` and no
+`DisplayName` behaves exactly as it does now.
+
+### 5.4 How the templates relate to the existing `Speech` / label columns
 
 The templates do **not** introduce a new output path — they feed the *same*
 events the runtime already raises. Today a started/updated timer raises
@@ -205,15 +214,15 @@ events the runtime already raises. Today a started/updated timer raises
 `TimerSoundRequested` (→ `FormMain` plays a sound or speaks). The change is
 purely *what string* those handlers receive:
 
-| Output | Today (no template) | With template (capture groups present) |
+| Output | Today (literal) | With template (capture groups present) |
 |---|---|---|
-| Mini-view / grid label | timer `Name` | `DisplayNameTemplate` resolved against captures |
-| Spoken phrase | literal `SpeechText` | `SpeechTemplate` resolved against captures |
+| Mini-view / grid label | timer `Name` | `DisplayName` resolved against captures |
+| Spoken phrase | literal `Speech` | `Speech` resolved as a template against captures |
 
-So conceptually the "speech column" you remembered **does** keep working — the
-`SpeechTemplate` simply *replaces* the literal speech string at render time when
-the matched keyword produced captures. If a timer has no template, or the matched
-term has no capture groups, the literal value is used and nothing changes.
+So the existing `Speech` column **keeps working** — when the matched keyword
+produced captures and `Speech` contains placeholders, it is resolved as a
+template; otherwise it is spoken verbatim. If a timer has no placeholders, or the
+matched term has no capture groups, the literal value is used and nothing changes.
 
 ### 5.5 Template mechanics
 
@@ -340,8 +349,8 @@ Author-time, **off the hot path** — runs in the editor, not the parser.
 
 | Table | Column | Type | Default | Purpose |
 |-------|--------|------|---------|---------|
-| `timers` | `SpeechTemplate` | TEXT | NULL | capture-group speech output |
-| `timers` | `DisplayNameTemplate` | TEXT | NULL | capture-group label override |
+| `timers` | `Speech` | TEXT | (existing) | **reused** — literal *or* template speech (no new column; see [`timer-output-authoring.md`](timer-output-authoring.md)) |
+| `timers` | `DisplayName` | TEXT | NULL | label override / template; NULL = use `Name` |
 | `timers` | `MinTriggerIntervalSeconds` | INTEGER | NULL/0 | throttle ping spam (stretch) |
 
 No change to existing `StartKeyword` / `EndKeyword` storage — tier is **derived at
@@ -361,7 +370,9 @@ in `Database.cs`.
 3. **Wildcard tier** — `*` globs compiled to cached regex. Measure.
 4. **Regex tier + line assembly + capture groups** — anchors, named groups,
    timeouts. Measure.
-5. **Templates** — `SpeechTemplate` / `DisplayNameTemplate` wiring.
+5. **Templates** — capture-group substitution into the reused `Speech` column and
+   the new `DisplayName` column; authoring via the Advanced Output dialog (see
+   [`timer-output-authoring.md`](timer-output-authoring.md)).
 6. **Conflict detection** — editor-side advisory.
 7. **(Conditional) automaton** — only if §7.3 numbers demand it.
 

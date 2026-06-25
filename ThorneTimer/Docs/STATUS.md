@@ -38,6 +38,7 @@ These reflect current behavior or active planning:
 | `multi-keyword-support-feature.md` | Feature Note | ✅ Implemented | Pipe-separated keyword matching shipped |
 | `views-grid-completion-phase1.md` | Phase Summary | ✅ Implemented | Views grid phase completion |
 | `keyword-power-features.md` | Feature Design | 📐 Design / Spec | v0.7.0 tiered keyword matching (literal→wildcard→regex), capture templates, perf/benchmark plan |
+| `timer-output-authoring.md` | Feature Design | 📐 Design / Spec | v0.7.0 grid simplification: reuse `Speech` for literal/template, `...`→Advanced Output dialog, deferred Templates tab |
 | `styles-and-views-enhancements-progress.md` | Progress Tracker | 🗄️ Historical | Time-format slice + `TimersController` extraction shipped in v0.6.0; skin-engine scope moved to ROADMAP Phase I |
 | `styles-and-views-enhancements.md` | Feature Spec | 📋 Planned | Master spec for broader skin engine work (ROADMAP Phase I) |
 | `architecture-redesign.md` | Architecture | 📋 Planned | Long-term MVP refactor roadmap |
