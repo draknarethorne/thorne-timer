@@ -30,12 +30,17 @@ namespace ThorneTimer
         public int mvBuffForeColor = Color.Orange.ToArgb();
         public int mvBuffBackColor = Color.Black.ToArgb();
 
+        public StylesRepository Styles { get; set; }
+
+        // v0.6.0: Track active character name for Character style mini view
+        private string activeCharacterName = "All Characters";
+
         /// <summary>
         /// Pairs a database view record with its live MiniView form.
         /// </summary>
         private class ViewEntry
         {
-            public Database.ViewPositionData Data { get; set; }
+            public ViewPositionData Data { get; set; }
             public MiniView Form { get; set; }
         }
 
@@ -52,6 +57,11 @@ namespace ThorneTimer
             public int PositionX { get; set; }
             public int PositionY { get; set; }
             public int SortOrder { get; set; }
+            public int ForeColor { get; set; }      // v0.6.0: Per-view foreground color
+            public int BackColor { get; set; }      // v0.6.0: Per-view background color
+            public int ShowWarning { get; set; }    // v0.6.0: Per-view warning color control
+            public string EmptyBehavior { get; set; }  // v0.6.0: Per-view empty display behavior
+            public string Example { get; set; }     // v0.6.0: Read-only preview (populated by UI layer)
         }
 
         public bool MiniViewsActive()
@@ -70,7 +80,7 @@ namespace ThorneTimer
 
             // Persist current positions before tearing down
             Dictionary<int, Point> positions = GetCurrentViewPositions();
-            Database.SaveViewPositions(con, positions);
+            ViewsRepository.SaveViewPositions(con, positions);
 
             DestroyMiniViews();
             CreateMiniViews(con, activeCharacterID);
@@ -109,7 +119,7 @@ namespace ThorneTimer
 
             if (row == null)
             {
-                List<MiniViews.GridData> data = Database.GetViews(con);
+                List<MiniViews.GridData> data = ViewsRepository.GetViews(con);
 
                 GridData gd = new MiniViews.GridData
                 {
@@ -133,9 +143,9 @@ namespace ThorneTimer
                 if (MessageBox.Show("Are you sure you want to delete this view?", "Delete View", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1) == System.Windows.Forms.DialogResult.Yes)
                 {
                     DataGridViewCell idCell = grdViews.Rows[grdViews.CurrentCell.RowIndex].Cells[grdViews.Columns["ID"].Index];
-                    Database.DeleteView(con, Convert.ToString(idCell.Value));
+                    ViewsRepository.DeleteView(con, Convert.ToString(idCell.Value));
 
-                    grdViews.DataSource = Database.GetViews(con);
+                    grdViews.DataSource = ViewsRepository.GetViews(con);
 
                     result = true;
                 }
@@ -175,8 +185,22 @@ namespace ThorneTimer
 
             if (activeViews.Count == 0)
             {
+                // Get the active character name for the Character mini view
+                // Use same approach as status bar for consistency
+                long charID = 0;
+                long.TryParse(activeCharacterID, out charID);
+                if (charID == 0)
+                {
+                    activeCharacterName = "All Characters";
+                }
+                else
+                {
+                    var character = CharactersRepository.GetCharacter(con, activeCharacterID);
+                    activeCharacterName = string.IsNullOrEmpty(character.Name) ? "All Characters" : character.Name;
+                }
+
                 // Load view definitions from database
-                List<Database.ViewPositionData> views = Database.GetViewPositions(con);
+                List<ViewPositionData> views = ViewsRepository.GetViewPositions(con);
 
                 foreach (var viewData in views)
                 {
@@ -184,11 +208,17 @@ namespace ThorneTimer
                     if (viewData.ActiveYn != 1)
                         continue;
 
-                    bool showView = true;
-                    if (viewData.StyleFilter == "Ping")
-                        showView = ShowPing();
+                    // v0.6.0: All views use ActiveYn (no special Ping handling)
+                    bool showView = (viewData.ActiveYn == 1);
 
                     string title = string.IsNullOrEmpty(viewData.Name) ? viewData.StyleFilter + " Timers" : viewData.Name;
+
+                    // Special handling for Character style: use character name as title
+                    if (viewData.StyleFilter == "Character")
+                    {
+                        title = string.IsNullOrEmpty(viewData.Name) ? activeCharacterName : viewData.Name;
+                    }
+
                     MiniView form = CreateMiniView(viewData.PositionX, viewData.PositionY, showView, title);
 
                     activeViews.Add(new ViewEntry { Data = viewData, Form = form });
@@ -208,48 +238,39 @@ namespace ThorneTimer
 
             foreach (var entry in activeViews)
             {
-                int viewFore, viewBack;
-                string emptyLabel;
-                bool showView = true;
-                GetStyleColors(entry.Data.StyleFilter, out viewFore, out viewBack, out emptyLabel);
+                StyleData style = Styles?.GetStyle(entry.Data.StyleFilter);
+                int viewFore = style == null ? Color.Black.ToArgb() : style.ForeColor;
+                int viewBack = style == null ? Color.Yellow.ToArgb() : style.BackColor;
+                bool showWarning = (entry.Data.ShowWarning != 0);
+                string emptyBehaviorSetting = entry.Data.EmptyBehavior ?? "ViewName";
+                bool showView = (entry.Data.ActiveYn != 0);
 
-                if (entry.Data.StyleFilter == "Ping")
-                    showView = ShowPing();
+                // Compute empty text based on EmptyBehavior setting
+                string emptyText;
+                switch (emptyBehaviorSetting)
+                {
+                    case "CharacterName":
+                        emptyText = activeCharacterName;
+                        break;
+                    case "ViewName":
+                        emptyText = string.IsNullOrEmpty(entry.Data.Name) ? entry.Data.StyleFilter : entry.Data.Name;
+                        break;
+                    case "Spaces":
+                        emptyText = "          ";  // 10 spaces for minimal presence
+                        break;
+                    case "HideEmpty":
+                        emptyText = "";  // Empty (view will be hidden when no timers)
+                        break;
+                    default:
+                        emptyText = entry.Data.Name ?? entry.Data.StyleFilter;
+                        break;
+                }
 
-                SetMiniAppearance(entry.Form, emptyLabel, showView, viewFore, viewBack);
+                bool isCharacterView = (entry.Data.StyleFilter == "Character");
+                SetMiniAppearance(entry.Form, emptyText, showView, viewFore, viewBack, isCharacterView, showWarning);
             }
 
             return result;
-        }
-
-        /// <summary>
-        /// Returns the fore/back colors and empty label text for a given style.
-        /// </summary>
-        private void GetStyleColors(string style, out int foreColor, out int backColor, out string emptyLabel)
-        {
-            switch (style)
-            {
-                case "Pet":
-                    foreColor = mvBuffForeColor;
-                    backColor = mvBuffBackColor;
-                    emptyLabel = "Pet";
-                    break;
-                case "Buff":
-                    foreColor = mvBuffForeColor;
-                    backColor = mvBuffBackColor;
-                    emptyLabel = "Buffs";
-                    break;
-                case "Ping":
-                    foreColor = mvPingForeColor;
-                    backColor = mvPingBackColor;
-                    emptyLabel = "Ping";
-                    break;
-                default:
-                    foreColor = mvNormForeColor;
-                    backColor = mvNormBackColor;
-                    emptyLabel = "Timers";
-                    break;
-            }
         }
 
         public bool DestroyMiniViews()
@@ -281,16 +302,15 @@ namespace ThorneTimer
             return null;
         }
 
-        private void SetMiniAppearance(MiniView view, String timerText, bool showView, int viewForeColor, int viewBackColor)
+        private void SetMiniAppearance(MiniView view, String emptyText, bool showView, int viewForeColor, int viewBackColor, bool isCharacterView, bool showWarning)
         {
             if (view != null)
             {
-                view.SetAppearance(mvOpacity, mvFontSize, Color.FromArgb(mvNormForeColor), Color.FromArgb(mvNormBackColor),
+                // v0.6.0: Pass per-view colors, emptyText, and settings; warn colors still global
+                view.SetAppearance(mvOpacity, mvFontSize, 
                              Color.FromArgb(mvWarnForeColor), Color.FromArgb(mvWarnBackColor), mvWarnTime,
-                             Color.FromArgb(mvPingForeColor), Color.FromArgb(mvPingBackColor),
-                             Color.FromArgb(mvBuffForeColor), Color.FromArgb(mvBuffBackColor),
-                             timerText,
-                             Color.FromArgb(viewForeColor), Color.FromArgb(viewBackColor));
+                             Color.FromArgb(viewForeColor), Color.FromArgb(viewBackColor),
+                             emptyText, isCharacterView, showWarning);
                 if (showView)
                 {
                     view.Show();
@@ -306,12 +326,40 @@ namespace ThorneTimer
 
         private bool ShowMiniTimer(string btnString)
         {
-            return (Timers.TimerRunning(btnString) || (Timers.PingTimer(btnString) && ShowPing()));
+            // v0.6.0: Simplified - no special Ping handling
+            // All timer visibility now controlled by timer state only
+            return Timers.TimerRunning(btnString) || Timers.PingTimer(btnString);
         }
 
         public bool ShowPing()
         {
             return (mvShowPing == 1);
+        }
+
+        /// <summary>
+        /// Updates the active character name for the Character style mini view.
+        /// Call this when the character changes without recreating mini views.
+        /// Uses same approach as status bar for consistency.
+        /// </summary>
+        public void UpdateActiveCharacter(SQLiteConnection con, string activeCharacterID)
+        {
+            long charID = 0;
+            long.TryParse(activeCharacterID, out charID);
+            if (charID == 0)
+            {
+                activeCharacterName = "All Characters";
+            }
+            else
+            {
+                var character = CharactersRepository.GetCharacter(con, activeCharacterID);
+                activeCharacterName = string.IsNullOrEmpty(character.Name) ? "All Characters" : character.Name;
+            }
+
+            // Update mini view appearances to reflect the new character name
+            if (activeViews.Count > 0)
+            {
+                UpdateMiniAppearance();
+            }
         }
 
         public void UpdateMiniTimers(List<MiniTimerData> timerData, bool bForce=true)
@@ -349,7 +397,8 @@ namespace ThorneTimer
                     {
                         Name = td.Name,
                         Remaining = td.Remaining,
-                        TheColor = colorType
+                        TheColor = colorType,
+                        RemainingMs = td.RemainingMs
                     };
 
                     // Route to view(s) whose StyleFilter matches this timer's Style

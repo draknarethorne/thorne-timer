@@ -95,6 +95,12 @@ namespace ThorneTimer
         public string Remaining { get; set; }
         public string Style { get; set; }
         public string ButtonState { get; set; }
+
+        // Raw remaining time in milliseconds, independent of the display format.
+        // Used for warning-threshold detection so compact/lossy formats (e.g.
+        // AdaptiveCompact "1d 4h") don't misfire the warning. Negative means
+        // "unknown — fall back to parsing the Remaining string".
+        public double RemainingMs { get; set; } = -1;
     }
 
     /// <summary>
@@ -127,6 +133,23 @@ namespace ThorneTimer
 
         // Lock for thread safety between poll thread and UI thread
         private readonly object syncLock = new object();
+
+        /// <summary>
+        /// Resolves a style name to its <see cref="TimeFormat"/> so countdown text
+        /// the runtime produces (grid Remaining column, frozen character state)
+        /// matches the style's configured format. Set by the host (FormMain) from
+        /// the active <c>StylesRepository</c>. Defaults to Classic when unset.
+        /// </summary>
+        public Func<string, TimeFormat> StyleTimeFormatResolver { get; set; }
+
+        private TimeFormat ResolveTimeFormat(string style)
+        {
+            var resolver = StyleTimeFormatResolver;
+            if (resolver == null) return TimeFormat.Classic;
+
+            try { return resolver(style); }
+            catch { return TimeFormat.Classic; }
+        }
 
         // Events
         public event EventHandler<TimerStateChangedEventArgs> TimerStateChanged;
@@ -259,11 +282,11 @@ namespace ThorneTimer
                 // Process Categories
                 foreach (var cat in categoryStates)
                 {
-                    if (cat.StartKeyword.Length > 0 && chunk.Contains(cat.StartKeyword))
+                    if (cat.StartKeyword.Length > 0 && KeywordMatches(cat.StartKeyword, chunk, caseSensitive: false))
                     {
                         ActivateCategoryTimers(cat.CategoryID, true);
                     }
-                    else if (cat.EndKeyword.Length > 0 && chunk.Contains(cat.EndKeyword))
+                    else if (cat.EndKeyword.Length > 0 && KeywordMatches(cat.EndKeyword, chunk, caseSensitive: false))
                     {
                         if (cat.AutoStop == 1)
                         {
@@ -277,19 +300,9 @@ namespace ThorneTimer
                 {
                     if (!ts.IsActive) continue;
 
-                    bool containsStart;
-                    bool containsEnd;
-
-                    if (ts.CaseYn != 0)
-                    {
-                        containsStart = chunk.IndexOf(ts.StartKeyword, StringComparison.Ordinal) >= 0;
-                        containsEnd = chunk.IndexOf(ts.EndKeyword, StringComparison.Ordinal) >= 0;
-                    }
-                    else
-                    {
-                        containsStart = chunk.IndexOf(ts.StartKeyword, StringComparison.OrdinalIgnoreCase) >= 0;
-                        containsEnd = chunk.IndexOf(ts.EndKeyword, StringComparison.OrdinalIgnoreCase) >= 0;
-                    }
+                    bool caseSensitive = ts.CaseYn != 0;
+                    bool containsStart = KeywordMatches(ts.StartKeyword, chunk, caseSensitive);
+                    bool containsEnd = KeywordMatches(ts.EndKeyword, chunk, caseSensitive);
 
                     if (containsStart && ts.StartKeyword.Length > 0)
                     {
@@ -427,7 +440,7 @@ namespace ThorneTimer
 
             runningTimers.Add(new RunningTimer { TimerID = ts.TimerID, Timer = tp });
 
-            ts.Remaining = tp.GetTimeRemaining();
+            ts.Remaining = tp.GetTimeRemaining(ResolveTimeFormat(ts.Style));
             tp.Start();
 
             // Fire sound for Ping timers on start
@@ -485,7 +498,7 @@ namespace ThorneTimer
                 var ts = timerStates.FirstOrDefault(t => t.TimerID == e.TimerID);
                 if (ts == null) return;
 
-                ts.Remaining = e.GetTimeRemaining();
+                ts.Remaining = e.GetTimeRemaining(ResolveTimeFormat(ts.Style));
                 FireStateChanged(ts, false);
             }
         }
@@ -703,12 +716,20 @@ namespace ThorneTimer
                 {
                     if (ts.IsRunning || ts.ButtonState == Timers.btnPing)
                     {
+                        // Use the live TimerPlus for the authoritative raw remaining
+                        // milliseconds so warning detection is format-independent.
+                        var rt = runningTimers.FirstOrDefault(r => r.TimerID == ts.TimerID);
+                        double remainingMs = (rt != null)
+                            ? (rt.Timer.DurationTime - rt.Timer.ElapsedTime)
+                            : -1;
+
                         data.Add(new MiniTimerData
                         {
                             Name = ts.Name,
                             Remaining = ts.Remaining,
                             Style = ts.Style ?? "Normal",
-                            ButtonState = ts.ButtonState
+                            ButtonState = ts.ButtonState,
+                            RemainingMs = remainingMs
                         });
                     }
                 }
@@ -790,9 +811,17 @@ namespace ThorneTimer
                 {
                     if (ValidDuration(ts.Duration))
                     {
-                        double remainingMS = TimerPlus.GetMilliseconds(ts.Remaining ?? "00:00:00");
-                        double durationMS = TimerPlus.GetMilliseconds(ts.Duration);
-                        double elapsedMS = durationMS - remainingMS;
+                        // Use the live TimerPlus elapsed time (authoritative raw ms)
+                        // rather than parsing the display string. The displayed
+                        // Remaining is formatted per the timer's style (e.g. Spawn
+                        // uses FullCompact "9m 30s"), which the old colon-only parser
+                        // turned into 0 ms â€” making elapsed look like the full duration
+                        // and firing every dependent immediately regardless of delay.
+                        var rt = runningTimers.FirstOrDefault(r => r.TimerID == ts.TimerID);
+                        double elapsedMS = (rt != null)
+                            ? rt.Timer.ElapsedTime
+                            : TimerPlus.GetMilliseconds(ts.Duration)
+                                - TimerPlus.GetMilliseconds(ts.Remaining ?? "00:00:00");
 
                         if (elapsedMS > delayMS)
                         {
@@ -815,36 +844,13 @@ namespace ThorneTimer
 
         private bool ValidDuration(string durationText)
         {
-            if (string.IsNullOrEmpty(durationText)) return false;
-
-            // Check for DD HH:MM:SS or DDd HH:MM:SS (space separates days from time)
-            int spaceIdx = durationText.IndexOf(' ');
-            if (spaceIdx > 0)
-            {
-                string dayPart = durationText.Substring(0, spaceIdx).TrimEnd('d');
-                if (dayPart.Length == 0 || !int.TryParse(dayPart, out _))
-                    return false;
-
-                string[] parts = durationText.Substring(spaceIdx + 1).Split(':');
-                if (parts.Length != 3) return false;
-
-                foreach (string p in parts)
-                {
-                    if (p.Length != 2 || !int.TryParse(p, out _)) return false;
-                }
-                return true;
-            }
-
-            // HH:MM:SS
-            string[] timeParts = durationText.Split(':');
-            if (timeParts.Length != 3) return false;
-
-            foreach (string p in timeParts)
-            {
-                if (p.Length != 2 || !int.TryParse(p, out _)) return false;
-            }
-
-            return true;
+            // A value is valid if the robust parser can turn it into a time.
+            // This accepts every format TimerTimeFormatter emits (colon forms for
+            // Classic/Long, unit-suffixed forms for Adaptive/FullCompact) so that
+            // restoring a persisted Remaining written in a non-Classic style format
+            // (e.g. Spawn's "9m 30s") is no longer rejected and silently dropped.
+            // Callers separately guard against zero via GetMilliseconds(...) <= 0.
+            return TimerPlus.TryParseRemaining(durationText, out _);
         }
 
         // --- Event firing helpers ---
@@ -915,7 +921,13 @@ namespace ThorneTimer
                         var rt = runningTimers.FirstOrDefault(r => r.TimerID == ts.TimerID);
                         if (rt != null)
                         {
-                            remaining = rt.Timer.GetTimeRemaining();
+                            // Persist in Classic (lossless colon) format, NOT the style's
+                            // display format. Compact formats are lossy/awkward to round-trip
+                            // (AdaptiveCompact "1d 4h" drops minutes & seconds), which would
+                            // corrupt the restored remaining time. The live grid/mini view
+                            // still renders the style format from the running TimerPlus; this
+                            // value is the serialized snapshot consumed by RestoreCharacterState.
+                            remaining = rt.Timer.GetTimeRemaining(TimeFormat.Classic);
                         }
                         StopTimerInternal(ts, false);
                         // Restore the frozen remaining and mark with the style button
@@ -938,16 +950,18 @@ namespace ThorneTimer
         /// <summary>
         /// Restores an incoming character's timer state from previously saved data.
         /// Restores per-character ActiveYn preferences for all timers.
-        /// Character-scope timers are restarted with their saved remaining time.
+        /// Character-scope timers are restarted ONLY if isActive=true (character is actively logging).
         /// Character+ scope timers are restarted with remaining adjusted for
         /// elapsed offline time (server-tracked cooldowns).
         /// World-scope timers are left alone (still running).
         /// </summary>
-        public void RestoreCharacterState(Dictionary<long, TimerState> savedStates)
+        /// <param name="savedStates">Previously saved timer states for this character</param>
+        /// <param name="isActive">True if this character is actively logging (LogMonitor active), false if just viewing</param>
+        public void RestoreCharacterState(Dictionary<long, TimerState> savedStates, bool isActive = true)
         {
             lock (syncLock)
             {
-                ThorneLog.Info($"RestoreCharacterState: timerStates={timerStates.Count} savedStates={savedStates.Count}");
+                ThorneLog.Info($"RestoreCharacterState: timerStates={timerStates.Count} savedStates={savedStates.Count} isActive={isActive}");
                 ThorneLog.DumpSavedStates("RestoreCharacterState-input", savedStates);
 
                 foreach (var ts in timerStates)
@@ -987,6 +1001,16 @@ namespace ThorneTimer
 
                     if (wasRunning && hasRemaining)
                     {
+                        // Character-scope timers should only run when the character is actively logging.
+                        // If we're just viewing this character (not actively logging), keep timers frozen.
+                        if (ts.Scope == "Character" && !isActive)
+                        {
+                            ThorneLog.Debug($"  RESTORE TID={ts.TimerID} \"{ts.Name}\" Scope=Character: SKIPPED (character not active), frozen at {saved.Remaining}");
+                            ts.Remaining = saved.Remaining;
+                            ts.ButtonState = saved.ButtonState;
+                            continue;
+                        }
+
                         if (!ValidDuration(saved.Remaining)) continue;
 
                         string effectiveRemaining = saved.Remaining;
@@ -1013,10 +1037,9 @@ namespace ThorneTimer
                             }
 
                             TimeSpan adjusted = TimeSpan.FromMilliseconds(adjustedMS);
-                            if (adjusted.Days > 0)
-                                effectiveRemaining = string.Format("{0}d {1:00}:{2:00}:{3:00}", adjusted.Days, adjusted.Hours, adjusted.Minutes, adjusted.Seconds);
-                            else
-                                effectiveRemaining = string.Format("{0:00}:{1:00}:{2:00}", adjusted.Hours, adjusted.Minutes, adjusted.Seconds);
+                            // Classic colon format keeps effectiveRemaining parseable by
+                            // TimerPlus.GetMilliseconds below; not user-facing display text.
+                            effectiveRemaining = TimerTimeFormatter.Format(adjusted, TimeFormat.Classic);
                         }
                         else if (ts.Scope == "Character+" && !saved.SavedAtUtc.HasValue)
                         {
@@ -1103,10 +1126,9 @@ namespace ThorneTimer
                         }
 
                         TimeSpan adjusted = TimeSpan.FromMilliseconds(adjustedMS);
-                        if (adjusted.Days > 0)
-                            effectiveRemaining = string.Format("{0}d {1:00}:{2:00}:{3:00}", adjusted.Days, adjusted.Hours, adjusted.Minutes, adjusted.Seconds);
-                        else
-                            effectiveRemaining = string.Format("{0:00}:{1:00}:{2:00}", adjusted.Hours, adjusted.Minutes, adjusted.Seconds);
+                        // Classic colon format keeps effectiveRemaining parseable by
+                        // TimerPlus.GetMilliseconds below; not user-facing display text.
+                        effectiveRemaining = TimerTimeFormatter.Format(adjusted, TimeFormat.Classic);
                     }
 
                     if (TimerPlus.GetMilliseconds(effectiveRemaining) <= 0) continue;
@@ -1177,5 +1199,45 @@ namespace ThorneTimer
                 default: return Timers.btnStop;
             }
         }
+
+        /// <summary>
+        /// Checks if a keyword or pipe-separated keywords match a log chunk.
+        /// Supports multiple keywords separated by '|' using OR logic:
+        /// if ANY keyword matches, returns true.
+        /// 
+        /// Example:
+        ///   KeywordMatches("spell cast|ability ready|buff applied", chunk, false)
+        ///   Returns true if chunk contains any of those phrases.
+        /// 
+        /// Single keywords work unchanged (backward compatible).
+        /// Empty or whitespace-only keywords are skipped.
+        /// </summary>
+        private bool KeywordMatches(string keywordString, string chunk, bool caseSensitive)
+        {
+            if (string.IsNullOrEmpty(keywordString) || string.IsNullOrEmpty(chunk))
+                return false;
+
+            // Split by pipe separator; trim whitespace from each keyword
+            var keywords = keywordString.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (var keyword in keywords)
+            {
+                string trimmedKeyword = keyword.Trim();
+                if (trimmedKeyword.Length == 0)
+                    continue;
+
+                // Check if chunk contains this keyword (with case sensitivity based on flag)
+                int index = caseSensitive
+                    ? chunk.IndexOf(trimmedKeyword, StringComparison.Ordinal)
+                    : chunk.IndexOf(trimmedKeyword, StringComparison.OrdinalIgnoreCase);
+
+                if (index >= 0)
+                    return true;  // Found a match — OR logic returns immediately
+            }
+
+            // No keywords matched
+            return false;
+        }
     }
 }
+

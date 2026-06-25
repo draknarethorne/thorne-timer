@@ -14,11 +14,16 @@
 | Component | File(s) | Responsibility |
 |-----------|---------|---------------|
 | Entry point | `Program.cs` | Application bootstrap |
-| Main form | `FormMain.cs` | Primary UI, timer grid, log monitoring |
-| Mini views | `MiniView.cs`, `MiniViews.cs` | Overlay windows (compact/full timer display) |
-| Timer engine | `TimerPlus.cs`, `Timers.cs` | Timer creation, countdown, event routing |
-| Database | `Database.cs` | SQLite operations, CRUD for all entities |
-| Data models | `Categories.cs`, `Characters.cs` | Domain model classes |
+| Main form | `FormMain.cs`, `FormMain.Designer.cs` | Primary UI shell, timer grid, log monitoring wiring |
+| Log monitoring | `LogMonitor.cs` | Multi-file polling; tracks `selectedCharacterID` (UI) vs `IsActive` (file growth) |
+| Timer engine | `TimerRuntime.cs`, `TimerPlus.cs`, `Timers.cs` | Timer state, countdown, character-state save/restore |
+| Mini views | `MiniView.cs`, `MiniViews.cs` | Always-on-top overlay windows; per-view colors and `EmptyBehavior` |
+| Styles tab | `StylesController.cs`, `StylesRepository.cs` | First-class style entity with Add/Delete/Rename + color picker |
+| Views tab | `ViewsController.cs`, `ViewsRepository.cs` | Per-view colors, `ShowWarning`, `EmptyBehavior`, dynamic style filter |
+| Categories tab | `CategoriesController.cs`, `CategoriesRepository.cs` | Reference Add/Delete grid pattern |
+| Database | `Database.cs` | SQLite schema/migration, shared CRUD helpers (`isTableExist`, `isFieldExist`, `EnsureViewExists`) |
+| Data models | `Categories.cs`, `Characters.cs`, `StyleData.cs` | Domain model classes |
+| Diagnostics | `ThorneLog.cs`, `ThorneArchive.cs` | INI-driven file logger, tiered log retention |
 | Utilities | `ComboBoxItem.cs`, `SortableBindingList.cs` | UI helpers |
 | About dialog | `FormAbout.cs` | Version and credits |
 
@@ -59,8 +64,12 @@ else
 ## Database
 
 - File extension: `.tdb` (Thorne Database / "tome" files)
-- Tables: `timers`, `categories`, `characters`, `settings`
-- All schema changes require migration support in `Database.cs`
+- Core tables: `timers`, `categories`, `characters`, `classes`, `styles`, `miniviews`, `settings`
+  - `styles` — first-class style entity (`ID`, `Name` UNIQUE, `ForeColor`, `BackColor`, `SortOrder`); seeded with Normal/Buff/Pet/Ping/Spawn/Lockout/Character on first run
+  - `miniviews` — per-view configuration (`Name`, `StyleFilter`, `ActiveYn`, `PositionX/Y`, `SortOrder`, `ForeColor`, `BackColor`, `ShowWarning`, `EmptyBehavior`)
+  - `settings` — still holds legacy color columns (`MiniViewNormFore/BuffFore/PingFore`) consumed only by the one-shot `StylesRepository.MigrateUserColorsFromLegacyViews` upgrade path
+- All schema changes require migration support in `Database.cs` (uses `isTableExist` / `isFieldExist` to be idempotent)
+- Startup migrations are **one-shot**: once a table exists, defaults are not re-seeded — user deletions and edits stick
 - Connection string uses relative path to `.tdb` file
 
 ## Build & Release
@@ -100,3 +109,12 @@ Thorne-Timer/
 - **Timer styles**: Timers support multiple display styles (bar, countdown, stopwatch)
 - **Character switching**: Users can switch active character; timers filter by character context
 - **Mini view lifecycle**: Created/destroyed dynamically, always-on-top overlay windows
+- **Feature-specific logic**: Prefer moving feature-specific logic into support classes/controllers/repositories instead of adding more logic directly to `FormMain` when practical.
+- **Tab Management**: For Thorne Timer WinForms tabs, use the hybrid Designer + Controller + Repository pattern: keep base UI controls in the designer for discoverability, move tab behavior into a dedicated controller (e.g. `StylesController`, `ViewsController`, `CategoriesController`), and put SQLite CRUD into a typed repository (e.g. `StylesRepository`, `ViewsRepository`). `Database.cs` stays the home of shared schema, migrations, and helpers.
+- **Style colors**: A style's `ForeColor` is the canonical style color. The main timer grid lightens it for the row tint; mini views use it directly for timer text. When changing style semantics, update both `StylesRepository`/`StylesController` and the main grid row painter.
+- **Migrations**: Make startup migrations idempotent and one-shot. Never re-seed defaults into an existing table — it will undo user deletions.
+- **Mini-view rendering (Classic vs. Thorne)**: Mini views support two interchangeable renderers behind the `IThorneMiniView` interface — **Classic** (`MiniView.cs`, the original `TableLayoutPanel` fixed-layout renderer, kept as the permanent fallback) and **Thorne** (`ThorneView.cs`, the layered-window custom-paint skin engine). `MiniViews.cs` orchestrates both through the interface only (no concrete-type branching); a factory selects the renderer per view based on the `miniviews.RenderEngine` column (`0=Classic`, `1=Thorne`), with a global override that forces Classic as a kill-switch. Engine changes are applied by tear-down/recreate via `RefreshMiniViews`, never a live hot-swap. `RenderEngine` defaults to Classic so existing `.tdb` files are unaffected. Note the two **Classic/Thorne axes are distinct**: `RenderEngine` picks the *painter*, while the per-view `TimePlacement` (Left/Right) only picks the *time-slot side* within the Thorne layout. See `ThorneTimer/Docs/styles-and-views-enhancements.md`.
+
+## Copilot Configuration
+
+- Prefer the latest AI models (e.g., Claude Opus 4.8, Claude Sonnet 4.6) when configuring Copilot custom agents or selecting models.

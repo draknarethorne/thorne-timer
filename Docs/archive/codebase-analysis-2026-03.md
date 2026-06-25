@@ -1,5 +1,7 @@
 # Thorne Timer — Codebase Analysis
 
+> **🗄️ Archived snapshot (March 2026).** This file analyses the pre-v0.5.0 codebase and is kept for historical context. File sizes, line counts, and the "SQL injection" findings are out of date — see `.github/copilot-instructions.md` and `Docs/ROADMAP.md` for the current architecture.
+
 > **Date:** 2026-03-27  
 > **Purpose:** Comprehensive code review to inform architecture decisions
 

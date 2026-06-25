@@ -1,7 +1,9 @@
 # Schema Migration Plan
 
+> **🗄️ Archived proposal — not implemented.** This proposed a `view_timers` junction table, `CustomColors` JSON column, and a `schema_version` table. v0.6.0 took a different path: per-view `ForeColor` / `BackColor` columns directly on `miniviews`, no junction table, idempotent `isTableExist` / `isFieldExist` checks in `Database.cs` instead of a versions table. Retained for reference only.
+
 > **Last Updated:** 2026-03-27  
-> **Related:** [active-views-design.md](./active-views-design.md)
+> **Related:** [active-views-design.md](../../ThorneTimer/Docs/active-views/active-views-design.md)
 
 ---
 

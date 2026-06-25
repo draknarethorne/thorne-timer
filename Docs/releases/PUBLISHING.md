@@ -76,6 +76,14 @@ Update the README.md Version History section with the new version entry:
 - ... etc.
 ```
 
+#### 2a. Create the per-release notes file
+
+Create `Docs/releases/notes/<tag>.md` with the user-facing changelog for this release. The release workflow inlines this file into the GitHub release body at publish time, so:
+
+- The published release is **self-contained** — it does not depend on the README of any branch (including branches you might delete later).
+- One file per tag, e.g. `v0.6.0-beta.md`, `v0.6.0-beta2.md`, `v0.6.0.md`.
+- If no file is found for the tag, the workflow falls back to a link to the commit history, so the release still publishes.
+
 Optionally update `AssemblyInfo.cs` and `.csproj` ApplicationVersion to match:
 
 ```csharp
@@ -88,7 +96,7 @@ Optionally update `AssemblyInfo.cs` and `.csproj` ApplicationVersion to match:
 #### 3. Commit and Push Release Prep
 
 ```bash
-git add README.md
+git add README.md Docs/releases/notes/v0.5.0.md
 git commit -m "chore(release): prepare v0.5.0"
 git push origin main
 ```

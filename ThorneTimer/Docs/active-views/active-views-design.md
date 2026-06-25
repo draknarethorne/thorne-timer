@@ -1,5 +1,16 @@
 # Active Views Design
 
+> **⚠️ Status:** Historical design reference — **partially superseded by v0.6.0**.
+>
+> The v0.6.0 release implemented user-configurable views through a simpler model: the `miniviews` table with `StyleFilter`, per-view `ForeColor` / `BackColor` / `ShowWarning` / `EmptyBehavior` columns, and full Add/Delete CRUD on the Views tab. We did **not** build the proposed `view_timers` junction, `FilterType` enum, or `CustomColors` JSON column.
+>
+> Sections that are **still relevant** for the Phase C maintenance dialog (v0.7.0):
+> - GUI Redesign Foundation
+> - Per-character view ownership concepts
+> - Position tracking model
+>
+> See `Docs/ROADMAP.md` and `ThorneTimer/Docs/roadmap-phase-c-priority.md` for current direction.
+
 > **Status:** Planning  
 > **Last Updated:** 2026-03-27  
 > **Author:** Draknaré Thorne  

@@ -13,6 +13,8 @@
   <a href="#screenshots">Screenshots</a> •
   <a href="#getting-started">Getting Started</a> •
   <a href="#how-it-works">How It Works</a> •
+  <a href="#working-with-timers">Working with Timers</a> •
+  <a href="#faq--troubleshooting">FAQ</a> •
   <a href="#roadmap">Roadmap</a> •
   <a href="#version-history">Versions</a> •
   <a href="#building-from-source">Building</a> •
@@ -48,24 +50,29 @@ Thorne Timer fills that gap. It lives *outside* the game, quietly reading your l
 ## Features
 
 ### 🎯 Timer Overlays (Mini Views)
-Compact, always-on-top windows that float over your game client. Four distinct view types keep your screen organized:
+Compact, always-on-top windows that float over your game client. Views are now **fully user-configurable** — add as many as you need, choose which timer style each one shows, and pick its own colors.
 
-- **Normal** — Standard countdown timers for respawns, cooldowns, and custom events
-- **Buff** — Track buff durations so you never let a key buff drop
-- **Pet** — Dedicated pet-related timers for summoners and beastlords
-- **Ping** — Instant visual notifications for log events (tells, auction alerts, custom triggers)
+Thorne Timer ships with a default set of styles you can edit, rename, or extend:
 
-Each view remembers its position independently — arrange them once and they stay put.
+- **Normal** (yellow) — Standard countdown timers for respawns, cooldowns, and custom events
+- **Buff** (orange) — Track buff durations so you never let a key buff drop
+- **Pet** (lavender) — Dedicated pet-related timers for summoners and beastlords
+- **Ping** (light green) — Instant visual notifications for log events (tells, auction alerts, custom triggers)
+- **Spawn** (cyan) — Respawn timers and named-mob windows
+- **Lockout** (DodgerBlue) — Long-duration raid and instance lockouts
+- **Character** (white) — Per-character overlays such as the active character header
 
-> 📌 **Note:** The four views above are currently fixed defaults. An upcoming update will let you create your own custom views and link them to specific styles, categories, or individual timers — giving you full control over how your overlays are organized.
+Each view remembers its position independently — arrange them once and they stay put. Use the **Styles** and **Views** tabs to add, rename, or delete styles and views, change their colors, and control how empty views display (character name, view name, blank, or hidden).
 
 ### ⏱️ Real-Time Log Parsing
 Point Thorne Timer at your EQ log file and it starts working immediately:
 
 - **Start keywords** trigger timers when specific text appears in your log
 - **End keywords** stop timers early when conditions are met
+- **Multi-keyword matching** — separate phrases with a pipe ( `|` ) to match ANY of them in one timer
 - **Case-sensitive matching** for precision when you need it
 - **Endless mode** for timers that restart automatically
+- **Dependent chains** — stagger a series of timers with the Chain button (Depends On / Depends Delay)
 
 ### 🔊 Voice & Sound Alerts
 Never miss a timer expiration again:
@@ -75,11 +82,12 @@ Never miss a timer expiration again:
 - **Adjustable volume and speech rate** — Tune it to your preference
 - **Per-timer audio** — Different sounds for different events
 
-### 📊 Timer Styles
-Each timer has a **Style** (Normal, Buff, Pet, or Ping) that determines which overlay window displays it. This lets you:
+### 📊 Timer Styles (first-class entity)
+Each timer has a **Style** that determines its color and which overlay window displays it. Styles are now a **first-class, user-editable entity** with their own tab — add, rename, recolor, or delete them, and any view filtered on that style updates immediately. Use styles to:
 
 - Separate combat timers from buff tracking
 - Keep ping notifications in their own corner
+- Color-code by raid role, class, or any system you want
 - Organize your screen the way you play
 
 ### 🗂️ Tome System
@@ -104,15 +112,48 @@ Your data lives in a **Tome** (`.tdb` file) — a portable SQLite database that 
 
 ## Screenshots
 
-<!-- 
-  TODO: Add screenshots showing:
-  - Main timer grid with timers configured
-  - Mini view overlays floating over the EQ client
-  - Timer configuration (Style, keywords, duration)
-  - Multiple mini views arranged on screen
--->
+### Main window
 
-*Screenshots coming soon — check back after the next release!*
+The timer grid, tabs, and toolbar &mdash; this is where you build and watch your timers.
+
+<p align="center">
+  <img src="Docs/images/main-grid.png" alt="Main timer grid with timers configured, tabs, and toolbar" width="900">
+</p>
+
+### Styles &amp; Views
+
+Two dedicated tabs let you add, rename, recolor, and delete **styles**, then map them to **views** (overlay windows) &mdash; each view with its own colors, style filter, warning behavior, and empty-state display.
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="Docs/images/styles-tab.png" alt="Styles tab with color pickers and time formats" width="100%"><br/>
+      <sub><b>Styles tab</b> &mdash; colors, time formats, and the style list</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="Docs/images/views-tab.png" alt="Views tab with per-view colors, style filter, and options" width="100%"><br/>
+      <sub><b>Views tab</b> &mdash; per-view colors, style filter, and behavior</sub>
+    </td>
+  </tr>
+</table>
+
+### Configuring a timer
+
+Set the **Start/End keywords** (pipe-separate for multi-keyword matching), **duration**, **style**, and **speech / WAV** alerts.
+
+<p align="center">
+  <img src="Docs/images/timer-config.png" alt="Configuring a timer: keywords, duration, style, and alerts" width="900">
+</p>
+
+### Overlays in action
+
+Compact, always-on-top mini views floating over the EverQuest client &mdash; a couple of examples cropped from live play.
+
+<p align="center">
+  <img src="Docs/images/mini-views-ingame.png" alt="Mini view overlays floating over the EverQuest client" width="600">
+</p>
+
+*(See [`Docs/images/`](Docs/images/) for the full list and naming.)*
 
 ---
 
@@ -125,6 +166,19 @@ Your data lives in a **Tome** (`.tdb` file) — a portable SQLite database that 
 3. Run **`ThorneTimer.exe`**
 
 > 🔄 **Upgrading?** Just extract over your existing folder. Your tome will be migrated automatically — all timers, characters, and settings are preserved.
+
+### ⚠️ First run — "Windows protected your PC"
+
+Thorne Timer is **not yet code-signed**, so the first time you run it Windows SmartScreen (and some antivirus) may warn you about an *unrecognized* app. This is expected for new indie software without a paid signing certificate — it does **not** mean the app is unsafe.
+
+To run it:
+
+1. On the blue **"Windows protected your PC"** dialog, click **More info**.
+2. Click the **Run anyway** button that appears.
+
+You only need to do this once per download. If your antivirus quarantines the EXE, restore it / add an exclusion for the install folder.
+
+> 🔐 **Why the warning?** SmartScreen flags executables that haven't built up "reputation" or aren't signed by a trusted certificate. A signing certificate is on the [roadmap](#roadmap) — until then, you can verify you're running the official build by downloading only from the [Releases](https://github.com/draknarethorne/thorne-timer/releases) page, or by [building from source](#building-from-source) yourself.
 
 ### Requirements
 - Windows with .NET Framework 4.8 (included in Windows 10 1903+)
@@ -141,23 +195,144 @@ Your data lives in a **Tome** (`.tdb` file) — a portable SQLite database that 
 
 ## How It Works
 
-```
-EverQuest Log File
-       │
-       ▼
- ┌─────────────┐     ┌──────────────┐     ┌─────────────────┐
- │  Log Parser  │────▶│ Timer Engine │────▶│  Mini View      │
- │ (real-time)  │     │  (matching)  │     │  Overlays       │
- └─────────────┘     └──────────────┘     │  ┌───────────┐  │
-                            │              │  │  Normal   │  │
-                            ▼              │  │  Buff     │  │
-                     ┌──────────────┐     │  │  Pet      │  │
-                     │ Voice/Sound  │     │  │  Ping     │  │
-                     │   Alerts     │     │  └───────────┘  │
-                     └──────────────┘     └─────────────────┘
+```mermaid
+flowchart LR
+    LOG["EverQuest Log File"] --> PARSER["Log Parser<br/><i>(real-time)</i>"]
+    PARSER --> ENGINE["Timer Engine<br/><i>(keyword matching)</i>"]
+    ENGINE --> ALERTS["Voice / Sound Alerts"]
+    ENGINE --> VIEWS["Mini View Overlays"]
+    VIEWS --> N["Normal"]
+    VIEWS --> B["Buff"]
+    VIEWS --> P["Pet"]
+    VIEWS --> PG["Ping"]
 ```
 
 Thorne Timer reads your EQ log file line by line as new entries appear. When a line matches a timer's **start keyword**, the timer begins counting down. When it matches an **end keyword** (or the duration expires), the timer fires its alert. The overlay windows update in real-time — so whether you're watching one character or four, you always know what's happening.
+
+---
+
+## Working with Timers
+
+This section walks through the everyday building blocks: **keywords**, **scope**, **categories**, **dependent chains**, and the **right-click / toolbar shortcuts**. Every column in the timer grid also has a hover tooltip, so you can learn the UI as you go.
+
+### Keywords & multi-keyword matching
+
+A timer's **Start Keyword** is the text that triggers it; the optional **End Keyword** stops it early. Matching is a simple "does the log line contain this text" check (toggle **Case** for case-sensitive matching).
+
+You can match **several phrases at once** by separating them with a pipe ( `|` ). The timer fires if **any** of the alternatives appears — handy when the game phrases the same event in different ways:
+
+```
+Start Keyword:  Your Lich Sting spell has worn off|Your target resisted the Lich Sting spell
+```
+
+> 💡 The pipe ( `|` ) means **OR**. Type it directly between phrases as shown in the code block above. It works in both the **timer** Start/End Keyword fields and the **category** Start/End Keyword fields. *(In the example tables below, the `|` between code-styled phrases is that same literal separator — it's split out only so the Markdown tables render correctly.)*
+
+### Example: capturing spells cast on *you*
+
+When you log spells, EverQuest writes lines like `Soandso begins to cast a spell.` and effect messages aimed at **YOU**. To track a debuff landing on you and time it out:
+
+| Field | Value |
+|-------|-------|
+| **Name** | `Lich Sting` |
+| **Start Keyword** | `begins to cast a spell on YOU` |
+| **End Keyword** | `Your Lich Sting spell has worn off`&#124;`You feel the effects of Lich Sting wear off` |
+| **Duration** | `0:01:00` (or shorthand `1m`) |
+| **Style** | `Buff` (or a custom debuff style) |
+| **Speech** | `Lich Sting is wearing off` |
+
+The timer starts the instant the cast lands on you and clears as soon as the "worn off" message appears — even if that's before the full minute is up.
+
+### Example: tracking spells cast on *others*
+
+To watch effects on a specific target (a mez, a snare, a charm on your pet's target, etc.), key off the **target's name** plus the spell text. Because names vary, the pipe lets one timer cover several mobs or several wear-off phrasings:
+
+| Field | Value |
+|-------|-------|
+| **Name** | `Mez` |
+| **Start Keyword** | `is enthralled`&#124;`is mesmerized` |
+| **End Keyword** | `is no longer enthralled`&#124;`has broken free`&#124;`is no longer mesmerized` |
+| **Duration** | `0:00:48` |
+| **Style** | `Normal` |
+
+> 💡 Charm is a classic use case: set a **Buff** timer with the charm's land message as the Start Keyword and `Your charm spell has worn off` as the End Keyword so you get a spoken warning the moment your pet is about to turn on you.
+
+### Scope — World vs. Character
+
+The **Scope** column controls *who* a timer belongs to and *when* it counts:
+
+| Scope | Counts when… | Use for |
+|-------|--------------|---------|
+| **World** | Always (shared across all characters) | Spawn windows, raid timers, anything global |
+| **Character** | Only while that character is actively logging; pauses when offline | Buffs, cooldowns tied to one toon |
+| **Character+** | Keeps counting even while the character is offline | Server-tracked recasts (e.g. long item/AA cooldowns) |
+
+### Categories — start/stop groups automatically
+
+A **Category** is a named group of timers that can be switched on or off together by log events. Give the category its own **Start Keyword** (e.g. zoning into a raid zone) to activate all its timers, and an **End Keyword** to deactivate them — optionally checking **Auto Stop** so the end keyword also stops anything currently running. Category keywords support the same pipe ( `|` ) OR-matching as timers.
+
+### Dependent timers & the Chain button
+
+Some events fire in a predictable sequence (a spawn that pops, then re-pops, then re-pops again). Instead of hand-building each link, select a timer and click **Chain** (or right-click → **Chain**):
+
+- It copies the selected timer's keyword, duration, and style
+- Appends the next Roman numeral to the name and speech: `Spawn 20` → `Spawn 20 II` → `Spawn 20 III`
+- Points the new row's **Depends On** at the previous one and applies the default **Depends Delay**
+
+Because the new row becomes the selection, clicking **Chain** again extends the series. At runtime each link only starts after the one it depends on has run for its **Depends Delay** (in seconds), so the whole sequence staggers correctly.
+
+You can also wire dependencies by hand: set **Depends On** to another timer's **Name** and **Depends Delay** to the seconds to wait after that timer starts.
+
+### Right-click & toolbar shortcuts
+
+The timer grid toolbar and right-click menu share the same actions (right-clicking first selects the row under the cursor, so the action always applies to the timer you clicked):
+
+| Action | What it does |
+|--------|--------------|
+| **Add** | Insert a new blank timer row |
+| **Duplicate** | Copy the selected timer (great starting point for a variant) |
+| **Chain** | Create the next dependent link in a staggered series (see above) |
+| **Delete** | Remove the selected timer |
+
+> 💡 Click any column header to sort; **Shift+Click** adds a secondary sort column and **Ctrl+Click** removes a column from the sort.
+
+### Real-world timer recipes
+
+These are real timers people run with Thorne Timer — copy the keyword text into your own timers and tweak the names/durations to taste. (Keyword matching ignores who is speaking; it just looks for the text in the log line.)
+
+**Pings — instant "it happened" notifications** (short duration, `Ping` style, no end keyword needed):
+
+| Name | Start Keyword | Duration | Speech |
+|------|---------------|----------|--------|
+| Tell | `tells you, ` | `0:00:05` | *(visual only)* |
+| Snare | `has been ensnared` | `0:00:10` | `Snared` |
+| Big hit | `YOU for` | `0:00:20` | `Ouch, that hurts!` |
+
+**Buffs/effects on you — start on the land message, warn before it drops:**
+
+| Name | Start Keyword | Duration | Style | Speech |
+|------|---------------|----------|-------|--------|
+| OKeil's Radiation | `begin to radiate` | `0:01:25` | `Buff` | `Radiation Dropping` |
+| Shield of Spikes | `is surrounded by a thorny` | `0:04:00` | `Buff` | `Thorns` |
+| Pet Strength | `looks stronger` | `0:29:50` | `Pet` | `Pet Strength Dropping` |
+
+> The buff timers above intentionally have **no end keyword** — they simply run the full duration and warn you as time runs low. Add an end keyword (e.g. `Your <spell> spell has worn off`) only if you also want them to clear early when the buff is removed.
+
+**Multi-keyword spawn timer — one timer, several log phrasings** (note the pipe `|`):
+
+| Name | Start Keyword | Duration | Scope |
+|------|---------------|----------|-------|
+| Spectre | `a spectre died`&#124;`slain a spectre`&#124;`spectre has been slain` | `0:16:00` | `World` |
+
+**Dependent spawn chain — `Sand Giant` re-pops, built with the Chain button:**
+
+| Name | Depends On | Depends Delay | Duration |
+|------|-----------|---------------|----------|
+| Sand Giant | *(none — the first link)* | — | `0:06:30` |
+| Sand Giant II | `Sand Giant` | `30` | `0:06:30` |
+| Sand Giant III | `Sand Giant II` | `30` | `0:06:30` |
+| Sand Giant IV | `Sand Giant III` | `30` | `0:06:30` |
+
+Each link starts 30 seconds after the previous one begins, so a single trigger fans out into a staggered series of respawn windows. You build the whole chain by selecting the first timer and clicking **Chain** three times.
 
 ---
 
@@ -167,8 +342,8 @@ Thorne Timer is evolving into a **complete tactical HUD** for serious multi-boxi
 
 | Phase | Description |
 |-------|-------------|
-| **Current** | Timer styles, mini view overlays, per-timer settings, column persistence, UI polish |
-| **Next** | Custom user-defined views, style-to-view linking, per-character timer collections, configuration dialogs |
+| **Current (v0.6.0 beta)** | User-editable styles & views, per-view colors, camp-out auto-pause, repository/manager refactor, richer Tome Information with sortable lists |
+| **Next (v0.7.0)** | Timer maintenance dialog — separate gameplay view from add/edit/delete, read-only main grid |
 | **Planned** | Class-specific timer profiles, zone-aware timers, global (cross-character) timers |
 | **Future** | Full spell/ability management per class with smart timer automation |
 
@@ -178,38 +353,60 @@ For detailed phase breakdowns, see the [Roadmap](Docs/ROADMAP.md).
 
 ---
 
+## FAQ & Troubleshooting
+
+**"Windows protected your PC" when I run it**
+Thorne Timer isn't code-signed yet — click **More info → Run anyway**. See [First run](#️-first-run--windows-protected-your-pc) above. Only download from the [Releases](https://github.com/draknarethorne/thorne-timer/releases) page.
+
+**My timers never fire**
+- Make sure logging is on in EverQuest: type `/log on` in-game (you'll see *"Logging is now on"*).
+- Confirm the character's **Log File** points at the right `eqlog_<Name>_<server>.txt`, then select that character and click **Start Parsing**.
+- Your **Start Keyword** must be text that actually appears in the log. Open the log in a text editor, find a real line for the event, and copy a unique phrase from it.
+- If you enabled **Case** (case-sensitive), the capitalization must match exactly.
+
+**A timer fires too often / on the wrong thing**
+Your keyword is too generic and matches other lines. Make it more specific (include more of the phrase), or add an **End Keyword** so it stops at the right moment.
+
+**No sound or voice**
+- Check the volume/speech-rate controls and that the timer has a **Speech** string or a **WAV File** selected.
+- Text-to-speech uses the Windows voices installed on your PC. Add more under **Windows Settings → Time & language → Speech**.
+
+**I switched characters and my timers paused**
+That's expected for **Character**-scope timers — they only count while that character is actively logging. Use **World** scope for timers that should always run, or **Character+** to keep counting while offline. See [Scope](#scope--world-vs-character).
+
+**A mini view disappeared / is off screen**
+Mini views are hidden from Alt-Tab by design. Use the mini-view toggle to show them; windows that end up off a disconnected monitor are auto-repositioned to a visible screen on next launch.
+
+**Where is my data stored?**
+In your **Tome** (`.tdb` file) — a portable SQLite database. Back it up by copying the file. Upgrading is safe: extract the new build over the old folder and your tome migrates automatically.
+
+**Does this work outside EverQuest / on other servers?**
+Yes. The parser reads any text-based log file. It's tuned for EverQuest (and tested on Project Quarm / TAKP), but any app that writes log lines can drive timers.
+
+---
+
 ## Version History
 
-**v0.5.0** (June 2025)
+> 📓 Full, per-release changelogs live in [`Docs/releases/notes/`](Docs/releases/notes/) and on the [Releases](https://github.com/draknarethorne/thorne-timer/releases) page. The highlights:
 
-- ✅ Per-character timer state persistence (save/restore across character switches)
-- ✅ Auto character switching via log file detection
-- ✅ Timer Styles system (Normal, Buff, Pet, Ping) with style-driven mini views
-- ✅ Mini view overlays — four always-on-top overlay windows with real-time countdown
-- ✅ Compact view mode for the main timer grid
-- ✅ Class system with 16 EQ class seed data and class filtering
-- ✅ Scope system (World vs Character) replacing legacy categories
-- ✅ DependsOn timer chaining (DependsOnTimer + DependsOnDelay)
-- ✅ Row painting with style-driven colors across grid and mini views
-- ✅ Column width persistence and window state management
-- ✅ Parameterized SQL throughout all database operations
-- ✅ Comprehensive architecture documentation
-- ✅ Multi-column sort with Shift+Click and Ctrl+Click support
-- ✅ Group Sort toggle (Class → Style → Name) with previous-sort restore
-- ✅ Programmatic toolbar icons for all buttons and menu items
-- ✅ Polished About dialog with version, features, runtime info, and GitHub link
-- ✅ Help → Tome Info dialog showing database statistics and file information
+### v0.6.0 — GUI enhancements & architecture cleanup
+- **First-class Styles** — a dedicated Styles tab to add, rename, recolor, and delete styles, with new defaults (Pet, Spawn, Lockout, Character).
+- **User-configurable Views** — add as many overlay windows as you like, each with its own style filter, colors, warning behavior, and empty-state display.
+- **Per-style time formats** — render remaining time as Classic, Long, Adaptive Compact, or Full Compact, in both the grid and mini views.
+- **Multi-keyword matching** — separate phrases with a pipe (`|`) in any Start or End Keyword and the timer fires if *any* alternative appears.
+- **Smarter character handling** — `(None)` character for manual pause, and camp-out auto-pause that switches you to `(None)` on `/camp`.
+- **Richer Tome Information** — timer/catalog counts and per-category/style/class/scope breakdowns with sortable lists.
+- **Newcomer-friendly docs** — per-cell tooltips on every grid, a `Working with Timers` walkthrough, real-world timer recipes, and a player FAQ.
+- **Performance & architecture** — per-entity repositories, FormMain split into focused managers/controllers, and an ~98% faster grid sync on large tomes.
 
-**v0.1.0 – v0.4.0** (2025) _archived_
+### v0.5.0 — Styles, overlays & multi-character
+- Per-character timer state (save/restore across switches) and auto character switching from the log.
+- The Timer Styles system and always-on-top mini-view overlays with real-time countdowns.
+- Scope system (World vs Character), dependent-timer chaining, and multi-column sort.
+- Parameterized SQL throughout, column/window persistence, and a polished About + Tome Info dialog.
 
-- ✅ Core timer engine with start/end keyword matching
-- ✅ Real-time EQ log file parsing (LogMonitor)
-- ✅ Text-to-speech and WAV audio alerts
-- ✅ SQLite database (tome) for timer and settings persistence
-- ✅ Always-on-top overlay windows
-- ✅ CI/CD pipeline with GitHub Actions (build + release workflows)
-- ✅ Code signing support in release workflow
-- ✅ Auto-version injection from git tags into AssemblyInfo.cs
+### v0.1.0 – v0.4.0 _(archived)_
+- The foundation: timer engine with start/end keyword matching, real-time EQ log parsing, text-to-speech and WAV alerts, the SQLite tome, always-on-top overlays, and the GitHub Actions build/release pipeline.
 
 ---
 
@@ -304,9 +501,10 @@ The release workflow will automatically:
 1. **Extract version from tag** (`v0.5.0` → `0.5.0.0`)
 2. **Inject into AssemblyInfo.cs** — the built EXE has the correct version embedded
 3. Build the Release configuration
-4. **Sign the executable** (if signing certificate is configured)
-5. Package all required files into a ZIP
-6. Create a GitHub Release with download links and **auto-generated changelog** from commits since the previous tag
+4. Package all required files into a ZIP
+5. Create a GitHub Release with download links and **auto-generated changelog** from commits since the previous tag
+
+> 🔐 **Code signing is not yet configured.** Released builds are currently **unsigned**, so users see a SmartScreen warning on first run (see [First run](#️-first-run--windows-protected-your-pc)). Adding a signing step to the release workflow is on the [roadmap](#roadmap).
 
 **Versioning:** Use semantic versioning (e.g., `v0.5.0`, `v1.0.0`, `v2.0.0-beta`). Pre-release tags containing `-` are automatically marked as pre-release.
 
@@ -328,3 +526,6 @@ Free to use, modify, and share. Built for the EverQuest community, useful anywhe
   <sub>Built with ☕ for the Project Quarm community by Draknaré Thorne</sub><br/>
   <sub>⚔️ See you in Norrath</sub>
 </p>
+
+
+

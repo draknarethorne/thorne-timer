@@ -21,10 +21,13 @@ jobs:
       id: version
       run: |
         $tag = "${{ github.ref_name }}"
-        # Remove 'v' prefix: v0.1.0 -> 0.1.0
+        # Remove 'v' prefix: v0.1.0 -> 0.1.0, v0.6.0-beta -> 0.6.0-beta
         $version = $tag -replace '^v', ''
-        # Convert to 4-part version: 0.1.0 -> 0.1.0.0
-        $parts = $version -split '\.' | Select-Object -First 3
+        # AssemblyVersion must be purely numeric major.minor.build.revision,
+        # so strip any pre-release suffix (e.g. "-beta", "-rc1") before
+        # splitting. Display/release artifacts keep the full tag.
+        $numeric = $version -replace '-.*$', ''
+        $parts = $numeric -split '\.' | Select-Object -First 3
         while ($parts.Count -lt 4) { $parts += "0" }
         $assemblyVersion = $parts -join '.'
         echo "VERSION=$version" >> $env:GITHUB_OUTPUT
@@ -36,10 +39,13 @@ jobs:
         $file = "ThorneTimer/Properties/AssemblyInfo.cs"
         $content = Get-Content $file -Raw
         $newVersion = "${{ steps.version.outputs.ASSEMBLY_VERSION }}"
+        $displayVersion = "${{ steps.version.outputs.VERSION }}"
         $content = $content -replace 'AssemblyVersion\("[^"]*"\)', "AssemblyVersion(`"$newVersion`")"
         $content = $content -replace 'AssemblyFileVersion\("[^"]*"\)', "AssemblyFileVersion(`"$newVersion`")"
+        # Display version keeps the full tag (e.g. "0.6.0-beta2") for the About dialog.
+        $content = $content -replace 'AssemblyInformationalVersion\("[^"]*"\)', "AssemblyInformationalVersion(`"$displayVersion`")"
         Set-Content $file $content
-        echo "Updated AssemblyInfo.cs to version $newVersion"
+        echo "Updated AssemblyInfo.cs to version $newVersion (display: $displayVersion)"
 
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
@@ -87,35 +93,53 @@ jobs:
     - name: Create ZIP archive
       run: Compress-Archive -Path release-package\* -DestinationPath ThorneTimer-${{ github.ref_name }}.zip
 
+    - name: Compose release body
+      id: body
+      shell: pwsh
+      run: |
+        $tag = "${{ github.ref_name }}"
+        $isPre = $tag -match '-'
+
+        # Per-release notes live in Docs/releases/notes/<tag>.md (committed
+        # at the same SHA as the tag) so the published release body is
+        # self-contained and never relies on the README of a future branch.
+        $notesPath = Join-Path $env:GITHUB_WORKSPACE "Docs/releases/notes/$tag.md"
+        if (Test-Path $notesPath) {
+            $whatsNew = Get-Content $notesPath -Raw
+            Write-Host "Using release notes from $notesPath"
+        } else {
+            $whatsNew = "_Per-release notes were not provided for this tag. See [commit history](https://github.com/draknarethorne/thorne-timer/commits/$tag) for details._"
+            Write-Warning "No release notes file found at $notesPath"
+        }
+
+        # Pre-release banner — only rendered for tags containing '-'.
+        # Kept on a single line so embedded backticks don't conflict with
+        # YAML block-scalar parsing (the previous here-string approach
+        # broke YAML because PowerShell required "@ in column 0).
+        $banner = ""
+        if ($isPre) {
+            $banner = "> :warning: **Pre-release / Beta build.** This release is published for early testing and feedback. It is feature-complete for its target version but may contain rough edges. Please **back up your ``.tdb`` tome file** before upgrading and [report any issues](https://github.com/draknarethorne/thorne-timer/issues) you encounter.`n"
+        }
+
+        # The full release body lives as a separate markdown template so it
+        # can be edited freely without worrying about YAML/PowerShell
+        # quoting. Placeholders are substituted here.
+        $templatePath = Join-Path $env:GITHUB_WORKSPACE ".github/release-body-template.md"
+        $body = Get-Content $templatePath -Raw
+        $body = $body.Replace("{TAG}", $tag)
+        $body = $body.Replace("{BANNER}", $banner)
+        $body = $body.Replace("{WHATSNEW}", $whatsNew)
+
+        $bodyPath = Join-Path $env:RUNNER_TEMP "release-body.md"
+        Set-Content -Path $bodyPath -Value $body -Encoding UTF8
+        "BODY_PATH=$bodyPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+        Write-Host "Composed release body at $bodyPath ($((Get-Item $bodyPath).Length) bytes)"
+
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
       with:
         name: Thorne Timer ${{ github.ref_name }}
-        body: |
-          ## ⚔️ Thorne Timer ${{ github.ref_name }}
-
-          **Your EverQuest companion — real-time log parsing, overlay timers, and voice alerts crafted for the way you play.**
-
-          Thorne Timer watches your log files and turns game events into overlay timers, voice alerts, and notifications — giving you the situational awareness that UI files alone can't provide. Whether you're raiding, soloing, or multi-boxing, it keeps the information you need visible and on screen.
-
-          ---
-
-          ### 📦 Installation
-          1. Download **`ThorneTimer-${{ github.ref_name }}.zip`** below
-          2. Extract to a folder of your choice
-          3. Run **`ThorneTimer.exe`**
-          4. Point it at your EQ log file and you're ready to go
-
-          > 🔄 **Upgrading?** Your tome (`.tdb` database) will be migrated automatically — all your timers, characters, and settings are preserved.
-
-          ### 🖥️ Requirements
-          - Windows with .NET Framework 4.8 (included in Windows 10 1903+)
-          - EverQuest with logging enabled (`/log on`)
-
-          ### 🔗 Links
-          - 📖 [README & Documentation](https://github.com/draknarethorne/thorne-timer#readme)
-          - 🐛 [Report an Issue](https://github.com/draknarethorne/thorne-timer/issues)
-          - 🎨 [Thorne-UI](https://github.com/draknarethorne/thorne-ui) — the companion in-game UI overhaul for TAKP
+        body_path: ${{ steps.body.outputs.BODY_PATH }}
         generate_release_notes: true
         append_body: true
         files: ThorneTimer-${{ github.ref_name }}.zip

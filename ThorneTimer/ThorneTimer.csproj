@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\packages\EntityFramework.6.3.0\build\EntityFramework.props" Condition="Exists('..\packages\EntityFramework.6.3.0\build\EntityFramework.props')" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
@@ -122,14 +122,25 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Categories.cs" />
+    <Compile Include="CategoriesController.cs" />
+    <Compile Include="CategoriesRepository.cs" />
+    <Compile Include="CharactersController.cs" />
+    <Compile Include="CharactersRepository.cs" />
+    <Compile Include="ClassesRepository.cs" />
     <Compile Include="FormTomeInfo.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="FormTomeInfo.Designer.cs">
       <DependentUpon>FormTomeInfo.cs</DependentUpon>
     </Compile>
+    <Compile Include="GridLayoutManager.cs" />
     <Compile Include="LogMonitor.cs" />
+    <Compile Include="MiniViewSettingsManager.cs" />
+    <Compile Include="RecentDatabasesManager.cs" />
     <Compile Include="SoundResolver.cs" />
+    <Compile Include="Styles.cs" />
+    <Compile Include="StylesController.cs" />
+    <Compile Include="StylesRepository.cs" />
     <Compile Include="ThorneArchive.cs" />
     <Compile Include="ThorneLog.cs" />
     <Compile Include="TimerRuntime.cs" />
@@ -167,11 +178,24 @@
     <Compile Include="TimerPlus.cs">
       <SubType>Component</SubType>
     </Compile>
+    <Compile Include="TimersController.cs" />
+    <Compile Include="TimersRepository.cs" />
+    <Compile Include="TimerStateRepository.cs" />
+    <Compile Include="TimerTimeFormatter.cs" />
+    <Compile Include="TomeStatisticsRepository.cs" />
+    <Compile Include="Views.cs" />
+    <Compile Include="ViewsController.cs" />
+    <Compile Include="ViewsRepository.cs" />
+    <Compile Include="VoiceManager.cs" />
+    <Compile Include="WindowPositionManager.cs" />
     <EmbeddedResource Include="FormMain.resx">
       <DependentUpon>FormMain.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="FormAbout.resx">
       <DependentUpon>FormAbout.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="FormTomeInfo.resx">
+      <DependentUpon>FormTomeInfo.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="MiniView.resx">
       <DependentUpon>MiniView.cs</DependentUpon>
@@ -184,16 +208,28 @@
     <None Include="..\.editorconfig">
       <Link>.editorconfig</Link>
     </None>
-    <None Include="Data\ThorneTimer_Draknare.tdb" />
-    <None Include="Data\ThorneTimer_Draknara.tdb" />
-    <None Include="Data\ThorneTimer_P99.tdb" />
-    <None Include="Data\ThorneTimer_THJ.tdb" />
+    <None Include="Data\ThorneTimer-v0.5.0.tdb" />
+    <None Include="Data\ThorneTimer-v0.6.0.tdb" />
+    <None Include="Data\Archive\EQTimer.db" />
+    <None Include="Data\Archive\ThorneTimer_P99.tdb" />
+    <None Include="Data\Archive\ThorneTimer_TAKP.tdb" />
+    <None Include="Data\Archive\ThorneTimer_THJ.tdb" />
     <None Include="Docs\active-views\active-views-design.md" />
-    <None Include="Docs\active-views\codebase-analysis.md" />
-    <None Include="Docs\active-views\schema-migration.md" />
     <None Include="Docs\active-views\technical-debt.md" />
     <None Include="Docs\architecture-redesign.md" />
+    <None Include="Docs\STATUS.md" />
     <None Include="Docs\auto-character-switching.md" />
+    <None Include="Docs\style-combo-sync-bugfix.md" />
+    <None Include="Docs\camp-out-auto-pause.md" />
+    <None Include="Docs\character-scope-timer-pausing.md" />
+    <None Include="Docs\depends-on-chaining-enhancement.md" />
+    <None Include="Docs\multi-keyword-support-feature.md" />
+    <None Include="Docs\mini-view-per-view-colors-plan.md" />
+    <None Include="Docs\mini-view-per-view-colors-progress.md" />
+    <None Include="Docs\views-grid-completion-phase1.md" />
+    <None Include="Docs\roadmap-phase-c-priority.md" />
+    <None Include="Docs\styles-and-views-enhancements.md" />
+    <None Include="Docs\styles-and-views-enhancements-progress.md" />
     <None Include="ThorneTimer.pfx" />
     <None Include="packages.config" />
     <None Include="Properties\app.manifest" />

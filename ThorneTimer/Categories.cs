@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace ThorneTimer
 {
-    class Categories
+    public class Categories
     {
         public class GridData
         {

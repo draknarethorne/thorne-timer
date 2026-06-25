@@ -879,3 +879,9 @@ The Watcher concept lives here as a north star — ensuring that architectural d
 8. **ClassID=0 covers cross-class shared timers**: Common buff timers (POTG, AEGO) that any class can receive use ClassID=0 (Global) + Scope=Character. Each character independently tracks their countdown and activation state. Multi-class (but not all-class) timer associations deferred — ClassID=0 handles the common cases, and the user can keep such timers visible and manually toggle them per-character.
 
 9. **Toolbar for runtime controls, menu for configuration**: Auto-Switch and Show All Classes are toolbar buttons because they're runtime mode switches toggled while playing. They remain useful post-Phase E (entity dialogs) as permanent toolbar controls. Settings that are "set once" remain in menus/dialogs.
+
+
+---
+
+## 11. Camp-Out Auto-Pause (v0.6.0)
+
