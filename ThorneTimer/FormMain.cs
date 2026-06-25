@@ -1350,7 +1350,8 @@ namespace ThorneTimer
 
         void GrdTimers_DataError(object sender, DataGridViewDataErrorEventArgs e)
         {
-            // (No need to write anything in here)
+            ThorneLog.Warn($"Timers grid data error at ({e.RowIndex}, {e.ColumnIndex}): {e.Exception?.Message ?? "Unknown"}");
+            e.ThrowException = false;
         }
 
         void GrdTimers_EditingControlShowing(object sender, DataGridViewEditingControlShowingEventArgs e)
@@ -1411,6 +1412,34 @@ namespace ThorneTimer
                     e.ToolTipText = "Controls whether this timer participates in log-file keyword matching.";
                     break;
 
+                case "StartKeyword":
+                    e.ToolTipText = "Text that starts this timer when it appears in the log.\nSeparate multiple alternatives with a pipe ( | ) to match ANY of them.\nExample: You begin casting|begins to cast a spell on YOU";
+                    break;
+
+                case "EndKeyword":
+                    e.ToolTipText = "Optional text that stops this timer early when it appears in the log.\nSeparate multiple alternatives with a pipe ( | ) to match ANY of them.\nLeave blank to let the timer run for its full duration.";
+                    break;
+
+                case "Duration":
+                    e.ToolTipText = "How long the timer runs once started.\nAccepts HH:MM:SS or shorthand like 90 (seconds), 5m, or 1h30m.";
+                    break;
+
+                case "Remaining":
+                    e.ToolTipText = "Live time left while the timer is running.\nDisplay format is controlled by the timer's Style (Styles tab).";
+                    break;
+
+                case "Speech":
+                    e.ToolTipText = "Text spoken aloud (text-to-speech) when the timer fires.\nLeave blank for no spoken alert.";
+                    break;
+
+                case "WAVFile":
+                    e.ToolTipText = "Optional sound file played when the timer fires.\nUse the WAV button to browse for a file.";
+                    break;
+
+                case "Count":
+                    e.ToolTipText = "How many times this timer has fired for the active character.";
+                    break;
+
                 case "CaseYn":
                     e.ToolTipText = "When checked, keyword matching is case-sensitive.";
                     break;
@@ -1425,6 +1454,14 @@ namespace ThorneTimer
 
                 case "CategoryID":
                     e.ToolTipText = "Logical grouping for this timer. Categories with Start/End Keywords\ncan automatically activate or deactivate all their timers\nbased on log events (e.g. entering or leaving a zone).";
+                    break;
+
+                case "DependsOnTimer":
+                    e.ToolTipText = "Optional dependency by timer name. This timer can only start\nafter a matching running timer has satisfied Depends Delay.\nTip: use the Chain button (or right-click > Chain) to build a\nstaggered series automatically (e.g. Spawn -> Spawn II -> Spawn III).";
+                    break;
+
+                case "DependsOnDelay":
+                    e.ToolTipText = "Delay in seconds before dependency is considered satisfied.\nExample: 1.5 waits 1.5 seconds after Depends On timer starts.";
                     break;
             }
         }
@@ -1454,7 +1491,7 @@ namespace ThorneTimer
 
             grdTimers.Columns["ActiveYn"].SortMode = DataGridViewColumnSortMode.Programmatic;
             grdTimers.Columns["Name"].SortMode = DataGridViewColumnSortMode.Programmatic;
-            grdTimers.Columns["Count"].SortMode = DataGridViewColumnSortMode.NotSortable;
+            grdTimers.Columns["Count"].SortMode = DataGridViewColumnSortMode.Programmatic;
             grdTimers.Columns["CategoryID"].SortMode = DataGridViewColumnSortMode.Programmatic;
             grdTimers.Columns["Style"].SortMode = DataGridViewColumnSortMode.Programmatic;
             grdTimers.Columns["ClassID"].SortMode = DataGridViewColumnSortMode.Programmatic;
@@ -1465,11 +1502,11 @@ namespace ThorneTimer
             grdTimers.Columns["WAVFile"].SortMode = DataGridViewColumnSortMode.NotSortable;
             grdTimers.Columns["Speech"].SortMode = DataGridViewColumnSortMode.NotSortable;
             grdTimers.Columns["Duration"].SortMode = DataGridViewColumnSortMode.Programmatic;
-            grdTimers.Columns["Remaining"].SortMode = DataGridViewColumnSortMode.NotSortable;
-            grdTimers.Columns["CaseYn"].SortMode = DataGridViewColumnSortMode.NotSortable;
-            grdTimers.Columns["EndlessYn"].SortMode = DataGridViewColumnSortMode.NotSortable;
+            grdTimers.Columns["Remaining"].SortMode = DataGridViewColumnSortMode.Programmatic;
+            grdTimers.Columns["CaseYn"].SortMode = DataGridViewColumnSortMode.Programmatic;
+            grdTimers.Columns["EndlessYn"].SortMode = DataGridViewColumnSortMode.Programmatic;
             grdTimers.Columns["DependsOnTimer"].SortMode = DataGridViewColumnSortMode.Programmatic;
-            grdTimers.Columns["DependsOnDelay"].SortMode = DataGridViewColumnSortMode.NotSortable;
+            grdTimers.Columns["DependsOnDelay"].SortMode = DataGridViewColumnSortMode.Programmatic;
             grdTimers.Columns["StartStop"].SortMode = DataGridViewColumnSortMode.NotSortable;
         }
 
@@ -1642,6 +1679,7 @@ namespace ThorneTimer
             grdTimers.Columns[9].MinimumWidth = 60;
             grdTimers.Columns[9].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             grdTimers.Columns[9].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCellsExceptHeader;
+            grdTimers.Columns[9].DefaultCellStyle.Format = "0.##";
 
             DataGridViewCheckBoxColumn chkCaseYn = new DataGridViewCheckBoxColumn
             {
@@ -1881,9 +1919,6 @@ namespace ThorneTimer
             viewsController = new ViewsController(viewsRepository, stylesRepository, OnViewsChanged);
             viewsController.Initialize(grdViews);
 
-            // Wire up data error handler to suppress combo-box validation errors
-            // during transient sync issues (e.g., when style combo items are being refreshed)
-            grdViews.DataError += GrdViews_DataError;
         }
 
         private void OnViewsChanged()
@@ -1930,19 +1965,6 @@ namespace ThorneTimer
             }
             if (col.Items.Count == 0)
                 col.Items.Add("Normal");
-        }
-
-        /// <summary>
-        /// Handles DataGridView errors on the Views grid (e.g., combo box value mismatches).
-        /// Suppresses the error dialog and optionally logs the error for diagnostics.
-        /// Combo-box errors typically occur during transient sync issues when the combo items
-        /// list is being refreshed after style additions/deletions.
-        /// </summary>
-        private void GrdViews_DataError(object sender, DataGridViewDataErrorEventArgs e)
-        {
-            ThorneLog.Warn($"Views grid data error at ({e.RowIndex}, {e.ColumnIndex}): {e.Exception?.Message ?? "Unknown"}");
-            // Suppress the error dialog by setting ThrowException to false
-            e.ThrowException = false;
         }
 
         void grdViews_CellToolTipTextNeeded(object sender, DataGridViewCellToolTipTextNeededEventArgs e)

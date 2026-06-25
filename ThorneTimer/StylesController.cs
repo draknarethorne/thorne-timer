@@ -39,7 +39,7 @@ namespace ThorneTimer
         public void Reload()
         {
             if (grid == null) return;
-            grid.DataSource = repository.GetStyles();
+            grid.DataSource = new SortableBindingList<StyleData>(repository.GetStyles());
         }
 
         public void AddStyle()
@@ -137,12 +137,22 @@ namespace ThorneTimer
             grid.Columns["SortOrder"].DataPropertyName = "SortOrder";
             grid.Columns["SortOrder"].Visible = false;
 
+            grid.Columns["ID"].SortMode = DataGridViewColumnSortMode.NotSortable;
+            grid.Columns["Name"].SortMode = DataGridViewColumnSortMode.Automatic;
+            grid.Columns["ForeColor"].SortMode = DataGridViewColumnSortMode.Automatic;
+            grid.Columns["BackColor"].SortMode = DataGridViewColumnSortMode.Automatic;
+            grid.Columns["Example"].SortMode = DataGridViewColumnSortMode.NotSortable;
+            grid.Columns["TimeFormat"].SortMode = DataGridViewColumnSortMode.Automatic;
+            grid.Columns["SortOrder"].SortMode = DataGridViewColumnSortMode.NotSortable;
+
             grid.CellPainting += Grid_CellPainting;
             grid.CellFormatting += Grid_CellFormatting;
             grid.CellClick += Grid_CellClick;
             grid.RowValidating += Grid_RowValidating;
             grid.CurrentCellDirtyStateChanged += Grid_CurrentCellDirtyStateChanged;
             grid.CellValueChanged += Grid_CellValueChanged;
+            grid.CellToolTipTextNeeded += Grid_CellToolTipTextNeeded;
+            grid.DataError += Grid_DataError;
         }
 
         public void Dispose()
@@ -160,6 +170,8 @@ namespace ThorneTimer
             grid.RowValidating -= Grid_RowValidating;
             grid.CurrentCellDirtyStateChanged -= Grid_CurrentCellDirtyStateChanged;
             grid.CellValueChanged -= Grid_CellValueChanged;
+            grid.CellToolTipTextNeeded -= Grid_CellToolTipTextNeeded;
+            grid.DataError -= Grid_DataError;
         }
 
         private void Grid_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
@@ -271,6 +283,41 @@ namespace ThorneTimer
             };
 
             repository.SaveStyle(style);
+        }
+
+        private void Grid_DataError(object sender, DataGridViewDataErrorEventArgs e)
+        {
+            ThorneLog.Warn($"Styles grid data error at ({e.RowIndex}, {e.ColumnIndex}): {e.Exception?.Message ?? "Unknown"}");
+            e.ThrowException = false;
+        }
+
+        private void Grid_CellToolTipTextNeeded(object sender, DataGridViewCellToolTipTextNeededEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
+
+            string colName = grid.Columns[e.ColumnIndex].Name;
+            switch (colName)
+            {
+                case "Name":
+                    e.ToolTipText = "Style name. Assign it to a timer (Style column) and to a view\n(Views tab > Style filter) to route that timer to that overlay.";
+                    break;
+
+                case "ForeColor":
+                    e.ToolTipText = "Color of the timer text in mini views. Click to pick a color.\nThe main grid uses a lightened tint of this color for the row.";
+                    break;
+
+                case "BackColor":
+                    e.ToolTipText = "Base color used when blending this style's row tint.\nClick to pick a color.";
+                    break;
+
+                case "Example":
+                    e.ToolTipText = "Live preview of how a remaining time looks with the selected\nText Color and Time Format.";
+                    break;
+
+                case "TimeFormat":
+                    e.ToolTipText = "How remaining time is displayed for this style:\nClassic (1:23:45), Long (1h 23m 45s), Adaptive Compact (1h 23m),\nor Full Compact (45s). Applies in mini views and the main grid.";
+                    break;
+            }
         }
 
         private static TimeFormat ParseTimeFormat(object value)

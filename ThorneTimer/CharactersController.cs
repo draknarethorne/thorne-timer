@@ -46,7 +46,7 @@ namespace ThorneTimer
         public void Reload()
         {
             if (grid == null) return;
-            grid.DataSource = CharactersRepository.GetCharacters(repository.Con);
+            grid.DataSource = new SortableBindingList<Characters.GridData>(CharactersRepository.GetCharacters(repository.Con));
         }
 
         public void SaveAll()
@@ -74,7 +74,7 @@ namespace ThorneTimer
                 MiniViewX = 100,
                 MiniViewY = 100
             });
-            grid.DataSource = data;
+            grid.DataSource = new SortableBindingList<Characters.GridData>(data);
 
             grid.CurrentCell = grid.Rows[grid.Rows.Count - 1].Cells[grid.Columns["Name"].Index];
             grid.BeginEdit(true);
@@ -116,23 +116,28 @@ namespace ThorneTimer
             grid.Columns.Add("ID", "ID");
             grid.Columns["ID"].DataPropertyName = "ID";
             grid.Columns["ID"].Visible = false;
+            grid.Columns["ID"].SortMode = DataGridViewColumnSortMode.NotSortable;
 
             grid.Columns.Add("Name", "Name");
             grid.Columns["Name"].DataPropertyName = "Name";
             grid.Columns["Name"].FillWeight = 100;
+            grid.Columns["Name"].SortMode = DataGridViewColumnSortMode.Automatic;
 
             grid.Columns.Add("LogFile", "Log File");
             grid.Columns["LogFile"].DataPropertyName = "LogFile";
             grid.Columns["LogFile"].Width = 600;
             grid.Columns["LogFile"].FillWeight = 300;
+            grid.Columns["LogFile"].SortMode = DataGridViewColumnSortMode.Automatic;
 
             grid.Columns.Add("MiniViewX", "MiniViewX");
             grid.Columns["MiniViewX"].DataPropertyName = "MiniViewX";
             grid.Columns["MiniViewX"].Visible = false;
+            grid.Columns["MiniViewX"].SortMode = DataGridViewColumnSortMode.NotSortable;
 
             grid.Columns.Add("MiniViewY", "MiniViewY");
             grid.Columns["MiniViewY"].DataPropertyName = "MiniViewY";
             grid.Columns["MiniViewY"].Visible = false;
+            grid.Columns["MiniViewY"].SortMode = DataGridViewColumnSortMode.NotSortable;
 
             var cboCharClass = new DataGridViewComboBoxColumn
             {
@@ -148,6 +153,7 @@ namespace ThorneTimer
             grid.Columns.Add(cboCharClass);
             grid.Columns["ClassID"].Width = 120;
             grid.Columns["ClassID"].MinimumWidth = 80;
+            grid.Columns["ClassID"].SortMode = DataGridViewColumnSortMode.Automatic;
 
             var buttonLogFile = new DataGridViewButtonColumn
             {
@@ -161,6 +167,7 @@ namespace ThorneTimer
             grid.Columns["LOG"].MinimumWidth = 30;
             grid.Columns["LOG"].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
             grid.Columns["LOG"].Resizable = DataGridViewTriState.False;
+            grid.Columns["LOG"].SortMode = DataGridViewColumnSortMode.NotSortable;
 
             // Explicit visible column ordering
             int ci = 0;
@@ -174,6 +181,8 @@ namespace ThorneTimer
 
             grid.RowValidating += Grid_RowValidating;
             grid.CellClick += Grid_CellClick;
+            grid.CellToolTipTextNeeded += Grid_CellToolTipTextNeeded;
+            grid.DataError += Grid_DataError;
         }
 
         private void UnwireEvents()
@@ -181,6 +190,8 @@ namespace ThorneTimer
             if (grid == null) return;
             grid.RowValidating -= Grid_RowValidating;
             grid.CellClick -= Grid_CellClick;
+            grid.CellToolTipTextNeeded -= Grid_CellToolTipTextNeeded;
+            grid.DataError -= Grid_DataError;
         }
 
         private void Grid_RowValidating(object sender, DataGridViewCellCancelEventArgs e)
@@ -195,6 +206,37 @@ namespace ThorneTimer
             if (e.ColumnIndex != grid.Columns["LOG"].Index) return;
 
             BrowseForLogFile(e.RowIndex);
+        }
+
+        private void Grid_DataError(object sender, DataGridViewDataErrorEventArgs e)
+        {
+            ThorneLog.Warn($"Characters grid data error at ({e.RowIndex}, {e.ColumnIndex}): {e.Exception?.Message ?? "Unknown"}");
+            e.ThrowException = false;
+        }
+
+        private void Grid_CellToolTipTextNeeded(object sender, DataGridViewCellToolTipTextNeededEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
+
+            string colName = grid.Columns[e.ColumnIndex].Name;
+            switch (colName)
+            {
+                case "Name":
+                    e.ToolTipText = "Display name for this character (your choice). Used in the active\ncharacter dropdown and the Character overlay header.";
+                    break;
+
+                case "LogFile":
+                    e.ToolTipText = "Full path to this character's EQ log file\n(e.g. eqlog_Name_server.txt). Click the ... button to browse.";
+                    break;
+
+                case "ClassID":
+                    e.ToolTipText = "Character's class. Timers filtered to a class only appear for\nmatching characters; 'All' timers appear for everyone.";
+                    break;
+
+                case "LOG":
+                    e.ToolTipText = "Browse for this character's EQ log file.";
+                    break;
+            }
         }
 
         private void BrowseForLogFile(int rowIndex)

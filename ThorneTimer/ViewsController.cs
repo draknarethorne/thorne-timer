@@ -33,7 +33,7 @@ namespace ThorneTimer
         public void Reload()
         {
             if (grid == null) return;
-            grid.DataSource = repository.GetViews();
+            grid.DataSource = new SortableBindingList<ViewData>(repository.GetViews());
         }
 
         public void RefreshStyleOptions()
@@ -119,11 +119,13 @@ namespace ThorneTimer
             grid.Columns.Add("ID", "ID");
             grid.Columns["ID"].DataPropertyName = "ID";
             grid.Columns["ID"].Visible = false;
+            grid.Columns["ID"].SortMode = DataGridViewColumnSortMode.NotSortable;
 
             grid.Columns.Add("Name", "Name");
             grid.Columns["Name"].DataPropertyName = "Name";
             grid.Columns["Name"].Width = 200;
             grid.Columns["Name"].FillWeight = 200;
+            grid.Columns["Name"].SortMode = DataGridViewColumnSortMode.Automatic;
 
             var cboStyle = new DataGridViewComboBoxColumn
             {
@@ -143,6 +145,7 @@ namespace ThorneTimer
             grid.Columns["StyleFilter"].Width = 85;
             grid.Columns["StyleFilter"].MinimumWidth = 60;
             grid.Columns["StyleFilter"].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+            grid.Columns["StyleFilter"].SortMode = DataGridViewColumnSortMode.Automatic;
 
             var chkActive = new DataGridViewCheckBoxColumn
             {
@@ -156,6 +159,7 @@ namespace ThorneTimer
             grid.Columns["ActiveYn"].Width = 50;
             grid.Columns["ActiveYn"].MinimumWidth = 50;
             grid.Columns["ActiveYn"].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+            grid.Columns["ActiveYn"].SortMode = DataGridViewColumnSortMode.Automatic;
 
             var chkShowWarning = new DataGridViewCheckBoxColumn
             {
@@ -169,6 +173,7 @@ namespace ThorneTimer
             grid.Columns["ShowWarning"].Width = 90;
             grid.Columns["ShowWarning"].MinimumWidth = 80;
             grid.Columns["ShowWarning"].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+            grid.Columns["ShowWarning"].SortMode = DataGridViewColumnSortMode.Automatic;
 
             var cboEmptyBehavior = new DataGridViewComboBoxColumn
             {
@@ -182,6 +187,7 @@ namespace ThorneTimer
             grid.Columns["EmptyBehavior"].Width = 120;
             grid.Columns["EmptyBehavior"].MinimumWidth = 100;
             grid.Columns["EmptyBehavior"].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+            grid.Columns["EmptyBehavior"].SortMode = DataGridViewColumnSortMode.Automatic;
 
             grid.Columns.Add("PositionX", "PositionX");
             grid.Columns["PositionX"].DataPropertyName = "PositionX";
@@ -208,6 +214,7 @@ namespace ThorneTimer
             grid.CurrentCellDirtyStateChanged += Grid_CurrentCellDirtyStateChanged;
             grid.CellValueChanged += Grid_CellValueChanged;
             grid.CellToolTipTextNeeded += Grid_CellToolTipTextNeeded;
+            grid.DataError += Grid_DataError;
         }
 
         public void Dispose()
@@ -223,6 +230,7 @@ namespace ThorneTimer
             grid.CurrentCellDirtyStateChanged -= Grid_CurrentCellDirtyStateChanged;
             grid.CellValueChanged -= Grid_CellValueChanged;
             grid.CellToolTipTextNeeded -= Grid_CellToolTipTextNeeded;
+            grid.DataError -= Grid_DataError;
         }
 
         private void Grid_RowValidating(object sender, DataGridViewCellCancelEventArgs e)
@@ -249,8 +257,34 @@ namespace ThorneTimer
         private void Grid_CellToolTipTextNeeded(object sender, DataGridViewCellToolTipTextNeededEventArgs e)
         {
             if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
-            if (grid.Columns[e.ColumnIndex].Name != "EmptyBehavior") return;
 
+            string colName = grid.Columns[e.ColumnIndex].Name;
+            switch (colName)
+            {
+                case "Name":
+                    e.ToolTipText = "Name of this overlay window. Shown as the header (and when empty,\ndepending on Empty Behavior).";
+                    return;
+
+                case "StyleFilter":
+                    e.ToolTipText = "Only timers whose Style matches this value appear in this view.\nChange a style on the Styles tab and this list updates automatically.";
+                    return;
+
+                case "ActiveYn":
+                    e.ToolTipText = "When checked, this overlay window is shown. Uncheck to hide it\nwithout deleting it.";
+                    return;
+
+                case "ShowWarning":
+                    e.ToolTipText = "When checked, timers in this view flash a warning color as they\nnear expiry. Turn off for ping/notification views.";
+                    return;
+
+                case "EmptyBehavior":
+                    break; // handled below
+
+                default:
+                    return;
+            }
+
+            // EmptyBehavior: value-specific tooltip
             string cellValue = grid.Rows[e.RowIndex].Cells[e.ColumnIndex].Value?.ToString();
             switch (cellValue)
             {
@@ -270,6 +304,12 @@ namespace ThorneTimer
                     e.ToolTipText = "Controls what displays when view has no active timers";
                     break;
             }
+        }
+
+        private void Grid_DataError(object sender, DataGridViewDataErrorEventArgs e)
+        {
+            ThorneLog.Warn($"Views grid data error at ({e.RowIndex}, {e.ColumnIndex}): {e.Exception?.Message ?? "Unknown"}");
+            e.ThrowException = false;
         }
 
         private void SaveRow(DataGridViewRow row)

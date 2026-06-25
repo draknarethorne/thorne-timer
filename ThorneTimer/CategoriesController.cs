@@ -27,7 +27,7 @@ namespace ThorneTimer
         public void Reload()
         {
             if (grid == null) return;
-            grid.DataSource = repository.GetCategories();
+            grid.DataSource = new SortableBindingList<Categories.GridData>(repository.GetCategories());
         }
 
         public void SaveAll()
@@ -47,7 +47,7 @@ namespace ThorneTimer
             var data = repository.GetCategories();
             var category = new Categories.GridData { ID = -1 };
             data.Add(category);
-            grid.DataSource = data;
+            grid.DataSource = new SortableBindingList<Categories.GridData>(data);
 
             grid.CurrentCell = grid.Rows[grid.Rows.Count - 1].Cells["Name"];
             grid.BeginEdit(true);
@@ -80,21 +80,25 @@ namespace ThorneTimer
             grid.Columns.Add("ID", "ID");
             grid.Columns["ID"].DataPropertyName = "ID";
             grid.Columns["ID"].Visible = false;
+            grid.Columns["ID"].SortMode = DataGridViewColumnSortMode.NotSortable;
 
             grid.Columns.Add("Name", "Name");
             grid.Columns["Name"].DataPropertyName = "Name";
             grid.Columns["Name"].Width = 100;
             grid.Columns["Name"].FillWeight = 100;
+            grid.Columns["Name"].SortMode = DataGridViewColumnSortMode.Automatic;
 
             grid.Columns.Add("StartKeyword", "Start Keyword");
             grid.Columns["StartKeyword"].DataPropertyName = "StartKeyword";
             grid.Columns["StartKeyword"].Width = 300;
             grid.Columns["StartKeyword"].FillWeight = 300;
+            grid.Columns["StartKeyword"].SortMode = DataGridViewColumnSortMode.Automatic;
 
             grid.Columns.Add("EndKeyword", "End Keyword");
             grid.Columns["EndKeyword"].DataPropertyName = "EndKeyword";
             grid.Columns["EndKeyword"].Width = 300;
             grid.Columns["EndKeyword"].FillWeight = 300;
+            grid.Columns["EndKeyword"].SortMode = DataGridViewColumnSortMode.Automatic;
 
             var chkAutoStop = new DataGridViewCheckBoxColumn
             {
@@ -108,20 +112,56 @@ namespace ThorneTimer
             grid.Columns["AutoStop"].Width = 70;
             grid.Columns["AutoStop"].MinimumWidth = 70;
             grid.Columns["AutoStop"].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+            grid.Columns["AutoStop"].SortMode = DataGridViewColumnSortMode.Automatic;
 
             grid.RowValidating += Grid_RowValidating;
+            grid.DataError += Grid_DataError;
+            grid.CellToolTipTextNeeded += Grid_CellToolTipTextNeeded;
         }
 
         private void UnwireEvents()
         {
             if (grid == null) return;
             grid.RowValidating -= Grid_RowValidating;
+            grid.DataError -= Grid_DataError;
+            grid.CellToolTipTextNeeded -= Grid_CellToolTipTextNeeded;
         }
 
         private void Grid_RowValidating(object sender, DataGridViewCellCancelEventArgs e)
         {
             SaveAll();
             categoriesChanged?.Invoke();
+        }
+
+        private void Grid_DataError(object sender, DataGridViewDataErrorEventArgs e)
+        {
+            ThorneLog.Warn($"Categories grid data error at ({e.RowIndex}, {e.ColumnIndex}): {e.Exception?.Message ?? "Unknown"}");
+            e.ThrowException = false;
+        }
+
+        private void Grid_CellToolTipTextNeeded(object sender, DataGridViewCellToolTipTextNeededEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
+
+            string colName = grid.Columns[e.ColumnIndex].Name;
+            switch (colName)
+            {
+                case "Name":
+                    e.ToolTipText = "A logical group of timers (e.g. a zone, raid, or spell set).\nAll timers assigned to this category can be activated or\ndeactivated together by the Start/End Keywords below.";
+                    break;
+
+                case "StartKeyword":
+                    e.ToolTipText = "Log text that ACTIVATES every timer in this category.\nSeparate multiple alternatives with a pipe ( | ) to match ANY of them.\nExample: You have entered Plane of Hate|You have entered The Plane of Fear";
+                    break;
+
+                case "EndKeyword":
+                    e.ToolTipText = "Log text that DEACTIVATES every timer in this category.\nSeparate multiple alternatives with a pipe ( | ) to match ANY of them.\nExample: LOADING, PLEASE WAIT";
+                    break;
+
+                case "AutoStop":
+                    e.ToolTipText = "When checked, the End Keyword also stops any running timers\nin this category (not just deactivates them for matching).";
+                    break;
+            }
         }
 
         private void SaveRow(DataGridViewRow row)
