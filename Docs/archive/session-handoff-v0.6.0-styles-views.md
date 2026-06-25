@@ -5,7 +5,7 @@
 **Build Status:** ✅ Compiles cleanly
 **Release Status:** 🔄 In testing — additional refactoring and bug fixes still expected before tagging v0.6.0
 
-> Companion to `SESSION-HANDOFF-v0.6.0-logmonitor-fix.md` (covers the LogMonitor `selectedCharacterID` vs `IsActive` split).
+> Companion to `session-handoff-v0.6.0-logmonitor-fix.md` (covers the LogMonitor `selectedCharacterID` vs `IsActive` split).
 
 ---
 
@@ -88,7 +88,7 @@ FormMain (UI shell)
 ## Things NOT to Do (lessons baked in)
 
 - **Do not** re-seed `styles` or `miniviews` defaults on subsequent startups. The current `EnsureSchema` is intentionally a one-shot. Reseeding would undo user deletions and was explicitly removed.
-- **Do not** reintroduce the snapshot/restore pattern for background character timers — that approach was reverted (see `SESSION-HANDOFF-v0.6.0-logmonitor-fix.md`). The simple "one active character at a time" model is the v0.6.0 contract.
+- **Do not** reintroduce the snapshot/restore pattern for background character timers — that approach was reverted (see `session-handoff-v0.6.0-logmonitor-fix.md`). The simple "one active character at a time" model is the v0.6.0 contract.
 - **Do not** add new style-aware logic by hardcoding style names in `if`/`switch` blocks. Look up via `StylesRepository`/`StyleData` so users can rename or add styles.
 - **Do not** put new CRUD logic in `FormMain`. Add it to (or extract) a controller + repository pair, following the Styles/Views/Categories model.
 

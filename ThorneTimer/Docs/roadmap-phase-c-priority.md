@@ -8,7 +8,7 @@
 
 ### Current State Issues
 
-The v0.6.0 main form still mixes gameplay with configuration. The character dropdown serves a dual purpose (gameplay + browsing), and Timers / Characters editing happens inline in the same form that displays the active runtime. The previously attempted complex snapshot/restore architecture (background character timer preservation) was **reverted** — the v0.6.0 model is intentionally simple: one active character at a time, with browsing handled as a read-only display concern. See `SESSION-HANDOFF-v0.6.0-logmonitor-fix.md` for the full reversion context.
+The v0.6.0 main form still mixes gameplay with configuration. The character dropdown serves a dual purpose (gameplay + browsing), and Timers / Characters editing happens inline in the same form that displays the active runtime. The previously attempted complex snapshot/restore architecture (background character timer preservation) was **reverted** — the v0.6.0 model is intentionally simple: one active character at a time, with browsing handled as a read-only display concern. See `session-handoff-v0.6.0-logmonitor-fix.md` for the full reversion context.
 
 What remains is the architectural split between **playing** and **maintaining**:
 

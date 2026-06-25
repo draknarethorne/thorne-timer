@@ -372,7 +372,7 @@ This separation enables:
 
 - [auto-character-switching.md](auto-character-switching.md) — LogMonitor design and auto-switch logic
 - [camp-out-auto-pause.md](camp-out-auto-pause.md) — Camp-out detection and "(None)" character state
-- [SESSION-HANDOFF-v0.6.0-logmonitor-fix.md](../../SESSION-HANDOFF-v0.6.0-logmonitor-fix.md) — Complete session context and LogMonitor selected vs. logging fix
+- [session-handoff-v0.6.0-logmonitor-fix.md](../../Docs/archive/session-handoff-v0.6.0-logmonitor-fix.md) — Complete session context and LogMonitor selected vs. logging fix
 
 ---
 

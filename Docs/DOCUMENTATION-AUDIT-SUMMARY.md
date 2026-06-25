@@ -22,7 +22,7 @@ Bring every `.md` file in the repository into alignment with the **actual v0.6.0
 | `.github/copilot-instructions.md` | Architecture table now lists `StylesController/Repository`, `ViewsController/Repository`, `CategoriesController/Repository`, `LogMonitor`, `TimerRuntime`, `ThorneLog`, `ThorneArchive`. Database section lists `styles` and expanded `miniviews` schema. Added Style colors and Migrations bullets. |
 | `ThorneTimer/Docs/mini-view-per-view-colors-plan.md` | Banner: ✅ implemented in v0.6.0; lists where the design diverged from the plan. Will archive at release. |
 | `ThorneTimer/Docs/mini-view-per-view-colors-progress.md` | Banner: ✅ all phases complete. Will archive at release. |
-| `ThorneTimer/Docs/phase1-views-grid-completion.md` | Banner: ✅ superseded — palette values in the file are out of date; current values live in `StylesRepository.SeedDefaultStyles`. Will archive at release. |
+| `ThorneTimer/Docs/views-grid-completion-phase1.md` | Banner: ✅ superseded — palette values in the file are out of date; current values live in `StylesRepository.SeedDefaultStyles`. Will archive at release. |
 | `ThorneTimer/Docs/roadmap-phase-c-priority.md` | Removed reverted snapshot/restore framing. Rewrote "Why v0.6.0 Work Enables This" around the actual building blocks: `LogMonitor.GetActiveCharacterID`, the hybrid Designer + Controller + Repository pattern, and the `isActive` flag. |
 | `ThorneTimer/Docs/active-views/active-views-design.md` | Banner: ⚠️ partially superseded by v0.6.0; called out which sections (GUI Redesign Foundation, ownership) are still useful Phase C input. |
 | `ThorneTimer/Docs/active-views/technical-debt.md` | Banner: TD-001 resolved, TD-002 partially addressed by the v0.6.0 controller extraction. |
@@ -46,7 +46,7 @@ Keep them in place during testing so they're easy to reference; move to `Docs/ar
 
 - `ThorneTimer/Docs/mini-view-per-view-colors-plan.md` (42 KB design doc)
 - `ThorneTimer/Docs/mini-view-per-view-colors-progress.md` (phase tracker)
-- `ThorneTimer/Docs/phase1-views-grid-completion.md` (phase status)
+- `ThorneTimer/Docs/views-grid-completion-phase1.md` (phase status)
 
 ---
 
@@ -60,7 +60,7 @@ Keep them in place during testing so they're easy to reference; move to `Docs/ar
 - `ThorneTimer/Docs/auto-character-switching.md` — accurate
 - `ThorneTimer/Docs/camp-out-auto-pause.md` — accurate
 - `ThorneTimer/Docs/character-scope-timer-pausing.md` — already rewritten in prior audit
-- `SESSION-HANDOFF-v0.6.0-logmonitor-fix.md` — historical handoff, accurate snapshot of that fix
+- `session-handoff-v0.6.0-logmonitor-fix.md` — historical handoff, accurate snapshot of that fix
 - `ThorneTimer/Docs/architecture-redesign.md` — long-term vision (79 KB); the "Current State" section reflects v0.5.0 but the target architecture is still the v0.7.0+ direction. Left as-is; a v0.6.0 status preamble would be nice but is non-blocking.
 
 ---

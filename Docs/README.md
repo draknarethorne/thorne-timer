@@ -5,7 +5,13 @@
 
 ---
 
-## 🚀 START HERE
+> 👤 **Just want to use the app?** Start with the main [**project README**](../README.md) — it covers
+> install, the first-run security warning, working with timers (with real examples), and an FAQ.
+> The documents in this folder are **contributor/maintainer** material (release process, roadmap, design history).
+
+---
+
+## 🚀 START HERE (contributors)
 
 ### **[VERSION-MANAGEMENT.md](VERSION-MANAGEMENT.md)** 📋
 How we version, tag, and release Thorne Timer. Read this before creating any release.
@@ -21,28 +27,32 @@ Detailed development roadmap with phase breakdowns and future plans.
 ## Directory Structure
 
 ### `archive/` 🗄️
-Historical design documents and superseded proposals — retained for context but no longer reflect the current architecture. Useful for understanding why certain paths were chosen (or rejected).
+Historical design documents, superseded proposals, and past session-handoff notes — retained for context but no longer reflecting the current architecture. Useful for understanding why certain paths were chosen (or rejected).
+
+### `images/` 🖼️
+Screenshots referenced by the main [README](../README.md). See [`images/README.md`](images/README.md) for the expected file names and capture guidelines.
+
+### `perf/` ⚡
+Performance investigation and refactor write-ups (e.g. the grid-filter refactor).
 
 ### `releases/` 📦
-Release process documentation, templates, and checklists.
+Release process documentation, templates, and per-version notes.
 
 **Start with** `releases/PUBLISHING.md` for the complete release workflow.
 
 Includes:
 - Publishing guide (step-by-step release process)
-- Release checklist template (reusable per-version)
-- Release notes template (for manual or enhanced notes)
+- Release checklist + notes templates (reusable per-version)
+- `releases/notes/` — the per-version changelog entries
 
 ### `../ThorneTimer/Docs/` 🔧
-Internal architecture and technical design documentation.
+Internal architecture and technical design documentation. See [`STATUS.md`](../ThorneTimer/Docs/STATUS.md) for an index of what is planned, in progress, implemented, or historical.
 
 Includes:
-- Architecture redesign notes
-- Auto character switching design
-- Active views design (partially superseded by v0.6.0)
-- Phase C maintenance dialog priority
-- Per-view color implementation notes (banner-marked, archived after v0.6.0 release)
-- Technical debt tracking
+- Architecture redesign notes and the long-term MVP roadmap
+- Feature design docs (auto character switching, camp-out auto-pause, character-scope pausing)
+- Styles & views enhancement spec + progress tracker
+- Active-views design and technical-debt tracking
 
 ---
 

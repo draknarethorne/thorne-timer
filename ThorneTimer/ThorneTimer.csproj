@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\packages\EntityFramework.6.3.0\build\EntityFramework.props" Condition="Exists('..\packages\EntityFramework.6.3.0\build\EntityFramework.props')" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
@@ -215,19 +215,21 @@
     <None Include="Data\Archive\ThorneTimer_TAKP.tdb" />
     <None Include="Data\Archive\ThorneTimer_THJ.tdb" />
     <None Include="Docs\active-views\active-views-design.md" />
-    <None Include="Docs\active-views\codebase-analysis.md" />
-    <None Include="Docs\active-views\schema-migration.md" />
     <None Include="Docs\active-views\technical-debt.md" />
     <None Include="Docs\architecture-redesign.md" />
+    <None Include="Docs\STATUS.md" />
     <None Include="Docs\auto-character-switching.md" />
-    <None Include="Docs\BUG-FIX-SUMMARY-v0.6.0-style-combo-sync.md" />
+    <None Include="Docs\style-combo-sync-bugfix.md" />
     <None Include="Docs\camp-out-auto-pause.md" />
     <None Include="Docs\character-scope-timer-pausing.md" />
-    <None Include="Docs\depends-on-chaining-enhancement.md" />\r\n    <None Include="Docs\FEATURE-multi-keyword-support.md" />\r\n    <None Include="Docs\styles-and-views-enhancements-progress.md" />\r\n    <None Include="Docs\mini-view-per-view-colors-plan.md" />
+    <None Include="Docs\depends-on-chaining-enhancement.md" />
+    <None Include="Docs\multi-keyword-support-feature.md" />
+    <None Include="Docs\mini-view-per-view-colors-plan.md" />
     <None Include="Docs\mini-view-per-view-colors-progress.md" />
-    <None Include="Docs\phase1-views-grid-completion.md" />
+    <None Include="Docs\views-grid-completion-phase1.md" />
     <None Include="Docs\roadmap-phase-c-priority.md" />
     <None Include="Docs\styles-and-views-enhancements.md" />
+    <None Include="Docs\styles-and-views-enhancements-progress.md" />
     <None Include="ThorneTimer.pfx" />
     <None Include="packages.config" />
     <None Include="Properties\app.manifest" />
