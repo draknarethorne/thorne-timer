@@ -67,7 +67,7 @@ Quality of life improvements, critical bug fixes, per-view color configuration, 
 **Also delivered in the v0.6.0 final polish:**
 - Per-style time formats (Classic / Long / Adaptive Compact / Full Compact)
 - Pipe-separated multi-keyword (OR) matching for timer and category keywords
-joining the Styles/Views/Categories pattern. This was the stated maintenance-dialog prerequisite — it is now done.
+- **Controller/repository extraction** — `TimersController` + `TimersRepository` and `CharactersController` + `CharactersRepository` extracted from `FormMain`, joining the Styles/Views/Categories pattern. This was the stated maintenance-dialog prerequisite — it is now done.
 - **Timer Duplicate + dependent-chain authoring** — one-click clone and Roman-numeral chain extension live in `TimersController`
 - **`db_meta` version-stamp table** — records `CreatedByVersion`, `LastWrittenByVersion`, `SchemaVersion`, `LastWrittenAtUtc`; stamped on every `Database.Open()`
 - **Tome Information dialog** (`FormTomeInfo` + `TomeStatisticsRepository`) — read-only summary of the active tome (catalog counts, version provenance) cross-cutting the `timers`, `characters`, `categories`, `styles`, `miniviews`, `classes`, `timer_runtime_state`, and `db_meta` tables
@@ -75,15 +75,13 @@ joining the Styles/Views/Categories pattern. This was the stated maintenance-dia
 - Per-cell tooltips across every configuration grid
 - Newcomer-focused README (recipes, FAQ, SmartScreen guidance, screenshots, Mermaid flow)
 
-**Why the GUI Pivot:**
-
 ---
 
 ## 🎯 Audience & Guiding Principles
 
 Thorne Timer is built primarily for **solo and small-group players** (not raid-coordination tools). Optimization priorities derive from that audience:
 
-1. **Timer authoring pain is the #1 user pain** — adding timers when leveling new spells, setting up spawn timers in a new zone, figuring out keywords and durations. Several phases below attack this wound from different angles.
+keywords and durations. Several releases below attack this wound from different angles.
 2. **Configuration data lives in the right place** — per-character / per-timer / per-style data lives in the `.tdb` tome; preferences, hotkeys, recent files, transient runtime state can live in INI.
 3. **Overlays should feel native to the EQ UI** — borders, padding, fonts, and color should be skinnable to match the player's chosen EQ UI (Vert, Drakah's, Project Quarm defaults, etc.) rather than forcing a single Thorne Timer look.
 4. **The core feature is timers — feeds and synthesis are additive output modes, not a chat-client substitute.** Captured events should be *transformed* (extract item + price), not echoed verbatim. If the user wants raw log, Notepad++ tail mode already exists.
@@ -97,14 +95,7 @@ Thorne Timer is built primarily for **solo and small-group players** (not raid-c
 
 The single biggest player pain: **adding and fine-tuning timers takes too long.** This is the
 highest-value gameplay work — it makes every timer you'll ever create faster and more accurate.
-This phase makes authoring feel fast and forgiving.
-
-> **Re-sequenced for player value (v0.7.0-dev planning).** The roadmap is now ordered by *what
-> brings the most value to a player at the keyboard*, not by internal architecture. The **Timer
-> Maintenance Dialog** (formerly the v0.7.0 priority) is **deferred to post-1.0** — the current
-> single-grid + auto-switch workflow is finely tuned and works well, so the dual-grid refactor is
-> a *nice-to-have* we'll revisit only if adoption grows enough to justify it. See
-> [Post-1.0 / Promote-on-Adoption](#-post-10--promote-on-adoption).
+This release makes authoring feel fast and forgiving.
 
 > **Already shipped (foundation laid in v0.6.0):** pipe-delimited multi-keyword (OR) matching and the one-click **Duplicate** button both landed early in `TimersController`. The remaining authoring work builds on top of them.
 
@@ -123,8 +114,8 @@ This phase makes authoring feel fast and forgiving.
 
 **Diagnostics:**
 - **Per-timer trigger history (ring buffer)** — in-memory last-N triggers per timer with timestamp and matched line, viewable via right-click → "Trigger history". Makes "did my timer actually fire?" answerable without re-reading the log.
-consistently" without any new parsing — it's just aggregation on data you already have. Foundation for the Personal Play Statistics release.
-No new parsing code; statistics fall out of writing timers. This is the architectural unlock for the Personal Play Statistics release.
+- **Per-timer fire-rate stats** — triggers/hour, last-fired timestamp, and average interval between fires, surfaced alongside the trigger history. Reveals "this timer never actually completes its cooldown" or "this buff drops 4s early consistently" without any new parsing — it's just aggregation on data you already have. Foundation for the Personal Play Statistics release.
+- **Capture-group `aggregate` modifier** — when a capture group is marked `aggregate=true` (e.g. `{damage:aggregate}`), the runtime rolls min / max / avg / count into per-timer stats. No new parsing code; statistics fall out of writing timers. This is the architectural unlock for the Personal Play Statistics release.
 
 **Reliability & data-safety riding along (the 1.0 quality bar):**
 Small, high-trust fixes shipped opportunistically alongside the authoring work — none require the deferred maintenance dialog:
@@ -132,19 +123,13 @@ Small, high-trust fixes shipped opportunistically alongside the authoring work �
 - **`(auto)` status indicator is always accurate** — re-enabling auto-switch reliably restores the indicator (issue #7).
 - **Compact/full toggle preserves window position** — toggling view modes no longer throws the window off-screen (issue #26).
 - **Periodic auto-save of timer state** — crash / power-loss protection by flushing runtime state on a timer, building on the existing `TimerStateRepository` (issue #23).
-- **Auto-archive `.tdb` on detected upgrade** — finish the data-safety add-on (relocated from the deferred maintenance-dialog work): snapshot the tome before migrations
+- **Auto-archive `.tdb` on detected upgrade** — finish the data-safety add-on (relocated from the deferred maintenance-dialog work): snapshot the tome before migrations when the stamped `LastWrittenByVersion` is older than the running build. The `db_meta` stamp and `BackupDatabase` plumbing already shipped in v0.6.0; only the upgrade-detection trigger remains.
 
 ### Spell Library & Templates — v0.8.0 📚 **NEW**
 
 Direct attack on the "new spell → new timer" pain. Eliminate the most repetitive part of authoring entirely.
 
-> **Player-value framing & scope:** this phase is an *accelerator*, not a 1.0 requirement.
-> The authoring release already makes hand-authoring fast; the spell library makes the common "I just learned
-> a new spell" case nearly automatic. **Treat the bundled spell data as optional** — Thorne Timer
-> stays fully usable without it. A **PDQ/Project Quarm `.sql` dump with spell data is already on
-> hand** as a candidate seed source, so the effort is mostly *import + UI*, not data collection
-> from scratch. Ship the smallest useful slice first (searchable "Add timer from spell" dialog
-> backed by a seeded `spells` table — issue #27) and grow packs from there.
+> **Scope:** this is an *accelerator*, not a 1.0 requirement — the authoring release already makes hand-authoring fast, and Thorne Timer stays fully usable without any bundled spell data. A PDQ/Project Quarm `.sql` dump is already on hand as a seed source, so the work is mostly *import + UI*. Ship the smallest useful slice first (a searchable "Add timer from spell" dialog — issue #27) and grow packs from there.
 
 **Spell library:**
 - **Bundled EQ spell database** — JSON / SQLite snapshot of spell data (name, duration, target type, recast, level by class). Shipped with the app; refreshable. **Candidate seed source already in hand:** a PDQ/Project Quarm `.sql` dump (see issue #27 — "seed spells table from .sql dump"). Other sources (Lucy, Allakhazam exports) where licensing permits, or community-contributed JSON.
@@ -177,9 +162,9 @@ Make overlays feel like part of the EQ UI rather than alien windows on top of it
 
 ### Feed Views & Log Synthesis — v0.10.0 📜 **NEW**
 
-Introduces a second view type alongside countdown timers
+Introduces a second view type alongside countdown timers: a **scrolling, transformed event feed**. The killer example: vendor sale prices appear as `Rusty Short Sword — 1p 2g` next to the merchant window, optionally spoken as "one platinum two gold".
 
-**Why this fits here:** depends on capture groups (parsing) from the authoring release and the skinning release's readable styling. Strengthens the "timers are core, feeds are additive" boundary.
+**Why it lands here:** it builds directly on the authoring release's capture groups (parsing) and the theming release's readable styling, and it reinforces the "timers are core, feeds are additive" boundary.
 
 **New view type:**
 - **`ViewType` column on `miniviews`** — `Timers` (current behavior) or `Feed` (new). Existing views default to `Timers`; backwards compatible.
@@ -207,9 +192,9 @@ Introduces a second view type alongside countdown timers
 
 ### Directional Speech & Ping Refactor — v0.11.0
 
-Centralize the Ping timer execution model
+Centralize the Ping timer execution model and eliminate hardcoded branch points. **Pushed later** because it's internal cleanup with no user-visible benefit — the authoring, spell-library, and theming releases deliver more user value first.
 
-- Refactor `StartTimer` / `StopTimer` / `ResetTimer` to handle Ping via directional speech pattern
+- Refactor `StartTimer` / `StopTimer` / `ResetTimer` to handle Ping via the directional speech pattern
 - Eliminate `|| PingTimer()` escape hatches throughout the codebase
 - Centralize Ping lifecycle management
 - See [TD-011](../ThorneTimer/Docs/active-views/technical-debt.md) for the full 19-step plan
@@ -284,7 +269,7 @@ The "everything we deferred because it was a nice-to-have" release that pushes u
 
 The **first post-1.0 release.** Statistics earn their place only because the foundation was built opportunistically across the authoring, spell-library, theming, feed, and zones work. This release is the dedicated focus that ties them together into a coherent self-improvement tool.
 
-**Why this comes after 1.0:** Thorne Timer is a timer app first. Stats arrive only after the core authoring + feed + theming + zones story is mature. The architecture unlock (Phase G capture groups + `aggregate` modifier) means most of the parsing is already free by the time we get here — Phase K is mostly *presentation* of data already being collected.
+**Why this comes after 1.0:** Thorne Timer is a timer app first. Stats arrive only after the core authoring + feed + theming + zones story is mature. The architecture unlock (capture groups + the `aggregate` modifier from the authoring release) means most of the parsing is already free by the time we get here — this release is mostly *presentation* of data already being collected.
 
 **Personal play metrics (in scope — "am I playing well?"):**
 - **Combat survival** — hits taken, hits/min, max single hit, heals received, net survivability
