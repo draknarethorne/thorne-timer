@@ -7,8 +7,8 @@
 
 ## Current Status
 
-**Latest Release:** v0.6.0 (in testing)
-**Active Branch:** `v0.6.0-gui-enhancements`
+**Latest Release:** v0.6.0 (shipped)
+**Active Branch:** `v0.7.0-dev`
 
 ---
 
@@ -44,11 +44,11 @@ Multi-character support and the four-style mini view system.
 - **Parameterized SQL** — all database operations use parameterized queries
 - **Window Management** — size/position persistence, screen bounds safety, min-size enforcement
 
-### Phase D++ — GUI Enhancements & Performance (v0.6.0) 🔄 **IN TESTING**
+### Phase D++ — GUI Enhancements & Performance (v0.6.0) ✅ **SHIPPED**
 
 Quality of life improvements, critical bug fixes, per-view color configuration, and a hybrid Designer + Controller + Repository pattern for the configuration tabs.
 
-**Shipped to branch `v0.6.0-gui-enhancements` (testing/polish in progress):**
+**Shipped in v0.6.0 (released from `main`):**
 - **Styles tab** — first-class entity with Add/Delete/Rename, color picker, drives both grid row tint and mini-view appearance
 - **New default styles** — Pet (lavender), Spawn (cyan), Lockout (DodgerBlue), Character (white) joining Normal/Buff/Ping
 - **Per-View Color Configuration** — every view has its own `ForeColor`, `BackColor`, `ShowWarning`, and `EmptyBehavior` columns in the `miniviews` table
@@ -63,10 +63,16 @@ Quality of life improvements, critical bug fixes, per-view color configuration, 
 - **Mini View Refinements** — hidden from Alt-Tab task switcher via `WS_EX_TOOLWINDOW`
 - **Grid Performance** — O(n²) → O(n) dictionary optimization in `SyncRuntimeToGrid` (~98% faster with 130+ timers)
 
-**Remaining for v0.6.0 ship:**
-- Bug fixes from user testing
-- Additional refactoring of timer / character grid setup out of `FormMain` (mirror the Styles/Views/Categories controller+repository pattern)
-- Possible UX polish (Timer "Duplicate" button, easier `DependsOn` picker)
+**Also delivered in the v0.6.0 final polish:**
+- Per-style time formats (Classic / Long / Adaptive Compact / Full Compact)
+- Pipe-separated multi-keyword matching for timer and category keywords
+- `TimersController` extracted from `FormMain` (Add / Duplicate / Chain + grid CRUD)
+- Per-cell tooltips across every configuration grid
+- Newcomer-focused README (recipes, FAQ, SmartScreen guidance, screenshots, Mermaid flow)
+
+**Carried forward into v0.7.0 (Phase C):**
+- Additional refactoring of the character grid setup out of `FormMain` (`CharactersController` / `CharactersRepository`)
+- UX polish (easier `DependsOn` picker)
 
 **Why the GUI Pivot:** User hit color configuration limitations during gameplay—need for multiple views of same style with different colors became urgent. Existing global color approach didn't scale. This work also lays the per-view foundation for future properties (font size, opacity, thresholds).
 
