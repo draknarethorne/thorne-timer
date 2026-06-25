@@ -65,16 +65,16 @@ Quality of life improvements, critical bug fixes, per-view color configuration, 
 
 **Also delivered in the v0.6.0 final polish:**
 - Per-style time formats (Classic / Long / Adaptive Compact / Full Compact)
-- Pipe-separated multi-keyword matching for timer and category keywords
-- `TimersController` extracted from `FormMain` (Add / Duplicate / Chain + grid CRUD)
+- Pipe-separated multi-keyword (OR) matching for timer and category keywords
+- **Controller/repository extraction completed ahead of schedule** — `TimersController` + `TimersRepository` (Add / Duplicate / Chain + grid CRUD) and `CharactersController` + `CharactersRepository` are both extracted from `FormMain`, joining the Styles/Views/Categories pattern. This was the stated Phase C prerequisite — it is now done.
+- **Timer Duplicate + dependent-chain authoring** — one-click clone and Roman-numeral chain extension live in `TimersController`
+- **`db_meta` version-stamp table** — records `CreatedByVersion`, `LastWrittenByVersion`, `SchemaVersion`, `LastWrittenAtUtc`; stamped on every `Database.Open()`
+- **Tome Information dialog** (`FormTomeInfo` + `TomeStatisticsRepository`) — read-only summary of the active tome (catalog counts, version provenance) cross-cutting the `timers`, `characters`, `categories`, `styles`, `miniviews`, `classes`, `timer_runtime_state`, and `db_meta` tables
+- **Tiered tome backup** (`Database.BackupDatabase`) reusing the `ThorneArchive` retention policy
 - Per-cell tooltips across every configuration grid
 - Newcomer-focused README (recipes, FAQ, SmartScreen guidance, screenshots, Mermaid flow)
 
-**Carried forward into v0.7.0 (Phase C):**
-- Additional refactoring of the character grid setup out of `FormMain` (`CharactersController` / `CharactersRepository`)
-- UX polish (easier `DependsOn` picker)
-
-**Why the GUI Pivot:** User hit color configuration limitations during gameplay—need for multiple views of same style with different colors became urgent. Existing global color approach didn't scale. This work also lays the per-view foundation for future properties (font size, opacity, thresholds).
+**Why the GUI Pivot:**
 
 ---
 
@@ -96,47 +96,52 @@ Thorne Timer is built primarily for **solo and small-group players** (not raid-c
 
 Separate gameplay view from timer maintenance, eliminating complexity in the main form.
 
+> **Status note (post-v0.6.0):** the Phase C **prerequisite refactor is already complete.**
+> `TimersController` + `TimersRepository` and `CharactersController` + `CharactersRepository`
+> shipped in v0.6.0. What remains for v0.7.0 is the *UI split itself* — making the main grid
+> read-only and hosting the existing `TimersController` inside a dedicated dialog.
+
 **Core Vision:**
 - **Main Form (Gameplay)** — Read-only grid locked to actively logging character, auto-switch enabled, mini-views active
 - **Timer Maintenance Dialog** — Full CRUD on any character's timers without affecting active gameplay
 
-**Key Features:**
+**Remaining work for v0.7.0:**
 - **Read-only timer view** — Main form grid becomes non-editable, always shows active character
-- **Timer maintenance dialog** — Separate dialog for add/edit/delete timers across all characters
+- **Timer maintenance dialog** (`Edit > Timers...`) — hosts the existing `TimersController` against a separate grid for add/edit/delete across all characters
 - **Dual-grid architecture** — Main form grid (active gameplay) + dialog grid (frozen maintenance)
 - **Always-show-active mode** — Main form automatically follows actively logging character
 - **No manual character browsing in main form** — Eliminates current dropdown complexity
 - **Frozen timer display in dialog** — Maintenance grid loads timers with `isActive=false` (no countdown)
 - **Background preservation** — Active character's timers continue running while editing others in dialog
-- **Prerequisite refactor** — Extract `TimersController` + `TimersRepository` and `CharactersController` + `CharactersRepository` from `FormMain`, mirroring the v0.6.0 Styles/Views/Categories pattern. The maintenance dialog reuses the same controller against a different grid host.
 
-**Why Priority:** The v0.6.0 controller/repository refactor plus the `isActive` flag and `GetActiveCharacterID()` on `LogMonitor` give us the right building blocks: configuration tabs already separate edit grids from runtime, and the main form can be locked to the actively logging character without snapshot/restore gymnastics. Completing Phase C also unblocks every feature in Phase G below (because `TimersController` is where Duplicate, DependsOn picker, right-click menus, etc. naturally live).
+**Why Priority:** The building blocks are now in place — the v0.6.0 controller/repository extraction is done, and the `isActive` flag plus `GetActiveCharacterID()` on `LogMonitor` let the main form lock to the actively logging character without snapshot/restore gymnastics. Phase C is now purely a **UI re-host**: point the finished `TimersController` at a dialog grid and freeze the main grid. Completing Phase C also unblocks the authoring polish in Phase G below (the right-click menu, DependsOn picker, and search/filter box naturally live on the maintenance grid).
 
-#### Phase C add-on — `.tdb` provenance & auto-archive 🛡️
+#### Phase C add-on — `.tdb` provenance & auto-archive 🛡️ **PARTIALLY SHIPPED**
 
 Lightweight data-safety feature so we never lose a "last known good" `.tdb` across upgrades.
 
-- **New `db_meta` table** (`Key TEXT PRIMARY KEY, Value TEXT`) holding `AppVersionFirstSeen`, `AppVersionLastWrite`, `LastWriteUtc`. Stamped at the end of `Database.Open()` with `Assembly.GetExecutingAssembly().GetName().Version`.
-- **Auto-archive on detected upgrade** — before running migrations, if the stamped version is older than the running assembly version, copy the live `.tdb` to `Data/Archive/ThorneTimer-v{stamped}-{yyyyMMdd}.tdb` (`File.Copy`, with the connection closed). Fall back to a `_2`, `_3` counter only if the dated name collides.
-- **Pre-stamp DBs (no `db_meta` row)** — treat as version unknown; run migrations and stamp going forward, but do **not** auto-archive (we don't know the source version).
+- ✅ **`db_meta` table** (`Key TEXT PRIMARY KEY, Value TEXT`) — **shipped in v0.6.0.** `Database.EnsureMetaSchema` creates it and stamps `CreatedByVersion` (one-shot), `LastWrittenByVersion`, `SchemaVersion`, and `LastWrittenAtUtc` on every `Database.Open()`.
+- ✅ **Tiered tome backup** — `Database.BackupDatabase` writes a timestamped copy into a `Backups/` subfolder and prunes via the `ThorneArchive` retention policy. **Shipped in v0.6.0.**
+- ⛳ **Auto-archive on detected upgrade (remaining)** — wire the existing `db_meta` stamp into an upgrade check: when `LastWrittenByVersion` is older than the running assembly version, snapshot the live `.tdb` *before* migrations run (connection closed) into `Data/Archive/ThorneTimer-v{stamped}-{yyyyMMdd}.tdb`, falling back to a `_2`, `_3` counter on a dated-name collision.
+- ⛳ **Pre-stamp DBs (no version row)** — treat as version unknown; migrate and stamp going forward, but do **not** auto-archive (source version is unknown).
 - **Never auto-delete** archives. Pairs with the historical `Archive/` files already committed for upgrade-path testing.
 - **Failure is non-fatal** — copy errors log via `ThorneLog.Warn` but never block app launch.
 
-**Why bundled with Phase C:** the maintenance dialog will be the first feature that makes destructive timer edits easy, so having an automatic pre-upgrade snapshot in place is a natural prerequisite. Trivially small change (well under a day), but it has to be deliberately scheduled or it'll get forgotten.
+**Why bundled with Phase C:** the maintenance dialog makes destructive timer edits easy, so an automatic pre-upgrade snapshot is a natural companion. The plumbing (`db_meta` + `BackupDatabase`) already exists; only the upgrade-detection trigger remains — a small, well-scoped finish.
 
 ### Phase G — Smarter Timer Authoring (v0.8.0) ✨ **NEW**
 
 The single biggest user pain identified: **adding new timers takes too long**. This phase makes authoring feel fast and forgiving.
 
+> **Already shipped (foundation laid in v0.6.0):** pipe-delimited multi-keyword (OR) matching and the one-click **Duplicate** button both landed early in `TimersController`. The remaining Phase G work builds on top of them.
+
 **Keyword power features:**
-- **Multiple start / end keywords per timer (OR-matching)** — pipe-delimited (`|`) values in the existing `StartKeyword` / `EndKeyword` columns; no schema change, fully backwards compatible
 - **Wildcards in keywords** — `*` glob support (compiled to `Regex` and cached per timer); `^` / `$` as an opt-in full-regex escape hatch for power users
 - **Capture groups → speech / display templates** — new `SpeechTemplate` and `DisplayNameTemplate` columns. With keyword `"* tells you, '*'"` and template `"{0} says {1}"`, pings can actually speak meaningful content instead of generic alerts
 - **Cooldown / throttling per timer** — new `MinTriggerIntervalSeconds` column to suppress ping spam in noisy zones (busy auction channel, etc.)
 
 **Authoring UX:**
 - **Test / preview keyword button** — small dialog in the timer editor where you paste a log line (or pick from the active log file's tail) and see ✅ Match / ❌ No match plus capture group preview. Eliminates the "alt-tab into the game to trigger it" loop.
-- **Duplicate button** — clone an existing timer in one click (`Name = "Copy of X"`), opens directly in edit mode. Pairs with multi-keyword for the common "I have four variants of one spell" case.
 - **DependsOn picker** — replace the free-text column with a `DataGridViewComboBoxColumn` bound to the in-memory timer list, sorted by Name, refreshed when the collection changes (same pattern as v0.6.0's dynamic Style dropdown).
 - **Right-click context menu on the Timers grid** — Start / Stop / Reset / Duplicate / Test / Toggle Active / Jump to last trigger.
 - **Search / filter box above the Timers grid** — type-to-filter by Name / Category / Style. Essential at 130+ timers.
@@ -243,7 +248,7 @@ The "everything we deferred because it was a nice-to-have" release that pushes u
 - **Quick mute button** in toolbar — doorbell / phone / boss-walked-in scenarios
 - **Character online/offline time tracking** — adjust Character+ scope timers for time elapsed while logged out (server cooldowns that progress offline)
 - **Better online state detection** — distinguish character inactive (manual switch) vs. logged out (camp/disconnect)
-- **Timer database backup / restore tooling** — built-in `.tdb` snapshot and restore, with auto-snapshots before destructive ops
+- **Timer database backup / restore tooling** — built-in `.tdb` snapshot and restore, with auto-snapshots before destructive ops. *(Partially shipped: `Database.BackupDatabase` with tiered pruning and the `db_meta` version stamps landed in v0.6.0; a `Restore` UI and the pre-destructive auto-snapshot trigger remain.)*
 - **Performance profiling diagnostics** — built-in panel showing log-poll latency, grid sync time, mini-view paint time
 - **Accessibility** — high contrast mode, screen-reader labels, larger text mode (overlaps with Phase I theming)
 - **User documentation / help system** — in-app help dialog or `Help → Topics` menu pointing at bundled markdown / online guide
@@ -336,8 +341,8 @@ Ongoing improvements that can ship with any release:
 |-------|---------|-------|--------|
 | Phase A — Core Engine | v0.1.0 – v0.4.0 | Foundation | ✅ Shipped |
 | Phase D — Per-Character & Styles | v0.5.0 | Multi-character | ✅ Shipped |
-| Phase D++ — GUI & Performance | v0.6.0 | Styles / Views CRUD, perf | 🔄 In Testing |
-| **Phase C — Maintenance Dialog** | **v0.7.0** | **Separate play from edit** | **🎯 Next** |
+| Phase D++ — GUI & Performance | v0.6.0 | Styles / Views CRUD, perf | ✅ Shipped |
+| **Phase C — Maintenance Dialog** | **v0.7.0** | **Separate play from edit (read-only grid + `Edit > Timers...` dialog)** | **🎯 Next** |
 | **Phase G — Smarter Authoring** | **v0.8.0** | **Multi-keyword, wildcards, capture groups, test button** | **🎯 Planned** |
 | **Phase H — Spell Library & Templates** | **v0.9.0** | **Spell DB, "add from spell", import/export packs** | **🎯 Planned** |
 | **Phase I — Skinning & Theming** | **v0.10.0** | **EQ-UI-matching overlays, per-style fonts** | **🎯 Planned** |
@@ -352,5 +357,5 @@ Ongoing improvements that can ship with any release:
 
 ---
 
-**Last Updated:** v0.6.0 testing cycle (`v0.6.0-gui-enhancements` branch)
+**Last Updated:** v0.7.0 planning pass (`v0.7.0-dev` branch) — reconciled with shipped v0.6.0 code
 **Maintained By:** Draknaré Thorne
