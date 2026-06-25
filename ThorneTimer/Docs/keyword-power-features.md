@@ -1,14 +1,16 @@
 # Keyword Power Features — Design
 
-> **Status**: 📐 Design (proposed)
+> **Status:** 📐 Design / Spec — pre-implementation
+> **Version:** v0.7.0 ("Smarter Timer Authoring")
+> **Branch:** `v0.7.0-dev`
+> **Date:** 2026-06-25
+> **Author:** Draknaré Thorne / GitHub Copilot
 >
-> **Type**: Feature Design
->
-> **Target**: v0.7.0 ("Smarter Timer Authoring")
->
-> **Branch**: `v0.7.0-dev`
->
-> **Author**: Draknaré Thorne / GitHub Copilot
+> This document is the **detailed, durable specification** for the keyword-matching
+> upgrade. If chat context is lost, this file is the source of truth for the agreed
+> behavior (matching tiers, compiled-matcher architecture, capture-group templates,
+> schema, and the performance/benchmark plan). Adjust this doc **before**
+> implementation begins, and update it as each phase in §10 lands.
 
 ---
 
@@ -61,6 +63,11 @@ On a busy raid log with 130+ active timers, that allocation churn — not the
    prerequisite for the regex tier (see §6).
 2. **No precompilation.** Keyword strings are re-parsed on every chunk. Anything
    we add (globs → regex) must be compiled **once** and cached, never per-chunk.
+   This drives a hard rule for the whole feature: **all keyword syntax is
+   classified and compiled at load/edit time** — the hot path never inspects a
+   keyword to decide *if* or *how* to handle `*`, `?`, anchors, or pipes. By the
+   time a chunk arrives, every term is already a prepared literal or a compiled
+   `Regex`; matching just executes it.
 
 ---
 
@@ -72,7 +79,7 @@ satisfies it. Most timers stay on the fast path.
 | Tier | Trigger syntax | Engine | Relative cost | Captures? |
 |------|----------------|--------|---------------|-----------|
 | **0 — Literal** | plain text (today) | `IndexOf(Ordinal[IgnoreCase])` | 1× (baseline) | No |
-| **1 — Wildcard** | contains `*` (glob) | compiled `Regex`, cached | ~2–5× | Optional |
+| **1 — Wildcard** | contains `*` and/or `?` (glob) | compiled `Regex`, cached | ~2–5× | Optional |
 | **2 — Regex** | wrapped `^…$` or `/…/` escape hatch | compiled `Regex`, cached | ~3–8× | Yes |
 
 Design rules:
@@ -80,9 +87,11 @@ Design rules:
 - **Literal stays literal.** A keyword with no `*` and no regex escape is never
   promoted to `Regex` — it keeps using `IndexOf`. This guarantees the common case
   has **zero** added cost versus today.
-- **Glob is sugar over regex.** `*` compiles to `.*?`, the rest of the token is
-  `Regex.Escape`-d, so `Cloud of * fades` becomes `Cloud\ of\ .*?\ fades`. Compiled
-  with `RegexOptions.Compiled | CultureInvariant` (+ `IgnoreCase` unless `CaseYn`).
+- **Glob is sugar over regex.** `*` compiles to `.*?` and `?` to `.` (single
+  char); the rest of the token is `Regex.Escape`-d, so `Cloud of * fades` becomes
+  `Cloud\ of\ .*?\ fades` and `Gate?` becomes `Gate.`. Compiled with
+  `RegexOptions.Compiled | CultureInvariant` (+ `IgnoreCase` unless `CaseYn`). The
+  glob→regex translation happens **once at load/edit time**, never per chunk.
 - **Full regex is an explicit escape hatch**, not the default, so users do not pay
   regex cost (or footguns) unless they opt in.
 - **Pipe (`|`) OR-splitting is preserved** and now splits into a list of
@@ -108,10 +117,14 @@ KeywordTerm
 ```
 
 - Built in/around `TimerRuntime` when `timerStates` / `categoryStates` load, and
-  rebuilt for a single timer on edit (cheap, off the hot path).
-- `ProcessLogText` calls `matcher.Matches(chunk, out captures)` instead of
+  rebuilt for a single timer on edit (cheap, off the hot path). **Classification
+  (literal vs. glob vs. regex) and glob→regex translation happen here, exactly
+  once** — so the match loop never parses syntax or branches on `*`/`?`/anchors.
+- `ProcessLogText` calls `matcher.Matches(line, out captures)` instead of
   `KeywordMatches(...)`. For `IsLiteralOnly` matchers this is a straight `IndexOf`
-  loop — **no allocation, no regex** — preserving the baseline.
+  loop — **no allocation, no regex** — preserving the baseline. Each `KeywordTerm`
+  already knows its tier, so dispatch is a single branch on a precomputed enum,
+  not a string inspection.
 - The `Regex` objects are reused for the life of the matcher; capture extraction
   only runs on tier-2 terms that actually matched.
 
@@ -142,12 +155,12 @@ Because chunks split mid-line, the regex tier needs whole lines.
 - Add a small **line reassembly buffer** in `LogMonitor` (or a thin shim before
   `ProcessLogText`): accumulate bytes, split on `\n`, and dispatch **complete
   lines**; hold a trailing partial line until its newline arrives.
-- Literal/wildcard tiers can still run on raw chunks for backward-compatible
-  behavior, but routing everything through line assembly is cleaner and makes
-  `^`/`$` meaningful. **Decision to confirm during implementation:** line-assemble
-  for all tiers (simpler, slightly more buffering) vs. only when any regex term is
-  present (lazy). Lean toward always-on line assembly for correctness, measured
-  against the benchmark in §7.
+- **Decision (locked): line assembly is always-on for all tiers.** Every chunk is
+  reassembled into complete lines before `ProcessLogText` sees it, so literal,
+  wildcard, and regex terms all match against whole lines and `^`/`$` are always
+  meaningful. This trades a small, bounded amount of buffering (one trailing
+  partial line) for correctness and a single uniform code path. The buffering
+  overhead is included in the §7 benchmark so we can confirm it stays negligible.
 
 ---
 
@@ -260,12 +273,22 @@ Each phase is independently shippable and independently measured.
 
 ---
 
-## 11. Open questions
+## 11. Decisions & open questions
 
-- Line assembly always-on vs. lazy (see §6) — resolve with the benchmark.
-- Glob syntax surface: just `*`, or also `?` (single char)? Start with `*` only.
-- Where does the matcher cache live — inside `TimerRuntime`, or a dedicated
+**Resolved:**
+
+- ✅ **Line assembly: always-on** for all tiers (see §6). Correctness over lazy
+  buffering; overhead verified by the §7 benchmark.
+- ✅ **Glob syntax: `*` and `?`** (`*` → `.*?`, `?` → `.`). Both are translated to a
+  compiled `Regex` **once at load/edit time** — the hot path never inspects glob
+  syntax. The `*`-vs-`?` cost difference is measured per the phasing in §10.
+- ✅ **Phasing: incremental and individually measured** (see §10). Each tier ships
+  and is benchmarked on its own so any regression is attributable.
+
+**Still open (resolve during implementation):**
+
+- Where the matcher cache lives — inside `TimerRuntime`, or a dedicated
   `KeywordMatcherFactory`? Prefer a small factory to keep `TimerRuntime` lean and
   testable.
 - Throttling (`MinTriggerIntervalSeconds`) — ship in this feature or defer? Listed
-  as stretch.
+  as a stretch item.
