@@ -195,7 +195,7 @@ You can match **several phrases at once** by separating them with a pipe ( `|` )
 Start Keyword:  Your Lich Sting spell has worn off|Your target resisted the Lich Sting spell
 ```
 
-> 💡 The pipe ( `|` ) means **OR**. It works in both the **timer** Start/End Keyword fields and the **category** Start/End Keyword fields.
+> 💡 The pipe ( `|` ) means **OR**. Type it directly between phrases as shown in the code block above. It works in both the **timer** Start/End Keyword fields and the **category** Start/End Keyword fields. *(In the example tables below, the `|` between code-styled phrases is that same literal separator — it's split out only so the Markdown tables render correctly.)*
 
 ### Example: capturing spells cast on *you*
 
@@ -205,7 +205,7 @@ When you log spells, EverQuest writes lines like `Soandso begins to cast a spell
 |-------|-------|
 | **Name** | `Lich Sting` |
 | **Start Keyword** | `begins to cast a spell on YOU` |
-| **End Keyword** | `Your Lich Sting spell has worn off|You feel the effects of Lich Sting wear off` |
+| **End Keyword** | `Your Lich Sting spell has worn off`&#124;`You feel the effects of Lich Sting wear off` |
 | **Duration** | `0:01:00` (or shorthand `1m`) |
 | **Style** | `Buff` (or a custom debuff style) |
 | **Speech** | `Lich Sting is wearing off` |
@@ -219,8 +219,8 @@ To watch effects on a specific target (a mez, a snare, a charm on your pet's tar
 | Field | Value |
 |-------|-------|
 | **Name** | `Mez` |
-| **Start Keyword** | `is enthralled|is mesmerized` |
-| **End Keyword** | `is no longer enthralled|has broken free|is no longer mesmerized` |
+| **Start Keyword** | `is enthralled`&#124;`is mesmerized` |
+| **End Keyword** | `is no longer enthralled`&#124;`has broken free`&#124;`is no longer mesmerized` |
 | **Duration** | `0:00:48` |
 | **Style** | `Normal` |
 
@@ -281,7 +281,7 @@ These are real timers people run with Thorne Timer — copy the keyword text int
 
 | Name | Start Keyword | Duration | Style | Speech |
 |------|---------------|----------|-------|--------|
-| O`Keil's Radiation | `begin to radiate` | `0:01:25` | `Buff` | `Radiation Dropping` |
+| OKeil's Radiation | `begin to radiate` | `0:01:25` | `Buff` | `Radiation Dropping` |
 | Shield of Spikes | `is surrounded by a thorny` | `0:04:00` | `Buff` | `Thorns` |
 | Pet Strength | `looks stronger` | `0:29:50` | `Pet` | `Pet Strength Dropping` |
 
@@ -291,7 +291,7 @@ These are real timers people run with Thorne Timer — copy the keyword text int
 
 | Name | Start Keyword | Duration | Scope |
 |------|---------------|----------|-------|
-| Spectre | `a spectre died|slain a spectre|spectre has been slain` | `0:16:00` | `World` |
+| Spectre | `a spectre died`&#124;`slain a spectre`&#124;`spectre has been slain` | `0:16:00` | `World` |
 
 **Dependent spawn chain — `Sand Giant` re-pops, built with the Chain button:**
 
