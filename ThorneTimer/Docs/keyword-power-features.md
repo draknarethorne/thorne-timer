@@ -113,7 +113,8 @@ KeywordTerm
 ├─ MatchTier Tier                   // Literal | Wildcard | Regex
 ├─ string Literal                   // tier 0 only (already trimmed)
 ├─ Regex Compiled                   // tiers 1–2 only (RegexOptions.Compiled)
-└─ bool HasCaptureGroups            // tier 2: drives template population
+└─ bool HasCaptureGroups            // tier 1 (implicit * group) or tier 2 (named/
+                                    // numbered groups); drives template population
 ```
 
 - Built in/around `TimerRuntime` when `timerStates` / `categoryStates` load, and
@@ -126,25 +127,120 @@ KeywordTerm
   already knows its tier, so dispatch is a single branch on a precomputed enum,
   not a string inspection.
 - The `Regex` objects are reused for the life of the matcher; capture extraction
-  only runs on tier-2 terms that actually matched.
+  only runs on a term that actually matched **and** has `HasCaptureGroups` set
+  (any tier-2 group, or a tier-1 glob whose `*` became an implicit capture — see
+  §5.5). Tier-0 literals never extract captures.
 
 ---
 
 ## 5. Capture groups → speech / display templates
 
-New nullable columns (idempotent migration, default NULL = unchanged behavior):
+This section defines the **lifecycle**: how a keyword *detects* an event, how
+values are *pulled out* of the matched line, and how those values then *drive*
+speech and/or the mini-view label. The keyword is the trigger; the templates are
+the output. They are independent — a timer can use either, both, or neither.
 
-- `timers.SpeechTemplate` (TEXT) — e.g. `{1} says {2}` or `{name} resists`
-- `timers.DisplayNameTemplate` (TEXT) — overrides the grid/mini-view label
+### 5.1 The scenario this enables
 
-Mechanics:
+A vendor's reply in the log:
 
-- Numbered groups `{0..n}` map to regex capture groups; named groups `{name}` map
-  to `(?<name>…)`.
-- Templates only resolve when the matched term `HasCaptureGroups`; otherwise the
-  literal `SpeechText` / timer name is used (today's behavior).
-- Resolution happens **after** a match is confirmed and **outside** the tight match
-  loop, so it never taxes non-matching chunks.
+```
+Vendor says, 'I'll give you 1 platinum and 2 gold for a Bronze Dagger.'
+```
+
+The user wants the mini view to show `Bronze Dagger — 1p 2g` and (optionally) hear
+"one platinum two gold". To do that we must (a) **recognize** this is a vendor
+sale line, (b) **extract** the price and item, and (c) **render** them into the
+display label and/or the spoken phrase. Steps (a)/(b) are one regex with capture
+groups; step (c) is a template applied to those captures.
+
+### 5.2 Lifecycle (detect → capture → render)
+
+```
+                       ┌─────────────────────────────────────────────┐
+log line ─▶ matcher ──▶│ matched? ──no──▶ (nothing; next line)        │
+(whole line, §6)       │     │yes                                     │
+                       │     ▼                                        │
+                       │  captures = { {1}="1", {2}="2",              │
+                       │               {item}="Bronze Dagger", … }    │
+                       └─────┬───────────────────────────────────────┘
+                             │  (resolution runs OUTSIDE the match loop)
+              ┌──────────────┼───────────────────────────┐
+              ▼              ▼                             ▼
+      DisplayNameTemplate  SpeechTemplate            (timer/feed action
+      "{item} — {1}p {2}g" "{1} platinum {2} gold"    as today: start,
+              │              │                          reset, sound)
+              ▼              ▼
+        mini-view label   spoken via VoiceManager
+        (TimerStateChanged) (TimerSoundRequested)
+```
+
+1. **Detect.** A keyword term matches the whole line (§6). For this scenario the
+   term is a tier-2 regex with capture groups, e.g.
+   `I'll give you (\d+) platinum and (\d+) gold for a (?<item>.+?)\.`
+   (a `*` glob can stand in for the looser parts — see §5.5).
+2. **Capture.** Because the matched term `HasCaptureGroups`, the engine pulls the
+   group values into a small capture map (`{1}`, `{2}`, `{item}`, …). This runs
+   **only on a confirmed match**, never on the non-matching majority of lines.
+3. **Render.** The capture map is substituted into whichever templates are set:
+   - `DisplayNameTemplate` → the label shown in the grid / mini view.
+   - `SpeechTemplate` → the phrase handed to `VoiceManager` for TTS.
+   Each is independent and optional.
+
+### 5.3 New columns (idempotent migration, default NULL = today's behavior)
+
+- `timers.SpeechTemplate` (TEXT) — overrides what is **spoken**. NULL ⇒ today's
+  behavior (speak the literal `SpeechText`, or nothing if unset).
+- `timers.DisplayNameTemplate` (TEXT) — overrides the **label** shown in the grid
+  and mini view. NULL ⇒ today's behavior (show the timer `Name`).
+
+Both are pure additions; an existing `.tdb` with no templates behaves exactly as
+it does now.
+
+### 5.4 How the templates relate to the existing `SpeechText` / label columns
+
+The templates do **not** introduce a new output path — they feed the *same*
+events the runtime already raises. Today a started/updated timer raises
+`TimerStateChanged` (→ `FormMain` updates the grid/mini view) and
+`TimerSoundRequested` (→ `FormMain` plays a sound or speaks). The change is
+purely *what string* those handlers receive:
+
+| Output | Today (no template) | With template (capture groups present) |
+|---|---|---|
+| Mini-view / grid label | timer `Name` | `DisplayNameTemplate` resolved against captures |
+| Spoken phrase | literal `SpeechText` | `SpeechTemplate` resolved against captures |
+
+So conceptually the "speech column" you remembered **does** keep working — the
+`SpeechTemplate` simply *replaces* the literal speech string at render time when
+the matched keyword produced captures. If a timer has no template, or the matched
+term has no capture groups, the literal value is used and nothing changes.
+
+### 5.5 Template mechanics
+
+- Numbered placeholders `{0..n}` map to regex capture groups by index; named
+  placeholders `{name}` map to `(?<name>…)`. Named groups are preferred for
+  readability (`{item}`, `{price}`), positional are fine for quick rules.
+- A glob `*` becomes an *implicit* capturing group so simple wildcard rules can
+  still feed a template (e.g. `… for a *` exposes `{1}` = the item text) without
+  the user writing regex. This translation is done **once at load/edit time**,
+  consistent with §3/§4 — the hot path never inspects template or glob syntax.
+- An unresolved placeholder (no such group, or empty capture) renders as empty
+  string and is logged once at Debug — it never throws on the parse path.
+- **Resolution happens after a match is confirmed and outside the tight match
+  loop**, so non-matching chunks pay nothing. Only matched, capture-bearing terms
+  do substitution.
+
+### 5.6 Boundary with Feed Views (where the bigger vision lives)
+
+The display/speech templating here is the **engine** for the larger
+**Feed Views & Log Synthesis** vision in [`Docs/ROADMAP.md`](../../Docs/ROADMAP.md)
+(vendor prices scrolling next to the merchant window, spoken as "one platinum two
+gold"). This document scopes the **matching + capture + template substitution**
+primitives onto the existing timer/mini-view path. The dedicated **feed**
+*renderer*, the `ViewType = Feed` column, multi-target fan-out, and the speech
+*sanitizer* (`1p 2g` → "one platinum two gold") are tracked there and build on
+top of these primitives — they are intentionally **out of scope** here so this
+feature stays shippable on its own.
 
 ---
 
