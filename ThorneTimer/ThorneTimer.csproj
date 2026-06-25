@@ -223,6 +223,8 @@
     <None Include="Docs\camp-out-auto-pause.md" />
     <None Include="Docs\character-scope-timer-pausing.md" />
     <None Include="Docs\depends-on-chaining-enhancement.md" />
+    <None Include="Docs\keyword-power-features.md" />
+    <None Include="Docs\timer-output-authoring.md" />
     <None Include="Docs\multi-keyword-support-feature.md" />
     <None Include="Docs\mini-view-per-view-colors-plan.md" />
     <None Include="Docs\mini-view-per-view-colors-progress.md" />

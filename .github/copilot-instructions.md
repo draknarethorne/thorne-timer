@@ -102,6 +102,60 @@ Thorne-Timer/
 - Test SQL changes against a copy of the `.tdb` file
 - Verify cross-thread safety for any timer or file watcher code
 
+## Documentation
+
+Internal design/spec docs live in `ThorneTimer/Docs/` (see `ThorneTimer/Docs/STATUS.md`
+for the index). When adding or changing documentation, follow these rules:
+
+### 1. Register new docs in the project (MANUAL step — easy to forget)
+
+`ThorneTimer.csproj` uses **classic `<None Include="...">` items**, NOT a glob.
+New files do **not** appear automatically. After creating a doc you MUST:
+
+- Add `<None Include="Docs\your-new-doc.md" />` to the existing
+  `<ItemGroup>` that holds the other `Docs\*.md` entries in `ThorneTimer.csproj`.
+- The IDE locks the `.csproj` while the solution is open, so edit it from the
+  **terminal** (e.g. a PowerShell text insert) rather than the file-edit tool.
+- Also add the doc to the table in `ThorneTimer/Docs/STATUS.md` so it is discoverable.
+
+A doc that is not in the `.csproj` will not show in Solution Explorer's Docs folder.
+
+### 2. Write docs as ASCII-safe Markdown (avoid "funky characters")
+
+Repo Markdown is stored as **UTF-8 without a BOM**. Some viewers (Solution Explorer
+preview, editors defaulting to the system codepage) then misread multi-byte UTF-8 as
+Windows-1252, so decorative Unicode shows up as garbled glyphs (e.g. an em dash `—`
+appears as `â€"`). To stay safe and portable, prefer plain ASCII:
+
+| Avoid (Unicode) | Use (ASCII) |
+|---|---|
+| em dash `—`, en dash `–` | ` - ` (spaced hyphen) |
+| ellipsis `…` | `...` |
+| arrows `→` `⇒` | `->` `=>` |
+| math `×` `≈` `≤` `Σ` | `x` `~=` `<=` `sum` |
+| box-drawing `│ ─ ┌ ┐ └ ┘ ├ ┼` | `| - + ` for ASCII diagrams |
+| middot `·` separators | `/` or `,` |
+| play/UI glyphs `▶ ▸ ▾` | `>` / `(play)` / `v` |
+
+Acceptable non-ASCII (intentional, also safe in Latin-1 or used consistently):
+status emoji in headers (`📐`, `✅`, `🗄️`), the section sign `§`, and accented names
+(e.g. `Draknaré`).
+
+### 3. Tooling note (how to write docs without corrupting bytes)
+
+When creating/rewriting a doc from the terminal, write it with an explicit
+**UTF-8-without-BOM** encoder, not bare `Set-Content -Encoding UTF8` (which adds a
+BOM the repo does not use):
+
+```powershell
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+[System.IO.File]::WriteAllText($path, $text, $utf8NoBom)
+```
+
+After writing, verify: confirm `BOM=False`, scan for mojibake markers
+(`Ã`, `â€`, `Â`), and list any chars `> U+007F` to catch stray decorative Unicode
+before committing.
+
 ## Key Patterns
 
 - **MVP-style separation**: Business logic in model classes, UI in forms

@@ -63,6 +63,19 @@ ThorneTimer/                   # Main application project
 - **`ThorneTimer/Docs/active-views/`** — Active views feature design docs
 - **`ThorneTimer/Docs/active-views/technical-debt.md`** — Technical debt tracker
 
+**Authoring new docs (two rules — see `.github/copilot-instructions.md` "Documentation"):**
+
+1. **Register in the project.** `ThorneTimer.csproj` lists docs as explicit
+   `<None Include="Docs\*.md" />` items (no glob), so a new doc will NOT show in
+   Solution Explorer until you add its entry. The IDE locks the `.csproj` while the
+   solution is open — edit it from the terminal. Also add the doc to
+   `ThorneTimer/Docs/STATUS.md`.
+2. **ASCII-safe Markdown.** Docs are UTF-8 without a BOM; avoid decorative Unicode
+   (em dashes, box-drawing, arrows, math glyphs) that renders as garbled characters
+   in viewers using the system codepage. Use `-`, `...`, `->`, and ASCII (`| - +`)
+   diagrams. Write files with an explicit UTF-8-no-BOM encoder and verify there is no
+   BOM and no mojibake before committing.
+
 ### Architecture Patterns
 
 **Current Pattern**: Monolithic WinForms (FormMain.cs is the primary form)
