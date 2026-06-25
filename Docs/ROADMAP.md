@@ -7,14 +7,15 @@
 
 ## Current Status
 
-**Latest Release:** v0.6.0 (in testing)
-**Active Branch:** `v0.6.0-gui-enhancements`
+**Latest Release:** v0.6.0 (shipped)
+**Active Branch:** `v0.7.0-dev`
+**v0.7.0 Focus:** Smarter Timer Authoring — wildcards, keyword test button, capture-group templates — plus small reliability/data-safety fixes. The Timer Maintenance Dialog is **deferred to post-1.0** (promote on adoption).
 
 ---
 
 ## ✅ Shipped
 
-### Phase A — Core Timer Engine (v0.1.0 – v0.4.0)
+### Core Timer Engine — v0.1.0 – v0.4.0
 
 The foundation: a working timer application with log parsing and overlay windows.
 
@@ -27,7 +28,7 @@ The foundation: a working timer application with log parsing and overlay windows
 - Code signing support in release workflow
 - Auto-version injection from git tags into `AssemblyInfo.cs`
 
-### Phase D — Per-Character State & Timer Styles (v0.5.0)
+### Per-Character State & Timer Styles — v0.5.0
 
 Multi-character support and the four-style mini view system.
 
@@ -44,11 +45,11 @@ Multi-character support and the four-style mini view system.
 - **Parameterized SQL** — all database operations use parameterized queries
 - **Window Management** — size/position persistence, screen bounds safety, min-size enforcement
 
-### Phase D++ — GUI Enhancements & Performance (v0.6.0) 🔄 **IN TESTING**
+### GUI Enhancements & Performance — v0.6.0 ✅ **SHIPPED**
 
 Quality of life improvements, critical bug fixes, per-view color configuration, and a hybrid Designer + Controller + Repository pattern for the configuration tabs.
 
-**Shipped to branch `v0.6.0-gui-enhancements` (testing/polish in progress):**
+**Shipped in v0.6.0 (released from `main`):**
 - **Styles tab** — first-class entity with Add/Delete/Rename, color picker, drives both grid row tint and mini-view appearance
 - **New default styles** — Pet (lavender), Spawn (cyan), Lockout (DodgerBlue), Character (white) joining Normal/Buff/Ping
 - **Per-View Color Configuration** — every view has its own `ForeColor`, `BackColor`, `ShowWarning`, and `EmptyBehavior` columns in the `miniviews` table
@@ -63,12 +64,16 @@ Quality of life improvements, critical bug fixes, per-view color configuration, 
 - **Mini View Refinements** — hidden from Alt-Tab task switcher via `WS_EX_TOOLWINDOW`
 - **Grid Performance** — O(n²) → O(n) dictionary optimization in `SyncRuntimeToGrid` (~98% faster with 130+ timers)
 
-**Remaining for v0.6.0 ship:**
-- Bug fixes from user testing
-- Additional refactoring of timer / character grid setup out of `FormMain` (mirror the Styles/Views/Categories controller+repository pattern)
-- Possible UX polish (Timer "Duplicate" button, easier `DependsOn` picker)
-
-**Why the GUI Pivot:** User hit color configuration limitations during gameplay—need for multiple views of same style with different colors became urgent. Existing global color approach didn't scale. This work also lays the per-view foundation for future properties (font size, opacity, thresholds).
+**Also delivered in the v0.6.0 final polish:**
+- Per-style time formats (Classic / Long / Adaptive Compact / Full Compact)
+- Pipe-separated multi-keyword (OR) matching for timer and category keywords
+- **Controller/repository extraction** — `TimersController` + `TimersRepository` and `CharactersController` + `CharactersRepository` extracted from `FormMain`, joining the Styles/Views/Categories pattern. This was the stated maintenance-dialog prerequisite — it is now done.
+- **Timer Duplicate + dependent-chain authoring** — one-click clone and Roman-numeral chain extension live in `TimersController`
+- **`db_meta` version-stamp table** — records `CreatedByVersion`, `LastWrittenByVersion`, `SchemaVersion`, `LastWrittenAtUtc`; stamped on every `Database.Open()`
+- **Tome Information dialog** (`FormTomeInfo` + `TomeStatisticsRepository`) — read-only summary of the active tome (catalog counts, version provenance) cross-cutting the `timers`, `characters`, `categories`, `styles`, `miniviews`, `classes`, `timer_runtime_state`, and `db_meta` tables
+- **Tiered tome backup** (`Database.BackupDatabase`) reusing the `ThorneArchive` retention policy
+- Per-cell tooltips across every configuration grid
+- Newcomer-focused README (recipes, FAQ, SmartScreen guidance, screenshots, Mermaid flow)
 
 ---
 
@@ -76,7 +81,7 @@ Quality of life improvements, critical bug fixes, per-view color configuration, 
 
 Thorne Timer is built primarily for **solo and small-group players** (not raid-coordination tools). Optimization priorities derive from that audience:
 
-1. **Timer authoring pain is the #1 user pain** — adding timers when leveling new spells, setting up spawn timers in a new zone, figuring out keywords and durations. Several phases below attack this wound from different angles.
+keywords and durations. Several releases below attack this wound from different angles.
 2. **Configuration data lives in the right place** — per-character / per-timer / per-style data lives in the `.tdb` tome; preferences, hotkeys, recent files, transient runtime state can live in INI.
 3. **Overlays should feel native to the EQ UI** — borders, padding, fonts, and color should be skinnable to match the player's chosen EQ UI (Vert, Drakah's, Project Quarm defaults, etc.) rather than forcing a single Thorne Timer look.
 4. **The core feature is timers — feeds and synthesis are additive output modes, not a chat-client substitute.** Captured events should be *transformed* (extract item + price), not echoed verbatim. If the user wants raw log, Notepad++ tail mode already exists.
@@ -86,80 +91,54 @@ Thorne Timer is built primarily for **solo and small-group players** (not raid-c
 
 ## 🔄 Next
 
-### Phase C — Timer Maintenance Dialog (v0.7.0) 🎯 **PRIORITY**
+### Smarter Timer Authoring — v0.7.0 🎯 **PRIORITY**
 
-Separate gameplay view from timer maintenance, eliminating complexity in the main form.
-
-**Core Vision:**
-- **Main Form (Gameplay)** — Read-only grid locked to actively logging character, auto-switch enabled, mini-views active
-- **Timer Maintenance Dialog** — Full CRUD on any character's timers without affecting active gameplay
-
-**Key Features:**
-- **Read-only timer view** — Main form grid becomes non-editable, always shows active character
-- **Timer maintenance dialog** — Separate dialog for add/edit/delete timers across all characters
-- **Dual-grid architecture** — Main form grid (active gameplay) + dialog grid (frozen maintenance)
-- **Always-show-active mode** — Main form automatically follows actively logging character
-- **No manual character browsing in main form** — Eliminates current dropdown complexity
-- **Frozen timer display in dialog** — Maintenance grid loads timers with `isActive=false` (no countdown)
-- **Background preservation** — Active character's timers continue running while editing others in dialog
-- **Prerequisite refactor** — Extract `TimersController` + `TimersRepository` and `CharactersController` + `CharactersRepository` from `FormMain`, mirroring the v0.6.0 Styles/Views/Categories pattern. The maintenance dialog reuses the same controller against a different grid host.
-
-**Why Priority:** The v0.6.0 controller/repository refactor plus the `isActive` flag and `GetActiveCharacterID()` on `LogMonitor` give us the right building blocks: configuration tabs already separate edit grids from runtime, and the main form can be locked to the actively logging character without snapshot/restore gymnastics. Completing Phase C also unblocks every feature in Phase G below (because `TimersController` is where Duplicate, DependsOn picker, right-click menus, etc. naturally live).
-
-#### Phase C add-on — `.tdb` provenance & auto-archive 🛡️
-
-Lightweight data-safety feature so we never lose a "last known good" `.tdb` across upgrades.
-
-- **New `db_meta` table** (`Key TEXT PRIMARY KEY, Value TEXT`) holding `AppVersionFirstSeen`, `AppVersionLastWrite`, `LastWriteUtc`. Stamped at the end of `Database.Open()` with `Assembly.GetExecutingAssembly().GetName().Version`.
-- **Auto-archive on detected upgrade** — before running migrations, if the stamped version is older than the running assembly version, copy the live `.tdb` to `Data/Archive/ThorneTimer-v{stamped}-{yyyyMMdd}.tdb` (`File.Copy`, with the connection closed). Fall back to a `_2`, `_3` counter only if the dated name collides.
-- **Pre-stamp DBs (no `db_meta` row)** — treat as version unknown; run migrations and stamp going forward, but do **not** auto-archive (we don't know the source version).
-- **Never auto-delete** archives. Pairs with the historical `Archive/` files already committed for upgrade-path testing.
-- **Failure is non-fatal** — copy errors log via `ThorneLog.Warn` but never block app launch.
-
-**Why bundled with Phase C:** the maintenance dialog will be the first feature that makes destructive timer edits easy, so having an automatic pre-upgrade snapshot in place is a natural prerequisite. Trivially small change (well under a day), but it has to be deliberately scheduled or it'll get forgotten.
-
-### Phase G — Smarter Timer Authoring (v0.8.0) ✨ **NEW**
-
-The single biggest user pain identified: **adding new timers takes too long**. This phase makes authoring feel fast and forgiving.
+Adding and fine-tuning timers is the single biggest player pain. This release makes authoring fast and forgiving — every timer becomes quicker to create and more accurate to match.
 
 **Keyword power features:**
-- **Multiple start / end keywords per timer (OR-matching)** — pipe-delimited (`|`) values in the existing `StartKeyword` / `EndKeyword` columns; no schema change, fully backwards compatible
-- **Wildcards in keywords** — `*` glob support (compiled to `Regex` and cached per timer); `^` / `$` as an opt-in full-regex escape hatch for power users
-- **Capture groups → speech / display templates** — new `SpeechTemplate` and `DisplayNameTemplate` columns. With keyword `"* tells you, '*'"` and template `"{0} says {1}"`, pings can actually speak meaningful content instead of generic alerts
-- **Cooldown / throttling per timer** — new `MinTriggerIntervalSeconds` column to suppress ping spam in noisy zones (busy auction channel, etc.)
+- **Wildcards in keywords** — `*` glob support (compiled to `Regex` and cached per timer); `^` / `$` as an opt-in full-regex escape hatch. Stops the fight with exact-match keywords for spells/messages that vary slightly.
+- **Capture groups → speech / display templates** — new `SpeechTemplate` and `DisplayNameTemplate` columns. Keyword `"* tells you, '*'"` with template `"{0} says {1}"` lets pings speak meaningful content instead of a generic alert.
+- **Cooldown / throttling per timer** — `MinTriggerIntervalSeconds` column to suppress ping spam in noisy zones.
+- **Keyword conflict detection** — warn when two timers would match the same line, so a new timer doesn't silently shadow an existing one (issue #33).
 
-**Authoring UX:**
+**Authoring UX (close the feedback loop):**
 - **Test / preview keyword button** — small dialog in the timer editor where you paste a log line (or pick from the active log file's tail) and see ✅ Match / ❌ No match plus capture group preview. Eliminates the "alt-tab into the game to trigger it" loop.
-- **Duplicate button** — clone an existing timer in one click (`Name = "Copy of X"`), opens directly in edit mode. Pairs with multi-keyword for the common "I have four variants of one spell" case.
 - **DependsOn picker** — replace the free-text column with a `DataGridViewComboBoxColumn` bound to the in-memory timer list, sorted by Name, refreshed when the collection changes (same pattern as v0.6.0's dynamic Style dropdown).
 - **Right-click context menu on the Timers grid** — Start / Stop / Reset / Duplicate / Test / Toggle Active / Jump to last trigger.
 - **Search / filter box above the Timers grid** — type-to-filter by Name / Category / Style. Essential at 130+ timers.
 - **Visual "just fired" indicator** — brief row-background flash when a timer starts or expires, so users can correlate sound alerts with which timer caused them.
 
 **Diagnostics:**
-- **Per-timer trigger history (ring buffer)** — in-memory last-N triggers per timer with timestamp and matched line, viewable via right-click → "Trigger history". Makes "did my timer actually fire?" answerable without re-reading the log.
-- **Per-timer fire-rate stats** — alongside trigger history, surface triggers/hour, last-fired timestamp, average interval between fires. Surfaces "this timer never actually completes its cooldown" or "this buff drops 4s early consistently" without any new parsing — it's just aggregation on data you already have. Foundation for Phase K.
-- **Capture-group `aggregate` modifier** — when a capture group is marked `aggregate=true` (e.g. `{damage:aggregate}`), the runtime automatically rolls min / max / avg / count into per-timer stats. No new parsing code; statistics fall out of writing timers. This is the architectural unlock for Phase K.
+- **Per-timer trigger history (ring buffer)** — in-memory last-N triggers per timer with timestamp and matched line, viewable via right-click → "Trigger history". Answers "did my timer actually fire?" without re-reading the log.
 
-### Phase H — Spell Library & Templates (v0.9.0) 📚 **NEW**
+**Reliability & data-safety (the 1.0 quality bar):**
+- **Auto-switch pause respects "peek" mode** — paused auto-switch no longer snaps back when the still-logged-in character's log grows (issue #6).
+- **`(auto)` status indicator is always accurate** — re-enabling auto-switch reliably restores the indicator (issue #7).
+- **Compact/full toggle preserves window position** — toggling view modes no longer throws the window off-screen (issue #26).
+- **Periodic auto-save of timer state** — crash / power-loss protection by flushing runtime state on a timer (issue #23).
+- **Auto-archive `.tdb` on detected upgrade** — snapshot the tome before migrations when the stamped `LastWrittenByVersion` is older than the running build. The `db_meta` stamp and `BackupDatabase` plumbing already shipped in v0.6.0; only the upgrade-detection trigger remains.
 
-Direct attack on the "new spell → new timer" pain. Eliminate the most repetitive part of authoring entirely.
+### Spell Library & Templates — v0.8.0 📚 **NEW**
+
+Direct attack on the "new spell → new timer" pain — eliminate the most repetitive part of authoring entirely.
+
+> Bundled spell data is **optional**; Thorne Timer stays fully usable without it. A PDQ/Project Quarm `.sql` dump is on hand as a seed source, so the work is mostly import + UI (issue #27).
 
 **Spell library:**
-- **Bundled EQ spell database** — JSON / SQLite snapshot of spell data (name, duration, target type, recast, level by class). Shipped with the app; refreshable. Sources: existing EQ databases (Lucy, Allakhazam exports) where licensing permits, or community-contributed JSON.
-- **"Add timer from spell" dialog** — pick spell from a searchable, class-filtered list → keywords, duration, recast, suggested style auto-populated. The whole timer is one click + a few tweaks instead of starting from a blank row.
-- **Spell-cast auto-detection (optional)** — when a `You begin casting <Spell>` or `<You|Someone> feel(s) the <Buff>` line is seen for a spell with no timer yet, surface a non-intrusive prompt or notification: "Add timer for <Spell>?" Click yes → pre-filled dialog. Click no → suppressed per-character.
+- **Bundled EQ spell database** — JSON / SQLite snapshot of spell data (name, duration, target type, recast, level by class), shipped with the app and refreshable. Seed source: a PDQ/Project Quarm `.sql` dump (issue #27), or community-contributed JSON where licensing permits.
+- **"Add timer from spell" dialog** — pick a spell from a searchable, class-filtered list → keywords, duration, recast, and suggested style auto-populated. One click plus a few tweaks instead of a blank row.
+- **Spell-cast auto-detection (optional)** — when a `You begin casting <Spell>` or `<You|Someone> feel(s) the <Buff>` line is seen for a spell with no timer, prompt "Add timer for <Spell>?" Yes → pre-filled dialog; No → suppressed per-character.
 
 **Templates:**
 - **Timer template / pack export & import** — share timer sets as portable JSON (or `.ttpack` files). Critical for community sharing: "Druid Vert's leveling pack", "Necro charm/snare combo", "Velious overland spawn timers".
 - **Class starter packs** — ship curated packs per EQ class (utility spells, common buffs, pet management). New player imports their class pack and has a sensible default setup in seconds.
 - **Zone spawn packs** — pre-built spawn timer sets for popular hunting zones, leveraging DependsOn chains. Solves the "new zone setup" pain.
 
-### Phase I — Mini View Skinning & Theming (v0.10.0) 🎨 **NEW**
+### Mini View Skinning & Theming — v0.9.0 🎨 **NEW**
 
 Make overlays feel like part of the EQ UI rather than alien windows on top of it.
 
-**Per-style typography (already partly scoped):**
+**Per-style typography:**
 - Add `FontFamily`, `FontSize`, `Bold`, `Italic` columns to the `styles` table
 - Settings to choose between bundled fonts (a curated set that match common EQ skins) or any installed system font
 
@@ -170,28 +149,26 @@ Make overlays feel like part of the EQ UI rather than alien windows on top of it
 - **Skin editor / preview** — small dialog to preview a skin against sample timers before applying
 
 **Layout polish:**
-- **Per-view padding / spacing** — currently fixed; let dense raid users go tight, casual users go loose
+- **Per-view padding / spacing** — currently fixed; let busy views go tight, casual views go loose
 - **Per-view background opacity** — already partial; expose to UI
 - **Optional title bar / drag handle** styling that matches the chosen skin
 
-### Phase J — Feed Views & Log Synthesis (v0.11.0) 📜 **NEW**
+### Feed Views & Log Synthesis — v0.10.0 📜 **NEW**
 
-Introduces a second view type alongside countdown timers: a **scrolling, transformed event feed**. Generalizes the speech-template work from Phase G into a full capture → transform → display → (optionally) speak pipeline. The killer example: vendor sale prices appear as `Rusty Short Sword — 1p 2g` next to the merchant window, optionally spoken as "one platinum two gold".
-
-**Why this fits here:** depends on Phase G capture groups (parsing), Phase I skinning (readable styling). Strengthens the "timers are core, feeds are additive" boundary.
+Introduces a second view type alongside countdown timers: a **scrolling, transformed event feed**. The killer example: vendor sale prices appear as `Rusty Short Sword — 1p 2g` next to the merchant window, optionally spoken as "one platinum two gold".
 
 **New view type:**
 - **`ViewType` column on `miniviews`** — `Timers` (current behavior) or `Feed` (new). Existing views default to `Timers`; backwards compatible.
 - **Feed renderer** — scrolling, timestamped lines; newest-top or newest-bottom (per view); configurable max line count; pause-on-hover; click-to-copy.
 - **Per-line color** inherits from the originating timer's style — the v0.6.0 style system carries straight through.
 - **Auto-fade / shrink on idle** — feed compresses when no new activity, expands when busy. Optional.
-- **Skin support** — feeds use the same Phase I skin system; bundled skins ship a "feed" variant tuned for readability over transparency.
+- **Skin support** — feeds use the same skin system from the theming release; bundled skins ship a "feed" variant tuned for readability over transparency.
 
-**Log synthesis pipeline (generalizes Phase G):**
+**Log synthesis pipeline (generalizes the authoring release):**
 - **Multiple output targets per timer** — a single keyword match can trigger any combination of: countdown timer, feed line, speech, sound. Each target has its own template.
 - **Templated output with capture groups** — `FeedTemplate`, `SpeechTemplate`, `DisplayNameTemplate` columns. Named groups (`{item}`, `{price}`, `{npc}`) preferred over positional (`{0}`, `{1}`) for clarity.
 - **Speech sanitizer** — user-configurable substitutions (INI-stored) so `1p 2g 3s 4c` becomes "one platinum two gold three silver four copper" instead of "one P two G three S four C". Ships with a default EQ-aware substitution set.
-- **Per-target throttling** — `MinFeedIntervalSeconds`, `MinSpeechIntervalSeconds`, separate from Phase G's per-timer throttle, so a busy timer can still flash visually but only speak the first match per window.
+- **Per-target throttling** — `MinFeedIntervalSeconds`, `MinSpeechIntervalSeconds`, separate from the authoring release's per-timer throttle, so a busy timer can still flash visually but only speak the first match per window.
 - **"Speak only if feed was idle"** option — in noisy zones, the visual feed shows everything but speech stays quiet until there's a gap.
 
 **Persistence model:**
@@ -204,20 +181,57 @@ Introduces a second view type alongside countdown timers: a **scrolling, transfo
 - ❌ No two-way chat / sending text to the game
 - ✅ Yes: curated, transformed streams (vendor prices, faction hits, named-mob sightings, group invites, tells)
 
-### Phase B — Directional Speech & Ping Refactor (v0.12.0)
+### Directional Speech & Ping Refactor — v0.11.0
 
-Centralize the Ping timer execution model and eliminate hardcoded branch points. **Pushed later** because it's internal cleanup with no user-visible benefit — Phases G, H, I deliver more user value first.
+Centralize the Ping timer execution model and eliminate hardcoded branch points — internal cleanup with no user-visible change.
 
-- Refactor `StartTimer` / `StopTimer` / `ResetTimer` to handle Ping via directional speech pattern
+- Refactor `StartTimer` / `StopTimer` / `ResetTimer` to handle Ping via the directional speech pattern
 - Eliminate `|| PingTimer()` escape hatches throughout the codebase
 - Centralize Ping lifecycle management
 - See [TD-011](../ThorneTimer/Docs/active-views/technical-debt.md) for the full 19-step plan
 
 ---
 
+## 🧭 Post-1.0 / Promote-on-Adoption
+
+Larger structural features that are **deliberately deferred until after 1.0** and only promoted
+into a numbered release if user adoption grows enough to justify the effort and the disruption.
+The current app is finely tuned for a solo/small-group player; these change *how the app is
+shaped*, so they wait until there's a base of users asking for them.
+
+### Timer Maintenance Dialog (formerly Phase C) ⏸️ **DEFERRED**
+
+Separate the gameplay view from timer maintenance by splitting the single grid into a read-only
+runtime dashboard plus a dedicated editing dialog.
+
+> **Why deferred:** the existing single-grid + auto-switch workflow already works well and is
+> finely tuned in daily play. The dual-grid split is a *UX refinement for power users with many
+> timers/characters*, not a correctness, stability, or data-safety gap — so it does not gate 1.0.
+> The prerequisite refactor is already done (see below), which keeps the door open to pick this up
+> cheaply whenever adoption warrants it.
+
+**Already in place (shipped in v0.6.0):**
+- ✅ `TimersController` + `TimersRepository` and `CharactersController` + `CharactersRepository` extracted from `FormMain`
+- ✅ `LogMonitor` exposes `isActive` + `GetActiveCharacterID()` so the main form can lock to the actively logging character without snapshot/restore gymnastics
+
+**Remaining work when promoted (issues #16–#21):**
+- **Read-only timer view** — main form grid becomes non-editable, always shows the active character
+- **Timer maintenance dialog** (`Edit > Timers...`) — host the existing `TimersController` against a separate grid for add/edit/delete across all characters (#16)
+- **Dual-grid architecture** — main form grid (active gameplay) + dialog grid (frozen maintenance)
+- **Always-show-active mode** — main form automatically follows the actively logging character (#21)
+- **Frozen timer display in dialog** — maintenance grid loads timers with `isActive=false` (no countdown)
+- **Background preservation** — active character's timers keep running while editing others in the dialog
+- **Companion management dialogs** — Characters (#17), Categories (#18), Classes (#19), Views (#20) follow the same dialog pattern once the Timers dialog proves it out
+
+**Promotion trigger:** revisit when there's meaningful external adoption (multiple active users
+managing large timer sets) or when a concrete user request makes the single-grid workflow a pain
+point rather than a preference.
+
+---
+
 ## 📋 Planned
 
-### Phase E — Zones, Groups & Conditions (v0.13.0)
+### Zones, Groups & Conditions — v0.12.0
 
 Context-aware timer activation — useful for solo/small-group exploration play.
 
@@ -227,9 +241,9 @@ Context-aware timer activation — useful for solo/small-group exploration play.
   - "Start timer Y only if timer X is currently running"
   - "Reset all timers in group Z when keyword fires" (great for wipes: `You have been slain` resets combat group)
 - **Per-timer warning threshold override** — global warning is the default; per-timer override for "warn at last 30s" or "warn at last 10%"
-- **Class profiles (optional)** — class-specific timer profiles per EQ class, building on Phase H's spell library
+- **Class profiles (optional)** — class-specific timer profiles per EQ class, building on the spell library
 
-### Phase F — Power-User & Quality-of-Life (v1.0.0)
+### Power-User & Quality-of-Life — v1.0.0
 
 The "everything we deferred because it was a nice-to-have" release that pushes us to 1.0.
 
@@ -237,23 +251,22 @@ The "everything we deferred because it was a nice-to-have" release that pushes u
 - **Quick mute button** in toolbar — doorbell / phone / boss-walked-in scenarios
 - **Character online/offline time tracking** — adjust Character+ scope timers for time elapsed while logged out (server cooldowns that progress offline)
 - **Better online state detection** — distinguish character inactive (manual switch) vs. logged out (camp/disconnect)
-- **Timer database backup / restore tooling** — built-in `.tdb` snapshot and restore, with auto-snapshots before destructive ops
+- **Timer database backup / restore tooling** — built-in `.tdb` snapshot and restore, with auto-snapshots before destructive ops. *(Partially shipped: `Database.BackupDatabase` with tiered pruning and the `db_meta` version stamps landed in v0.6.0; a `Restore` UI and the pre-destructive auto-snapshot trigger remain.)*
 - **Performance profiling diagnostics** — built-in panel showing log-poll latency, grid sync time, mini-view paint time
-- **Accessibility** — high contrast mode, screen-reader labels, larger text mode (overlaps with Phase I theming)
+- **Accessibility** — high contrast mode, screen-reader labels, larger text mode (overlaps with the theming release)
 - **User documentation / help system** — in-app help dialog or `Help → Topics` menu pointing at bundled markdown / online guide
 
-### Phase K — Personal Play Statistics (v1.1.0) 📊 **NEW**
+### Personal Play Statistics — v1.1.0 📊 **NEW**
 
-The **first post-1.0 release.** Statistics earn their place only because the foundation was built opportunistically across G / H / I / J / E. Phase K is the dedicated focus that ties them together into a coherent self-improvement tool.
+The first post-1.0 release: a self-improvement dashboard built mostly on data the earlier releases already capture. The `aggregate` capture-group modifier means most stats fall out of writing timers — this release is mostly *presentation*.
 
-**Why this comes after 1.0:** Thorne Timer is a timer app first. Stats arrive only after the core authoring + feed + theming + zones story is mature. The architecture unlock (Phase G capture groups + `aggregate` modifier) means most of the parsing is already free by the time we get here — Phase K is mostly *presentation* of data already being collected.
-
-**Personal play metrics (in scope — "am I playing well?"):**
+**Personal play metrics ("am I playing well?"):**
 - **Combat survival** — hits taken, hits/min, max single hit, heals received, net survivability
 - **Casting health** — fizzle rate per spell, interrupt rate, cast count, pet death count
 - **Progression** — XP messages per hour (proxy for XP/hr), loot drops by item, currency earned per session
 - **Session summary** — time logged in per character, time per zone, camp count, character switches
 - **Death recap** — last N log lines before death with damage source highlighted; written to `Logs/deaths/` for post-mortem review
+- **Per-timer fire-rate stats** — triggers/hour, last-fired timestamp, average interval between fires; reveals "this timer never completes its cooldown" or "this buff drops 4s early"
 
 **New view type:**
 - **`ViewType=Stats` (third view type alongside `Timers` and `Feed`)** — dashboard renderer with cards, simple bar / line charts, top-N tables. Same skin system as the other view types.
@@ -261,6 +274,7 @@ The **first post-1.0 release.** Statistics earn their place only because the fou
 - **CSV export** — raw session data for users who want their own analysis
 
 **Architecture (avoids parsing slowdown):**
+- **Capture-group `aggregate` modifier** — marking a group `aggregate=true` (e.g. `{damage:aggregate}`) rolls min / max / avg / count into per-timer stats with no new parsing code
 - Stats accumulate in **in-memory dictionaries** keyed by timer ID / spell name / zone, not SQLite-per-match
 - **Periodic flush to SQLite** — every 60s and on session end / character switch / camp
 - **Lazy computation** — derived metrics (kills/hour, fizzle %) computed only when the stats view is open
@@ -286,7 +300,7 @@ Items captured from design discussion but not yet slotted to a version. Kept her
 - **Move transient / preference state from `.tdb` to INI** — recent tomes, window position, mute-until timestamp, hotkey bindings, "last selected character". Per-character / per-timer / per-style data stays in the tome.
 
 **Performance & code health:**
-- **Virtual-mode `DataGridView`** for 200+ timer datasets (Phase G+ enhancement)
+- **Virtual-mode `DataGridView`** for 200+ timer datasets (authoring-phase enhancement)
 - **Incremental grid updates** — only refresh changed rows, not the whole grid
 - **Async log polling with `Task` + `CancellationToken`** + adaptive backoff (10 ms active, 250 ms idle)
 - **Move startup work off the UI thread** — show form immediately with a loading overlay; bind grid after `Task.Run` load
@@ -326,25 +340,25 @@ Ongoing improvements that can ship with any release:
 
 ## Timeline
 
-| Phase | Version | Theme | Status |
-|-------|---------|-------|--------|
-| Phase A — Core Engine | v0.1.0 – v0.4.0 | Foundation | ✅ Shipped |
-| Phase D — Per-Character & Styles | v0.5.0 | Multi-character | ✅ Shipped |
-| Phase D++ — GUI & Performance | v0.6.0 | Styles / Views CRUD, perf | 🔄 In Testing |
-| **Phase C — Maintenance Dialog** | **v0.7.0** | **Separate play from edit** | **🎯 Next** |
-| **Phase G — Smarter Authoring** | **v0.8.0** | **Multi-keyword, wildcards, capture groups, test button** | **🎯 Planned** |
-| **Phase H — Spell Library & Templates** | **v0.9.0** | **Spell DB, "add from spell", import/export packs** | **🎯 Planned** |
-| **Phase I — Skinning & Theming** | **v0.10.0** | **EQ-UI-matching overlays, per-style fonts** | **🎯 Planned** |
-| **Phase J — Feed Views & Log Synthesis** | **v0.11.0** | **Scrolling feed view type, transformed event streams, speech sanitizer** | **📜 Planned** |
-| Phase B — Ping Refactor | v0.12.0 | Internal cleanup | 📋 Planned |
-| Phase E — Zones, Groups, Conditions | v0.13.0 | Context-aware activation | 📋 Planned |
-| Phase F — Power-User & QoL | v1.0.0 | Hotkeys, mute, backups, a11y | 📋 Future |
-| **Phase K — Personal Play Statistics** | **v1.1.0** | **Survival, fizzle rate, deaths, XP/hr; stats view type; death recap** | **📊 Post-1.0** |
+| Release | Version | Highlights | Status |
+|---------|---------|------------|--------|
+| Core Engine | v0.1.0 – v0.4.0 | Foundation | ✅ Shipped |
+| Per-Character & Styles | v0.5.0 | Multi-character | ✅ Shipped |
+| GUI & Performance | v0.6.0 | Styles / Views CRUD, perf | ✅ Shipped |
+| **Smarter Authoring** | **v0.7.0** | **Wildcards, capture groups, keyword test button, conflict detection (+ reliability fixes)** | **🎯 Next** |
+| **Spell Library & Templates** | **v0.8.0** | **Seed `spells` from PDQ `.sql`, "add from spell", import/export packs** | **🎯 Planned** |
+| **Skinning & Theming** | **v0.9.0** | **EQ-UI-matching overlays, per-style fonts** | **🎯 Planned** |
+| **Feed Views & Log Synthesis** | **v0.10.0** | **Scrolling feed view type, transformed event streams, speech sanitizer** | **📜 Planned** |
+| Ping Refactor | v0.11.0 | Internal cleanup | 📋 Planned |
+| Zones, Groups, Conditions | v0.12.0 | Context-aware activation | 📋 Planned |
+| Power-User & QoL | v1.0.0 | Hotkeys, mute, backups, a11y, in-app help | 📋 Future |
+| **Personal Play Statistics** | **v1.1.0** | **Survival, fizzle rate, deaths, XP/hr; stats view type; death recap** | **📊 Post-1.0** |
+| Timer Maintenance Dialog | Post-1.0 | Read-only grid + `Edit > Timers...` dialog | ⏸️ Deferred (promote on adoption) |
 
 > Version numbers are targets and may shift as development progresses.
-> **Theme grouping:** v0.7.0–v0.10.0 form a coherent "authoring & presentation" arc — separate editing from play, then make editing fast, then auto-populate from spell data, then make the overlays look native. **v0.11.0 (Phase J)** introduces the second display modality (scrolling feeds) and the log-synthesis pipeline; v0.12.0–v1.0.0 shift to internal cleanup, context awareness, and power-user polish. **v1.1.0 (Phase K)** is the first post-1.0 release, adding personal-play statistics on top of the capture-group infrastructure built in Phase G.
+> The **Timer Maintenance Dialog** sits off the numbered track; promoted into a release only if adoption justifies the dual-grid restructure.
 
 ---
 
-**Last Updated:** v0.6.0 testing cycle (`v0.6.0-gui-enhancements` branch)
+**Last Updated:** v0.7.0 planning pass (`v0.7.0-dev` branch) — re-sequenced for player value; maintenance dialog deferred post-1.0
 **Maintained By:** Draknaré Thorne

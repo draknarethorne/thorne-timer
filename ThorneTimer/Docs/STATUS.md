@@ -1,8 +1,13 @@
 # Documentation Status Index
 
-> **Purpose:** Quick visibility into what is planned, implemented, in progress, or historical for the `v0.6.0-gui-enhancements` branch.
+> **Purpose:** Quick visibility into what is planned, implemented, in progress, or historical.
 > 
-> **Last Updated:** 2026-06-25
+> **Last Updated:** v0.7.0 planning pass (`v0.7.0-dev` branch) \u2014 reconciled with shipped v0.6.0 code
+>
+> **Reconciliation note:** v0.6.0 has shipped. The `TimersController`/`TimersRepository`
+> and `CharactersController`/`CharactersRepository` extractions that earlier docs list as
+> "in flight" are **done and merged**. The styles/views *time-format* slice shipped; the
+> broader **skin-engine** spec (`styles-and-views-enhancements.md`) is still future work.
 
 ---
 
@@ -32,8 +37,8 @@ These reflect current behavior or active planning:
 | `character-scope-timer-pausing.md` | Feature Design | ✅ Implemented | Implemented behavior reference |
 | `multi-keyword-support-feature.md` | Feature Note | ✅ Implemented | Pipe-separated keyword matching shipped |
 | `views-grid-completion-phase1.md` | Phase Summary | ✅ Implemented | Views grid phase completion |
-| `styles-and-views-enhancements-progress.md` | Progress Tracker | 🔄 In Progress | Tracks implemented subset vs remaining scope |
-| `styles-and-views-enhancements.md` | Feature Spec | 📋 Planned | Master spec for broader skin engine work |
+| `styles-and-views-enhancements-progress.md` | Progress Tracker | 🗄️ Historical | Time-format slice + `TimersController` extraction shipped in v0.6.0; skin-engine scope moved to ROADMAP Phase I |
+| `styles-and-views-enhancements.md` | Feature Spec | 📋 Planned | Master spec for broader skin engine work (ROADMAP Phase I) |
 | `architecture-redesign.md` | Architecture | 📋 Planned | Long-term MVP refactor roadmap |
 | `roadmap-phase-c-priority.md` | Roadmap | 📋 Planned | Priority planning notes |
 | `depends-on-chaining-enhancement.md` | Proposal | 📋 Planned | Dependency-chain optimization proposal |

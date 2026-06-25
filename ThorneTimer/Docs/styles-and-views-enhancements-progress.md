@@ -1,16 +1,22 @@
 # Styles & Views Enhancements - Implementation Progress
 
-> **Status: IN PROGRESS - foundation slice complete, skin engine not yet started.**
-> The **Time Formats** slice (plan section 2) has fully landed and is in testing. An unplanned
-> **interim correctness-hardening** pass (plan section 13.7) plus a **`FormMain` -> `TimersController`**
-> extraction are currently **in flight (uncommitted)**. The marquee work - per-view appearance
-> fields (section 3.2), editor dialogs + live preview (sections 7.1-7.4), and the entire **Thorne** layered-window
-> skin engine (section 8) with the dual-renderer seam (section 10) - has **not been started**.
+# Styles & Views Enhancements - Implementation Progress
 
-**Version:** v0.6.0
+> **Status: HISTORICAL (post-v0.6.0).** This tracker covered the v0.6.0 foundation slice.
+> The **Time Formats** slice (plan section 2) shipped, and the **interim correctness-hardening**
+> pass (plan section 13.7) plus the **`FormMain` -> `TimersController`** extraction are now
+> **committed and shipped in v0.6.0** (they are no longer "in flight"). The marquee skin-engine
+> work - per-view appearance fields (section 3.2), editor dialogs + live preview (sections 7.1-7.4),
+> and the entire **Thorne** layered-window skin engine (section 8) with the dual-renderer seam
+> (section 10) - was **not started here** and now lives in **ROADMAP Phase I (v0.10.0)**.
+>
+> Percentages and "in flight" notes below are preserved as a point-in-time snapshot; treat the
+> ROADMAP as the current source of truth.
+
+**Version:** v0.6.0 (shipped)
 **Plan document:** [styles-and-views-enhancements.md](styles-and-views-enhancements.md)
-**Branch:** `v0.6.0-gui-enhancements`
-**Last assessed:** 2026-06-25 (branch `v0.6.0-gui-enhancements`)
+**Branch (at time of writing):** `v0.6.0-gui-enhancements` (merged to `main`)
+**Last assessed:** 2026-06-25 (snapshot retained for history)
 
 ---
 
