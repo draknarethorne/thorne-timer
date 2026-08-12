@@ -211,6 +211,35 @@ Thorne Timer reads your EQ log file line by line as new entries appear. When a l
 
 ---
 
+## Configuration
+
+Most behavior works out of the box, but two layers let you fine-tune things:
+
+- **`ThorneTimer.ini`** — a plain-text file next to `ThorneTimer.exe`, applying to
+  **every** tome. It controls diagnostic logging (`[Logging]`), automatic tome
+  backups (`[Backups]`), and the auto-pause / character-switch monitor
+  (`[Monitoring]`). The file ships fully commented, so you can read each option and
+  its default right inside it — just edit, save, and restart.
+- **The Settings tab** — preferences stored **inside each tome** (`.tdb`), so they
+  travel with it: voice, overlay opacity, warning time, colors, and class filtering.
+
+Common knobs in `[Monitoring]` (seconds; `0` disables a timeout):
+
+```ini
+[Monitoring]
+CampInactivityThresholdSeconds=10   ; delay after a /camp warning before auto-pause
+InactivityTimeoutSeconds=300        ; crash / disconnect fallback (no log activity)
+SwitchThresholdBytes=10             ; min log growth before auto-switching characters
+```
+
+> Lower the two timeouts (e.g. `3` and `15`) to test the camp-out auto-pause without
+> waiting the full production windows.
+
+**See the full [Configuration Guide](Docs/configuration.md)** for every INI option,
+the tiered file-retention rules, and the complete list of per-tome Settings.
+
+---
+
 ## Working with Timers
 
 This section walks through the everyday building blocks: **keywords**, **scope**, **categories**, **dependent chains**, and the **right-click / toolbar shortcuts**. Every column in the timer grid also has a hover tooltip, so you can learn the UI as you go.

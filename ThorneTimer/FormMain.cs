@@ -669,6 +669,22 @@ namespace ThorneTimer
             tsbAutoSwitch.Checked = autoSwitch;
             logMonitor.AutoSwitchEnabled = autoSwitch;
 
+            // Restore inactivity-fallback threshold (ungraceful exit / crash /
+            // link-dead, where no camp warning is ever logged). Stored in seconds;
+            // 0 disables. Defaults to the LogMonitor default (300s) when unset.
+            string inactivityRaw = Database.GetSetting(con, "InactivityTimeoutSeconds");
+            if (!string.IsNullOrEmpty(inactivityRaw)
+                && int.TryParse(inactivityRaw, out int inactivitySecs)
+                && inactivitySecs >= 0)
+            {
+                logMonitor.InactivityTimeoutSeconds = inactivitySecs;
+            }
+
+            // Layer ThorneTimer.ini [Monitoring] on top of the DB/default values
+            // so the thresholds can be tuned without recompiling or touching the
+            // tome. INI keys win; absent keys leave the values set above untouched.
+            logMonitor.LoadIniSettings();
+
             // Restore show-all-classes setting
             bool showAllClasses = Database.GetSetting(con, "ShowAllClasses") != "0";
             tsbShowAllClasses.Checked = showAllClasses;

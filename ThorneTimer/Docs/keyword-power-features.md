@@ -362,8 +362,9 @@ in `Database.cs`.
 
 ## 10. Phasing
 
-1. **Baseline + harness** - add the replay benchmark and PERF stats around the
-   *current* `KeywordMatches`. Record the number. (No behavior change.)
+1. **Baseline + harness** [DONE - Phase 1] - add the replay benchmark and PERF
+   stats around the *current* `KeywordMatches`. Record the number. (No behavior
+   change.) See "Implementation status" below.
 2. **Compiled-matcher refactor** - replace per-chunk `Split/Trim/IndexOf` with
    precompiled literal matchers. Re-measure: should be **<= baseline** (less
    allocation).
@@ -377,6 +378,32 @@ in `Database.cs`.
 7. **(Conditional) automaton** - only if Section 7.3 numbers demand it.
 
 Each phase is independently shippable and independently measured.
+
+### Implementation status
+
+**Phase 1 - Baseline + harness (landed):** measurement only, no behavior change.
+
+- `MatchStats.cs` - opt-in aggregator (Section 7.1). Accumulates per-chunk match
+  time and counters (chunks, matches, keyword evaluations) over a rolling window
+  and flushes ONE `PERF [match-window]` line every `FlushIntervalSeconds`
+  (default 10s) instead of logging per chunk. No-op when `ThorneLog.Enabled` is
+  false, so production pays nothing.
+- `TimerRuntime.ProcessLogText` - wrapped with a `Stopwatch` (only when logging
+  is enabled) that feeds `MatchStats.Sample(...)`. The match logic is unchanged;
+  only counters were added around the existing `KeywordMatches` calls.
+- `TimerRuntime.UpdateTierHistogram` / `ClassifyTier` - read-only classification
+  of existing keyword text into literal / wildcard / regex shape, logged once at
+  load as `PERF [tier-histogram]: literal=.. wildcard=.. regex=..`. Phase 1 only
+  COUNTS tiers; it does not change how anything is matched.
+- `TimerRuntime.RunReplayBenchmark(path, chunkSize=1024)` - replay harness
+  (Section 7.3): feeds a captured EQ log file through `ProcessLogText` in the same
+  1024-byte ASCII chunks `LogMonitor` uses, then flushes a `PERF [match-final]`
+  summary. Use this to capture the BASELINE number before later tiers land.
+
+To capture a baseline: enable logging (`[Logging] enabled=true`, `minlevel=Info`
+in `ThorneTimer.ini`), load the stress tome, call `RunReplayBenchmark` on a
+captured log, and record the emitted `PERF` lines. Every later phase is compared
+against that number.
 
 ---
 

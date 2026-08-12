@@ -22,6 +22,10 @@ Step-by-step guide for creating a GitHub Release — from prep to publish.
 ### **[ROADMAP.md](ROADMAP.md)** 🗺️
 Detailed development roadmap with phase breakdowns and future plans.
 
+### **[configuration.md](configuration.md)** ⚙️
+User-facing configuration reference: every `ThorneTimer.ini` option (`[Logging]`,
+`[Monitoring]`, `[Backups]`) and the per-tome Settings tab. Linked from the main README.
+
 ---
 
 ## Directory Structure
@@ -58,6 +62,7 @@ Includes:
 
 ## Quick Links
 
+- **[Configuration Guide](configuration.md)** ⚙️ INI options and per-tome Settings (user-facing)
 - **[Version Management](VERSION-MANAGEMENT.md)** 📋 Versioning strategy and release workflow
 - **[Release Publishing](releases/PUBLISHING.md)** 📦 How to create a release
 - **[Roadmap](ROADMAP.md)** 🗺️ Development phases and future plans

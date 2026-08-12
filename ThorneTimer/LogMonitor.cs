@@ -38,6 +38,12 @@ namespace ThorneTimer
         public DateTime LastActivityUtc { get; set; }
         public bool CampingOut { get; set; }
         public DateTime CampStartUtc { get; set; }
+
+        // Trailing fragment from the previous read, prepended to the next chunk
+        // for camp-pattern detection only, so a camp message that straddles a
+        // 1024-byte read boundary is still matched. Not forwarded to the timer
+        // engine (it is only used for Contains checks).
+        public string CampScanTail { get; set; } = "";
     }
 
     /// <summary>
@@ -56,9 +62,11 @@ namespace ThorneTimer
 
         /// <summary>
         /// Minimum bytes a non-active file must grow before triggering a switch.
-        /// Prevents false positives from OS flushes or antivirus scans.
+        /// Prevents false positives from OS flushes or antivirus scans. Tunable
+        /// via the [Monitoring] section of ThorneTimer.ini; raise it if benign
+        /// background writes cause spurious character switches.
         /// </summary>
-        private const int SwitchThresholdBytes = 10;
+        public int SwitchThresholdBytes { get; set; } = 10;
 
         /// <summary>
         /// When false, file growth on non-active characters is tracked but
@@ -80,6 +88,73 @@ namespace ThorneTimer
         /// Default is 10 seconds.
         /// </summary>
         public int CampInactivityThresholdSeconds { get; set; } = 10;
+
+        /// <summary>
+        /// Fallback for ungraceful exits (client crash, Alt-F4, link-dead /
+        /// disconnect) where NO camp warning is ever written and the log simply
+        /// goes silent. If the actively logging character produces no new log
+        /// bytes for this many seconds, it is treated as gone and the same
+        /// <see cref="CharacterCampedOut"/> auto-pause fires.
+        ///
+        /// This is intentionally much longer than the camp threshold because real
+        /// play almost always emits *some* log noise; the window only elapses when
+        /// the client is truly gone. Set to 0 to disable the fallback entirely.
+        /// Default is 300 seconds (5 minutes).
+        /// </summary>
+        public int InactivityTimeoutSeconds { get; set; } = 300;
+
+        /// <summary>
+        /// Loads the auto-pause thresholds from the [Monitoring] section of
+        /// ThorneTimer.ini (next to the executable). INI values take priority
+        /// over the built-in defaults; missing keys leave the current value
+        /// untouched, so callers may layer this over database-restored values.
+        ///
+        /// Keys (seconds; 0 disables that timer):
+        ///   CampInactivityThresholdSeconds  - quiet period after a camp warning
+        ///   InactivityTimeoutSeconds        - silent-log fallback for crashes
+        /// </summary>
+        public void LoadIniSettings()
+        {
+            try
+            {
+                string iniPath = ThorneArchive.GetIniPath();
+                var settings = ThorneArchive.ParseIniSection(iniPath, "Monitoring");
+                if (settings.Count == 0) return;
+
+                if (settings.TryGetValue("CampInactivityThresholdSeconds", out string campVal)
+                    && int.TryParse(campVal, out int campSecs)
+                    && campSecs >= 0)
+                {
+                    CampInactivityThresholdSeconds = campSecs;
+                }
+
+                if (settings.TryGetValue("InactivityTimeoutSeconds", out string inactiveVal)
+                    && int.TryParse(inactiveVal, out int inactiveSecs)
+                    && inactiveSecs >= 0)
+                {
+                    InactivityTimeoutSeconds = inactiveSecs;
+                }
+
+                // Must be at least 1; a 0 threshold would make every OS flush
+                // look like a character switch.
+                if (settings.TryGetValue("SwitchThresholdBytes", out string switchVal)
+                    && int.TryParse(switchVal, out int switchBytes)
+                    && switchBytes >= 1)
+                {
+                    SwitchThresholdBytes = switchBytes;
+                }
+
+                ThorneLog.Info(
+                    $"Monitoring config loaded from ini: " +
+                    $"CampInactivityThresholdSeconds={CampInactivityThresholdSeconds}, " +
+                    $"InactivityTimeoutSeconds={InactivityTimeoutSeconds}, " +
+                    $"SwitchThresholdBytes={SwitchThresholdBytes}");
+            }
+            catch (Exception ex)
+            {
+                ThorneLog.Warn($"Failed to load [Monitoring] from ini: {ex.Message}");
+            }
+        }
 
         /// <summary>
         /// Fired when new text is read from the active character's log file.
@@ -140,6 +215,51 @@ namespace ThorneTimer
         private const string CampAbandonPattern = "You abandon your preparations to camp.";
         private const string DisconnectPattern = "You have been disconnected.";
         private const string LinkDeadPattern = "LOADING, PLEASE WAIT...";
+
+        /// <summary>
+        /// Scans a freshly read chunk for camp warning / abandon patterns and
+        /// updates the camp state on <paramref name="state"/>. Handles the case
+        /// where a camp message straddles a 1024-byte read boundary by prepending
+        /// the trailing fragment kept from the previous read
+        /// (<see cref="CharacterFileState.CampScanTail"/>) before matching, then
+        /// retaining a new tail for the next read. This runs for the actively
+        /// logging character regardless of which character is selected in the UI,
+        /// so camp-out is detected even while browsing another character.
+        /// </summary>
+        private void ScanForCampPatterns(CharacterFileState state, string chunk)
+        {
+            if (state == null || string.IsNullOrEmpty(chunk)) return;
+
+            // Prepend the residual tail so a pattern split across two reads is
+            // still found. The combined string is used for matching only.
+            string scan = state.CampScanTail.Length > 0
+                ? state.CampScanTail + chunk
+                : chunk;
+
+            if (scan.IndexOf(CampWarningPattern, StringComparison.Ordinal) >= 0)
+            {
+                if (!state.CampingOut)
+                    ThorneLog.Info($"Camp warning detected for charID={state.CharacterID} (active={state.IsActive}); threshold={CampInactivityThresholdSeconds}s");
+                state.CampingOut = true;
+                state.CampStartUtc = DateTime.UtcNow;
+            }
+            else if (scan.IndexOf(CampAbandonPattern, StringComparison.Ordinal) >= 0)
+            {
+                if (state.CampingOut)
+                    ThorneLog.Info($"Camp abandoned for charID={state.CharacterID}; camp-out cancelled");
+                state.CampingOut = false;
+                state.CampStartUtc = DateTime.MinValue;
+            }
+
+            // Keep enough trailing text to bridge a boundary split on the next
+            // read. The longest pattern is the camp warning; keep one char less
+            // than its length so a pattern that begins at the very end of this
+            // chunk can complete at the start of the next one.
+            int keep = CampWarningPattern.Length - 1;
+            state.CampScanTail = scan.Length <= keep
+                ? scan
+                : scan.Substring(scan.Length - keep);
+        }
 
         /// <summary>
         /// Start monitoring multiple character log files.
@@ -340,9 +460,19 @@ namespace ThorneTimer
                         {
                             ReadNewContent(state, token);
                         }
+                        else if (state.IsActive)
+                        {
+                            // The actively logging character is NOT the one selected for
+                            // viewing (browsing mode). We still must detect its camp-out,
+                            // so read its new bytes for pattern scanning only - without
+                            // forwarding them to the timer engine (the selected character's
+                            // content drives timers, not this one).
+                            ScanActiveFileForCamp(state, token);
+                        }
                         else
                         {
-                            // Track file size for non-selected files without reading content
+                            // Track file size for non-selected, non-active files
+                            // without reading content.
                             state.LastFileSize = currentSize;
                         }
                     }
@@ -364,31 +494,65 @@ namespace ThorneTimer
         }
 
         /// <summary>
-        /// Checks if the active character has camped out (camp warning + inactivity threshold).
-        /// Fires CharacterCampedOut event if timeout is reached.
+        /// Checks whether the actively logging character should be auto-paused,
+        /// via either of two paths, and fires <see cref="CharacterCampedOut"/> if so:
+        ///   1. Camp-out  - a camp warning was seen and the camp inactivity
+        ///      threshold has since elapsed (the graceful /camp case).
+        ///   2. Inactivity fallback - no camp warning at all, but the log has gone
+        ///      completely silent for <see cref="InactivityTimeoutSeconds"/> (the
+        ///      ungraceful crash / Alt-F4 / link-dead case). Disabled when that
+        ///      value is 0.
         /// </summary>
         private void CheckCampOutTimeout(List<CharacterFileState> snapshot)
         {
             var activeState = snapshot.FirstOrDefault(s => s.IsActive);
             if (activeState == null) return;
-            if (!activeState.CampingOut) return;
 
-            // Check if inactivity threshold has been exceeded since camp warning
-            double secondsSinceCampStart = (DateTime.UtcNow - activeState.CampStartUtc).TotalSeconds;
-            if (secondsSinceCampStart >= CampInactivityThresholdSeconds)
+            // Path 1: graceful camp-out (camp warning + short inactivity threshold).
+            if (activeState.CampingOut)
             {
-                // Character has camped out — clear camp state, clear IsActive flag, and fire event
-                activeState.CampingOut = false;
-                activeState.CampStartUtc = DateTime.MinValue;
-                activeState.IsActive = false; // No longer actively logging
-
-                CharacterCampedOut?.Invoke(this, new CharacterSwitchedEventArgs
+                double secondsSinceCampStart = (DateTime.UtcNow - activeState.CampStartUtc).TotalSeconds;
+                if (secondsSinceCampStart >= CampInactivityThresholdSeconds)
                 {
-                    OldCharacterID = activeState.CharacterID,
-                    NewCharacterID = 0,  // No actively logging character
-                    NewCharacterName = ""
-                });
+                    FireAutoPause(activeState,
+                        $"Camp-out confirmed for charID={activeState.CharacterID} after {secondsSinceCampStart:F1}s inactivity");
+                }
+                return; // While camping, the inactivity fallback below does not apply.
             }
+
+            // Path 2: ungraceful-exit fallback (no camp warning, log went silent).
+            if (InactivityTimeoutSeconds > 0)
+            {
+                double secondsSinceActivity = (DateTime.UtcNow - activeState.LastActivityUtc).TotalSeconds;
+                if (secondsSinceActivity >= InactivityTimeoutSeconds)
+                {
+                    FireAutoPause(activeState,
+                        $"Inactivity fallback for charID={activeState.CharacterID}: no log activity for {secondsSinceActivity:F0}s (threshold {InactivityTimeoutSeconds}s); assuming client closed/disconnected");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Clears the active/camp state on a character and raises
+        /// <see cref="CharacterCampedOut"/> so the host pauses Character-scope
+        /// timers (active character -> "(None)"). Shared by the camp-out and
+        /// inactivity-fallback paths.
+        /// </summary>
+        private void FireAutoPause(CharacterFileState activeState, string reason)
+        {
+            activeState.CampingOut = false;
+            activeState.CampStartUtc = DateTime.MinValue;
+            activeState.IsActive = false; // No longer actively logging
+            activeState.CampScanTail = ""; // Reset boundary buffer
+
+            ThorneLog.Info($"{reason}; firing CharacterCampedOut");
+
+            CharacterCampedOut?.Invoke(this, new CharacterSwitchedEventArgs
+            {
+                OldCharacterID = activeState.CharacterID,
+                NewCharacterID = 0,  // No actively logging character
+                NewCharacterName = ""
+            });
         }
 
         /// <summary>
@@ -414,19 +578,43 @@ namespace ThorneTimer
                     // Update activity timestamp
                     state.LastActivityUtc = DateTime.UtcNow;
 
-                    // Camp-out pattern detection
-                    if (text.Contains(CampWarningPattern))
-                    {
-                        state.CampingOut = true;
-                        state.CampStartUtc = DateTime.UtcNow;
-                    }
-                    else if (text.Contains(CampAbandonPattern))
-                    {
-                        state.CampingOut = false;
-                        state.CampStartUtc = DateTime.MinValue;
-                    }
+                    // Camp-out pattern detection (boundary-safe; see ScanForCampPatterns)
+                    ScanForCampPatterns(state, text);
 
                     LogChunkReceived?.Invoke(this, new LogChunkReceivedEventArgs { Text = text });
+                }
+            }
+        }
+
+        /// <summary>
+        /// Reads new bytes from the actively logging character's file purely to
+        /// detect camp-out patterns, WITHOUT firing LogChunkReceived. Used when the
+        /// active character differs from the selected (viewed) character so camp-out
+        /// is still detected during browsing mode. Advances LastFileSize and updates
+        /// the activity timestamp, mirroring ReadNewContent minus the timer-engine
+        /// dispatch.
+        /// </summary>
+        private void ScanActiveFileForCamp(CharacterFileState state, CancellationToken token)
+        {
+            using (var fs = new FileStream(state.FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            {
+                fs.Seek(state.LastFileSize, SeekOrigin.Begin);
+                var buffer = new byte[1024];
+
+                while (!token.IsCancellationRequested)
+                {
+                    var bytesRead = fs.Read(buffer, 0, buffer.Length);
+                    state.LastFileSize += bytesRead;
+
+                    if (bytesRead == 0) break;
+
+                    var text = ASCIIEncoding.ASCII.GetString(buffer, 0, bytesRead);
+
+                    // Update activity timestamp
+                    state.LastActivityUtc = DateTime.UtcNow;
+
+                    // Camp-out pattern detection (boundary-safe; see ScanForCampPatterns)
+                    ScanForCampPatterns(state, text);
                 }
             }
         }

@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Windows.Forms;
 
@@ -134,6 +136,11 @@ namespace ThorneTimer
         // Lock for thread safety between poll thread and UI thread
         private readonly object syncLock = new object();
 
+        // Opt-in match-performance aggregator (keyword-power-features.md Section 7.1).
+        // Phase 1: measures the CURRENT keyword path with no behavior change.
+        // Near-zero overhead when ThorneLog is disabled.
+        private readonly MatchStats matchStats = new MatchStats();
+
         /// <summary>
         /// Resolves a style name to its <see cref="TimeFormat"/> so countdown text
         /// the runtime produces (grid Remaining column, frozen character state)
@@ -247,6 +254,9 @@ namespace ThorneTimer
                 ThorneLog.Info($"LoadTimers complete: {timerStates.Count} timers, {runningTimers.Count} running");
                 ThorneLog.DumpTimerStates("LoadTimers-end", timerStates);
             }
+
+            // Refresh the tier histogram (read-only; informational in Phase 1).
+            UpdateTierHistogram();
         }
 
         /// <summary>
@@ -269,6 +279,131 @@ namespace ThorneTimer
                     });
                 }
             }
+
+            // Refresh the tier histogram (read-only; informational in Phase 1).
+            UpdateTierHistogram();
+        }
+
+        // -- Phase 1 performance instrumentation (keyword-power-features.md Section 7) --
+
+        /// <summary>
+        /// Classifies the SHAPE of every loaded keyword field into the cheapest
+        /// matching tier it would use (literal / wildcard / regex) and reports the
+        /// histogram via <see cref="MatchStats.SetTierHistogram"/>. This is purely
+        /// observational in Phase 1 - it does not change how keywords are matched;
+        /// it only shows how much of a tome is on the fast path. Runs off the hot
+        /// path (load/edit time only).
+        /// </summary>
+        private void UpdateTierHistogram()
+        {
+            if (!ThorneLog.Enabled) return;
+
+            int literal = 0, wildcard = 0, regex = 0;
+
+            void Tally(string keywordField)
+            {
+                if (string.IsNullOrEmpty(keywordField)) return;
+                var terms = keywordField.Split('|');
+                foreach (var raw in terms)
+                {
+                    string term = raw.Trim();
+                    if (term.Length == 0) continue;
+                    switch (ClassifyTier(term))
+                    {
+                        case 2: regex++; break;
+                        case 1: wildcard++; break;
+                        default: literal++; break;
+                    }
+                }
+            }
+
+            lock (syncLock)
+            {
+                foreach (var ts in timerStates)
+                {
+                    Tally(ts.StartKeyword);
+                    Tally(ts.EndKeyword);
+                }
+                foreach (var cat in categoryStates)
+                {
+                    Tally(cat.StartKeyword);
+                    Tally(cat.EndKeyword);
+                }
+            }
+
+            matchStats.SetTierHistogram(literal, wildcard, regex);
+        }
+
+        /// <summary>
+        /// Returns the matching tier a single (already trimmed, non-empty) keyword
+        /// term WOULD use under the tiered model: 0 = literal, 1 = wildcard (glob
+        /// '*'/'?'), 2 = explicit regex (anchored '^...$' or '/.../' escape hatch).
+        /// Phase 1 only counts these; later phases compile them.
+        /// </summary>
+        private static int ClassifyTier(string term)
+        {
+            // Explicit regex escape hatch: anchored or /.../ wrapped.
+            if ((term.Length >= 2 && term[0] == '/' && term[term.Length - 1] == '/') ||
+                term[0] == '^' || term[term.Length - 1] == '$')
+                return 2;
+
+            // Glob sugar: contains '*' or '?'.
+            if (term.IndexOf('*') >= 0 || term.IndexOf('?') >= 0)
+                return 1;
+
+            return 0; // plain literal - fast path
+        }
+
+        /// <summary>
+        /// Replay benchmark (keyword-power-features.md Section 7.3). Feeds a captured EQ
+        /// log file through <see cref="ProcessLogText"/> against the currently loaded
+        /// tome in the same 1024-byte ASCII chunks <c>LogMonitor</c> uses, then emits
+        /// the aggregated PERF summary. This produces an apples-to-apples before/after
+        /// number per tier and prevents "it feels fine" regressions.
+        ///
+        /// Phase 1 captures the BASELINE (today's literal-only code) so every later
+        /// change is measured against it. Returns the number of chunks replayed, or
+        /// -1 if the file could not be read. Requires logging to be enabled to record
+        /// numbers (otherwise sampling is a no-op).
+        /// </summary>
+        /// <param name="logFilePath">Path to a captured EQ log file to replay.</param>
+        /// <param name="chunkSize">Chunk size in bytes (defaults to LogMonitor's 1024).</param>
+        public long RunReplayBenchmark(string logFilePath, int chunkSize = 1024)
+        {
+            if (string.IsNullOrEmpty(logFilePath) || !File.Exists(logFilePath))
+            {
+                ThorneLog.Warn($"RunReplayBenchmark: file not found: {logFilePath}");
+                return -1;
+            }
+            if (chunkSize <= 0) chunkSize = 1024;
+
+            long chunks = 0;
+            try
+            {
+                ThorneLog.Info($"PERF [replay-start]: {Path.GetFileName(logFilePath)} chunkSize={chunkSize}");
+                using (var sw = ThorneLog.Time("replay total"))
+                using (var fs = new FileStream(logFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                {
+                    byte[] buffer = new byte[chunkSize];
+                    int read;
+                    while ((read = fs.Read(buffer, 0, buffer.Length)) > 0)
+                    {
+                        // LogMonitor reads ASCII chunks; mirror that here.
+                        string text = System.Text.Encoding.ASCII.GetString(buffer, 0, read);
+                        ProcessLogText(text);
+                        chunks++;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ThorneLog.Error("RunReplayBenchmark failed", ex);
+                return -1;
+            }
+
+            matchStats.FlushNow("replay");
+            ThorneLog.Info($"PERF [replay-end]: {chunks} chunk(s) replayed");
+            return chunks;
         }
 
         /// <summary>
@@ -277,17 +412,28 @@ namespace ThorneTimer
         /// </summary>
         public void ProcessLogText(string chunk)
         {
+            // Phase 1 instrumentation: measure the CURRENT match path with no
+            // behavior change (keyword-power-features.md Section 7.1). The Stopwatch is
+            // only allocated/read when logging is enabled, so production pays
+            // nothing. Counters tally hits and individual keyword comparisons.
+            bool measure = ThorneLog.Enabled;
+            Stopwatch sw = measure ? Stopwatch.StartNew() : null;
+            long matches = 0;
+            long evals = 0;
+
             lock (syncLock)
             {
                 // Process Categories
                 foreach (var cat in categoryStates)
                 {
-                    if (cat.StartKeyword.Length > 0 && KeywordMatches(cat.StartKeyword, chunk, caseSensitive: false))
+                    if (cat.StartKeyword.Length > 0 && (evals++ >= 0) && KeywordMatches(cat.StartKeyword, chunk, caseSensitive: false))
                     {
+                        matches++;
                         ActivateCategoryTimers(cat.CategoryID, true);
                     }
-                    else if (cat.EndKeyword.Length > 0 && KeywordMatches(cat.EndKeyword, chunk, caseSensitive: false))
+                    else if (cat.EndKeyword.Length > 0 && (evals++ >= 0) && KeywordMatches(cat.EndKeyword, chunk, caseSensitive: false))
                     {
+                        matches++;
                         if (cat.AutoStop == 1)
                         {
                             ActivateCategoryTimers(cat.CategoryID, false);
@@ -301,8 +447,11 @@ namespace ThorneTimer
                     if (!ts.IsActive) continue;
 
                     bool caseSensitive = ts.CaseYn != 0;
+                    evals += 2;
                     bool containsStart = KeywordMatches(ts.StartKeyword, chunk, caseSensitive);
                     bool containsEnd = KeywordMatches(ts.EndKeyword, chunk, caseSensitive);
+                    if (containsStart) matches++;
+                    if (containsEnd) matches++;
 
                     if (containsStart && ts.StartKeyword.Length > 0)
                     {
@@ -330,6 +479,12 @@ namespace ThorneTimer
                         }
                     }
                 }
+            }
+
+            if (measure)
+            {
+                sw.Stop();
+                matchStats.Sample(sw.Elapsed.TotalMilliseconds, matches, evals);
             }
         }
 
